@@ -1,0 +1,35 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "gateway-service"
+    static_configs:
+      - targets: ["gateway-service:8080"]
+
+  - job_name: "posts-service"
+    static_configs:
+      - targets: ["posts-service:8081"]
+
+  - job_name: "feed-service"
+    static_configs:
+      - targets: ["feed-service:8082"]
+
+  - job_name: "comments-service"
+    static_configs:
+      - targets: ["comments-service:8083"]
+
+  - job_name: "likes-service"
+    static_configs:
+      - targets: ["likes-service:8084"]
+
+  - job_name: "users-service"
+    static_configs:
+      - targets: ["users-service:8085"]
+
+  - job_name: "media-service"
+    static_configs:
+      - targets: ["media-service:8086"]
+
+  - job_name: "notification-service"
+    static_configs:
+      - targets: ["notification-service:8087"]

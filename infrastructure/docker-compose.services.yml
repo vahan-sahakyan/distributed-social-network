@@ -1,0 +1,109 @@
+services:
+  gateway-service:
+    build:
+      context: ../
+      dockerfile: services/gateway-service/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      PORT: "8080"
+      POSTS_SERVICE_URL: http://posts-service:8081
+      FEED_SERVICE_URL: http://feed-service:8082
+      COMMENTS_SERVICE_URL: http://comments-service:8083
+      LIKES_SERVICE_URL: http://likes-service:8084
+      USERS_SERVICE_URL: http://users-service:8085
+      MEDIA_SERVICE_URL: http://media-service:8086
+    depends_on:
+      - posts-service
+      - feed-service
+      - comments-service
+      - likes-service
+      - users-service
+      - media-service
+
+  posts-service:
+    build:
+      context: ../
+      dockerfile: services/posts-service/Dockerfile
+    environment:
+      PORT: "8081"
+      DATABASE_URL: postgres://postgres:postgres@posts-db:5432/posts?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+    depends_on:
+      - posts-db
+      - redpanda
+
+  comments-service:
+    build:
+      context: ../
+      dockerfile: services/comments-service/Dockerfile
+    environment:
+      PORT: "8083"
+      DATABASE_URL: postgres://postgres:postgres@comments-db:5432/comments?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+    depends_on:
+      - comments-db
+      - redpanda
+
+  likes-service:
+    build:
+      context: ../
+      dockerfile: services/likes-service/Dockerfile
+    environment:
+      PORT: "8084"
+      DATABASE_URL: postgres://postgres:postgres@likes-db:5432/likes?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+    depends_on:
+      - likes-db
+      - redpanda
+
+  feed-service:
+    build:
+      context: ../
+      dockerfile: services/feed-service/Dockerfile
+    environment:
+      PORT: "8082"
+      DATABASE_URL: postgres://postgres:postgres@feed-db:5432/feed?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - feed-db
+      - redpanda
+      - redis
+
+  users-service:
+    build:
+      context: ../
+      dockerfile: services/users-service/Dockerfile
+    environment:
+      PORT: "8085"
+      DATABASE_URL: postgres://postgres:postgres@users-db:5432/users?sslmode=disable
+    depends_on:
+      - users-db
+
+  media-service:
+    build:
+      context: ../
+      dockerfile: services/media-service/Dockerfile
+    environment:
+      PORT: "8086"
+      KAFKA_BROKERS: redpanda:9092
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: images
+    depends_on:
+      - minio
+      - redpanda
+
+  notification-service:
+    build:
+      context: ../
+      dockerfile: services/notification-service/Dockerfile
+    environment:
+      PORT: "8087"
+      DATABASE_URL: postgres://postgres:postgres@notifications-db:5432/notifications?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+    depends_on:
+      - notifications-db
+      - redpanda

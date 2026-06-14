@@ -1,0 +1,13 @@
+go 1.24
+
+use (
+	./pkg
+	./services/gateway-service
+	./services/posts-service
+	./services/comments-service
+	./services/likes-service
+	./services/feed-service
+	./services/users-service
+	./services/media-service
+	./services/notification-service
+)
