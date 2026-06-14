@@ -167,21 +167,13 @@ Optimizations:
 ```go
 type Post struct {
     ID string
-
     Text string
-
     AuthorID string
-
     ImageID string
-
     Likes int
-
     TopLikes []Like
-
     Comments int
-
     TopComment Comment
-
     CreatedAt time.Time
 }
 ```
@@ -193,9 +185,7 @@ type Post struct {
 ```go
 type Like struct {
     ID string
-
     UserID string
-
     EntityID string
 }
 ```
@@ -213,15 +203,10 @@ EntityID may reference:
 ```go
 type Comment struct {
     ID string
-
     UserID string
-
     EntityID string
-
     Text string
-
     Likes int
-
     CreatedAt time.Time
 }
 ```
@@ -238,11 +223,8 @@ EntityID may reference:
 ```go
 type Image struct {
     ID string
-
     Likes int
-
     Comments int
-
     TopLikes []Like
 }
 ```
@@ -387,19 +369,12 @@ System consists of independent microservices.
 
 ```text
 gateway-service
-
 posts-service
-
 comments-service
-
 likes-service
-
 feed-service
-
 users-service
-
 media-service
-
 notification-service
 ```
 
@@ -413,11 +388,8 @@ Separate write and read responsibilities.
 
 ```text
 POST /posts
-
 POST /likes
-
 POST /comments
-
 POST /images/upload
 ```
 
@@ -431,9 +403,7 @@ Then publishes events.
 
 ```text
 GET /feed/home
-
 GET /feed/user/{id}
-
 GET /posts/{id}/comments
 ```
 
@@ -461,15 +431,10 @@ Services communicate through events.
 
 ```text
 post.created
-
 comment.created
-
 like.created
-
 image.uploaded
-
 feed.updated
-
 notification.created
 ```
 
@@ -528,13 +493,9 @@ Separate database per service.
 
 ```text
 posts-db
-
 comments-db
-
 likes-db
-
 feed-db
-
 users-db
 ```
 
@@ -657,29 +618,17 @@ Flow:
 
 ```text
 Post Created
-
 ↓
-
 posts-service stores post
-
 ↓
-
 publish event post.created
-
 ↓
-
 feed-service receives event
-
 ↓
-
 find followers
-
 ↓
-
 create feed entries
-
 ↓
-
 store denormalized feed
 ```
 
@@ -731,17 +680,11 @@ Pipeline:
 
 ```text
 Upload image
-
 ↓
-
 Store in MinIO
-
 ↓
-
 Generate metadata
-
 ↓
-
 Publish image.uploaded event
 ```
 
@@ -842,41 +785,23 @@ Optional:
 distributed-social-network/
 
 services/
-
   gateway-service/
-
   posts-service/
-
   comments-service/
-
   likes-service/
-
   feed-service/
-
   users-service/
-
   media-service/
-
   notification-service/
-
 infrastructure/
-
   docker-compose.yml
-
 deploy/
-
   kubernetes/
-
 monitoring/
-
   prometheus/
-
   grafana/
-
   loki/
-
 docs/
-
   architecture.md
 ```
 
