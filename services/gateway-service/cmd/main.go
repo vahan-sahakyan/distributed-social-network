@@ -38,6 +38,7 @@ func registerRoutes(app *fiber.App) {
 	likesURL := envOrDefault("LIKES_SERVICE_URL", "http://localhost:8084")
 	usersURL := envOrDefault("USERS_SERVICE_URL", "http://localhost:8085")
 	mediaURL := envOrDefault("MEDIA_SERVICE_URL", "http://localhost:8086")
+	notificationsURL := envOrDefault("NOTIFICATIONS_SERVICE_URL", "http://localhost:8087")
 
 	app.All("/api/v1/posts/*", func(c *fiber.Ctx) error {
 		return proxy.Forward(postsURL + c.Path())(c)
@@ -61,6 +62,10 @@ func registerRoutes(app *fiber.App) {
 
 	app.All("/api/v1/media/*", func(c *fiber.Ctx) error {
 		return proxy.Forward(mediaURL + c.Path())(c)
+	})
+
+	app.All("/api/v1/notifications/*", func(c *fiber.Ctx) error {
+		return proxy.Forward(notificationsURL + c.Path())(c)
 	})
 
 	app.Get("/health", func(c *fiber.Ctx) error {
