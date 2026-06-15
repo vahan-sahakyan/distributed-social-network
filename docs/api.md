@@ -1,5 +1,9 @@
 # API Reference
 
+[← README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · **API** · [Infrastructure](infrastructure.md) · [Development](development.md)
+
+---
+
 All endpoints are accessed through the gateway at `http://localhost:8080`.
 
 ## Base URL

@@ -1,5 +1,9 @@
 # Architecture
 
+[← README](../README.md) · **Architecture** · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md)
+
+---
+
 ## Overview
 
 The system follows an **event-driven microservices** architecture with CQRS (Command Query Responsibility Segregation) for the feed system.

@@ -1,5 +1,9 @@
 # Infrastructure
 
+[← README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · **Infrastructure** · [Development](development.md)
+
+---
+
 ## Container Overview
 
 The system runs **24 containers** via two Docker Compose files:
