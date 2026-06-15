@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/vahan/distributed-social-network/comments-service/internal/model"
+	"github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/model"
 )
 
 type Repository struct {

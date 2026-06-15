@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/segmentio/kafka-go"
-	"github.com/vahan/distributed-social-network/notification-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/service"
 )
 
 type Consumer struct {

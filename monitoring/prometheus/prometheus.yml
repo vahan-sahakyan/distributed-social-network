@@ -33,3 +33,11 @@ scrape_configs:
   - job_name: "notification-service"
     static_configs:
       - targets: ["notification-service:8087"]
+
+  - job_name: "event-writer-service"
+    static_configs:
+      - targets: ["event-writer-service:8088"]
+
+  - job_name: "cache-rebuilder-service"
+    static_configs:
+      - targets: ["cache-rebuilder-service:8089"]

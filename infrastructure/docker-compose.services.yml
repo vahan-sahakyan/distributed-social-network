@@ -27,7 +27,8 @@ services:
       dockerfile: services/posts-service/Dockerfile
     environment:
       PORT: "8081"
-      DATABASE_URL: postgres://postgres:postgres@posts-db:5432/posts?sslmode=disable
+      SCYLLA_HOSTS: posts-db:9042
+      SCYLLA_KEYSPACE: posts
       KAFKA_BROKERS: redpanda:9092
     depends_on:
       - posts-db
@@ -63,13 +64,11 @@ services:
       dockerfile: services/feed-service/Dockerfile
     environment:
       PORT: "8082"
-      DATABASE_URL: postgres://postgres:postgres@feed-db:5432/feed?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
-      REDIS_URL: redis://redis:6379
+      MEMCACHED_ADDR: memcached:11211
     depends_on:
-      - feed-db
       - redpanda
-      - redis
+      - memcached
 
   users-service:
     build:
@@ -107,3 +106,30 @@ services:
     depends_on:
       - notifications-db
       - redpanda
+
+  event-writer-service:
+    build:
+      context: ../
+      dockerfile: services/event-writer-service/Dockerfile
+    environment:
+      PORT: "8088"
+      KAFKA_BROKERS: redpanda:9092
+      CLICKHOUSE_ADDR: clickhouse:9000
+      CLICKHOUSE_DB: default
+    depends_on:
+      - redpanda
+      - clickhouse
+
+  cache-rebuilder-service:
+    build:
+      context: ../
+      dockerfile: services/cache-rebuilder-service/Dockerfile
+    environment:
+      PORT: "8089"
+      CLICKHOUSE_ADDR: clickhouse:9000
+      CLICKHOUSE_DB: default
+      MEMCACHED_ADDR: memcached:11211
+    depends_on:
+      - clickhouse
+      - memcached
+

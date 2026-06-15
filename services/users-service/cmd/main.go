@@ -7,10 +7,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/vahan/distributed-social-network/pkg/database"
-	"github.com/vahan/distributed-social-network/users-service/internal/handler"
-	"github.com/vahan/distributed-social-network/users-service/internal/repository"
-	"github.com/vahan/distributed-social-network/users-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
+	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/handler"
+	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/repository"
+	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/service"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"

@@ -1,11 +1,11 @@
-module github.com/vahan/distributed-social-network/media-service
+module github.com/vahan-sahakyan/distributed-social-network/media-service
 
 go 1.24
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/minio/minio-go/v7 v7.0.80
-	github.com/vahan/distributed-social-network/pkg v0.0.0
+	github.com/vahan-sahakyan/distributed-social-network/pkg v0.0.0
 )
 
 require (
@@ -33,4 +33,4 @@ require (
 	golang.org/x/text v0.21.0 // indirect
 )
 
-replace github.com/vahan/distributed-social-network/pkg => ../../pkg
+replace github.com/vahan-sahakyan/distributed-social-network/pkg => ../../pkg

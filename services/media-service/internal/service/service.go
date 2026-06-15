@@ -4,9 +4,9 @@ import (
 	"context"
 	"io"
 
-	"github.com/vahan/distributed-social-network/media-service/internal/storage"
-	"github.com/vahan/distributed-social-network/pkg/broker"
-	"github.com/vahan/distributed-social-network/pkg/id"
+	"github.com/vahan-sahakyan/distributed-social-network/media-service/internal/storage"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 )
 
 type Image struct {

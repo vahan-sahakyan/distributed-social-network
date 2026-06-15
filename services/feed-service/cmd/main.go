@@ -7,12 +7,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/vahan/distributed-social-network/feed-service/internal/consumer"
-	"github.com/vahan/distributed-social-network/feed-service/internal/handler"
-	"github.com/vahan/distributed-social-network/feed-service/internal/repository"
-	"github.com/vahan/distributed-social-network/feed-service/internal/service"
-	"github.com/vahan/distributed-social-network/pkg/cache"
-	"github.com/vahan/distributed-social-network/pkg/database"
+	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/consumer"
+	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/handler"
+	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/repository"
+	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/cache"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -22,17 +21,15 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	db, err := database.NewPostgres(ctx, os.Getenv("DATABASE_URL"))
-	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+	memcachedAddr := os.Getenv("MEMCACHED_ADDR")
+	if memcachedAddr == "" {
+		memcachedAddr = "localhost:11211"
 	}
-	defer db.Close()
 
-	redisClient := cache.NewRedis(os.Getenv("REDIS_URL"))
-	defer redisClient.Close()
+	mc := cache.NewMemcached(memcachedAddr)
 
-	repo := repository.New(db)
-	svc := service.New(repo, redisClient)
+	repo := repository.New(mc)
+	svc := service.New(repo)
 	h := handler.New(svc)
 
 	// start event consumer for fanout-on-write

@@ -3,10 +3,10 @@ package service
 import (
 	"context"
 
-	"github.com/vahan/distributed-social-network/likes-service/internal/model"
-	"github.com/vahan/distributed-social-network/likes-service/internal/repository"
-	"github.com/vahan/distributed-social-network/pkg/broker"
-	"github.com/vahan/distributed-social-network/pkg/id"
+	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/model"
+	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/repository"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 )
 
 type Service struct {

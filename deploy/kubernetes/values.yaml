@@ -21,16 +21,28 @@ services:
     port: 8086
   notifications:
     port: 8087
+  event-writer:
+    port: 8088
+  cache-rebuilder:
+    port: 8089
 
 postgres:
   user: postgres
   password: postgres
 
-redis:
-  url: redis://redis:6379
+memcached:
+  addr: memcached:11211
 
 kafka:
   brokers: redpanda:9092
+
+scylla:
+  hosts: posts-db:9042
+  keyspace: posts
+
+clickhouse:
+  addr: clickhouse:9000
+  database: default
 
 minio:
   endpoint: minio:9000

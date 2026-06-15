@@ -10,4 +10,6 @@ use (
 	./services/users-service
 	./services/media-service
 	./services/notification-service
+	./services/event-writer-service
+	./services/cache-rebuilder-service
 )

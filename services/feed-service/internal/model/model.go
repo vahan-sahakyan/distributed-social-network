@@ -3,7 +3,6 @@ package model
 import "time"
 
 type FeedItem struct {
-	UserID        string    `json:"user_id"`
 	PostID        string    `json:"post_id"`
 	AuthorID      string    `json:"author_id"`
 	Text          string    `json:"text"`

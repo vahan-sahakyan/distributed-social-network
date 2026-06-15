@@ -1,4 +1,4 @@
-module github.com/vahan/distributed-social-network/notification-service
+module github.com/vahan-sahakyan/distributed-social-network/notification-service
 
 go 1.24
 
@@ -6,7 +6,7 @@ require (
 	github.com/gofiber/fiber/v2 v2.52.5
 	github.com/jackc/pgx/v5 v5.7.2
 	github.com/segmentio/kafka-go v0.4.47
-	github.com/vahan/distributed-social-network/pkg v0.0.0
+	github.com/vahan-sahakyan/distributed-social-network/pkg v0.0.0
 )
 
 require (
@@ -30,4 +30,4 @@ require (
 	golang.org/x/text v0.21.0 // indirect
 )
 
-replace github.com/vahan/distributed-social-network/pkg => ../../pkg
+replace github.com/vahan-sahakyan/distributed-social-network/pkg => ../../pkg

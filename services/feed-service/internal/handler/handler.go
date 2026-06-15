@@ -2,7 +2,7 @@ package handler
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/vahan/distributed-social-network/feed-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/service"
 )
 
 type Handler struct {
@@ -14,13 +14,12 @@ func New(svc *service.Service) *Handler {
 }
 
 func (h *Handler) GetHomeFeed(c *fiber.Ctx) error {
-	// TODO: extract user_id from auth context
 	userID := c.Query("user_id")
 	if userID == "" {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "user_id required"})
 	}
 
-	feed, err := h.svc.GetHomeFeed(c.Context(), userID)
+	feed, err := h.svc.GetHomeFeed(userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to get feed"})
 	}
@@ -31,7 +30,7 @@ func (h *Handler) GetHomeFeed(c *fiber.Ctx) error {
 func (h *Handler) GetUserFeed(c *fiber.Ctx) error {
 	userID := c.Params("user_id")
 
-	feed, err := h.svc.GetUserFeed(c.Context(), userID)
+	feed, err := h.svc.GetUserFeed(userID)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to get feed"})
 	}

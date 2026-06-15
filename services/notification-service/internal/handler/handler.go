@@ -2,7 +2,7 @@ package handler
 
 import (
 	"github.com/gofiber/fiber/v2"
-	"github.com/vahan/distributed-social-network/notification-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/service"
 )
 
 type Handler struct {

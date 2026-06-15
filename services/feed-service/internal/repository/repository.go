@@ -1,71 +1,60 @@
 package repository
 
 import (
-	"context"
+	"encoding/json"
+	"fmt"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/vahan/distributed-social-network/feed-service/internal/model"
+	"github.com/bradfitz/gomemcache/memcache"
+	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/model"
 )
 
 type Repository struct {
-	db *pgxpool.Pool
+	mc *memcache.Client
 }
 
-func New(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db}
+func New(mc *memcache.Client) *Repository {
+	return &Repository{mc: mc}
 }
 
-func (r *Repository) InsertFeedItem(ctx context.Context, item *model.FeedItem) error {
-	_, err := r.db.Exec(ctx,
-		`INSERT INTO feed_items (user_id, post_id, author_id, text, likes_count, comments_count, image_url, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		item.UserID, item.PostID, item.AuthorID, item.Text, item.LikesCount, item.CommentsCount, item.ImageURL, item.CreatedAt,
-	)
-	return err
-}
-
-func (r *Repository) GetHomeFeed(ctx context.Context, userID string, limit int) ([]model.FeedItem, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT user_id, post_id, author_id, text, likes_count, comments_count, image_url, created_at
-		 FROM feed_items WHERE user_id = $1 ORDER BY created_at DESC LIMIT $2`,
-		userID, limit,
-	)
+func (r *Repository) GetFeed(userID string) ([]model.FeedItem, error) {
+	key := fmt.Sprintf("feed:%s", userID)
+	item, err := r.mc.Get(key)
+	if err == memcache.ErrCacheMiss {
+		return nil, nil
+	}
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
 	var items []model.FeedItem
-	for rows.Next() {
-		var item model.FeedItem
-		if err := rows.Scan(&item.UserID, &item.PostID, &item.AuthorID, &item.Text,
-			&item.LikesCount, &item.CommentsCount, &item.ImageURL, &item.CreatedAt); err != nil {
-			return nil, err
-		}
-		items = append(items, item)
+	if err := json.Unmarshal(item.Value, &items); err != nil {
+		return nil, err
 	}
 	return items, nil
 }
 
-func (r *Repository) GetUserFeed(ctx context.Context, authorID string, limit int) ([]model.FeedItem, error) {
-	rows, err := r.db.Query(ctx,
-		`SELECT user_id, post_id, author_id, text, likes_count, comments_count, image_url, created_at
-		 FROM feed_items WHERE author_id = $1 ORDER BY created_at DESC LIMIT $2`,
-		authorID, limit,
-	)
+func (r *Repository) SetFeed(userID string, items []model.FeedItem) error {
+	key := fmt.Sprintf("feed:%s", userID)
+	data, err := json.Marshal(items)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	defer rows.Close()
+	return r.mc.Set(&memcache.Item{
+		Key:        key,
+		Value:      data,
+		Expiration: 3600, // 1 hour TTL
+	})
+}
 
-	var items []model.FeedItem
-	for rows.Next() {
-		var item model.FeedItem
-		if err := rows.Scan(&item.UserID, &item.PostID, &item.AuthorID, &item.Text,
-			&item.LikesCount, &item.CommentsCount, &item.ImageURL, &item.CreatedAt); err != nil {
-			return nil, err
-		}
-		items = append(items, item)
+func (r *Repository) AppendToFeed(userID string, item *model.FeedItem) error {
+	existing, err := r.GetFeed(userID)
+	if err != nil {
+		return err
 	}
-	return items, nil
+	items := append([]model.FeedItem{*item}, existing...)
+	// Keep max 100 items in feed cache
+	if len(items) > 100 {
+		items = items[:100]
+	}
+	return r.SetFeed(userID, items)
 }

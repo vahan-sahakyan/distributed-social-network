@@ -4,10 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/vahan/distributed-social-network/pkg/broker"
-	"github.com/vahan/distributed-social-network/pkg/id"
-	"github.com/vahan/distributed-social-network/posts-service/internal/model"
-	"github.com/vahan/distributed-social-network/posts-service/internal/repository"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
+	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/model"
+	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/repository"
 )
 
 type Service struct {

@@ -7,11 +7,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/vahan/distributed-social-network/pkg/broker"
-	"github.com/vahan/distributed-social-network/pkg/database"
-	"github.com/vahan/distributed-social-network/posts-service/internal/handler"
-	"github.com/vahan/distributed-social-network/posts-service/internal/repository"
-	"github.com/vahan/distributed-social-network/posts-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
+	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/handler"
+	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/repository"
+	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/service"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -21,9 +21,18 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 
-	db, err := database.NewPostgres(ctx, os.Getenv("DATABASE_URL"))
+	scyllaHosts := os.Getenv("SCYLLA_HOSTS")
+	if scyllaHosts == "" {
+		scyllaHosts = "localhost:9042"
+	}
+	scyllaKeyspace := os.Getenv("SCYLLA_KEYSPACE")
+	if scyllaKeyspace == "" {
+		scyllaKeyspace = "posts"
+	}
+
+	db, err := database.NewScyllaDB(scyllaHosts, scyllaKeyspace)
 	if err != nil {
-		log.Fatalf("failed to connect to database: %v", err)
+		log.Fatalf("failed to connect to scylladb: %v", err)
 	}
 	defer db.Close()
 

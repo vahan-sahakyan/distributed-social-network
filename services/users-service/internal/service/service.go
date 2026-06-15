@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/vahan/distributed-social-network/pkg/id"
-	"github.com/vahan/distributed-social-network/users-service/internal/model"
-	"github.com/vahan/distributed-social-network/users-service/internal/repository"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
+	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/model"
+	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/repository"
 )
 
 type Service struct {

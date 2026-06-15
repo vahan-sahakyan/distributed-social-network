@@ -4,9 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/vahan/distributed-social-network/notification-service/internal/model"
-	"github.com/vahan/distributed-social-network/notification-service/internal/repository"
-	"github.com/vahan/distributed-social-network/pkg/id"
+	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/model"
+	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/repository"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 )
 
 type Service struct {

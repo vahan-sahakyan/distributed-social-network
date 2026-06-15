@@ -1,4 +1,4 @@
-module github.com/vahan/distributed-social-network/gateway-service
+module github.com/vahan-sahakyan/distributed-social-network/gateway-service
 
 go 1.24
 
@@ -18,4 +18,4 @@ require (
 	golang.org/x/sys v0.15.0 // indirect
 )
 
-replace github.com/vahan/distributed-social-network/pkg => ../../pkg
+replace github.com/vahan-sahakyan/distributed-social-network/pkg => ../../pkg

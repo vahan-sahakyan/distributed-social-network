@@ -1,15 +1,12 @@
 services:
   # --- Databases ---
   posts-db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: posts
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+    image: scylladb/scylla:latest
+    command: --smp 1 --memory 512M --overprovisioned 1
     ports:
-      - "5432:5432"
+      - "9042:9042"
     volumes:
-      - posts-db-data:/var/lib/postgresql/data
+      - posts-db-data:/var/lib/scylla
 
   comments-db:
     image: postgres:16-alpine
@@ -33,17 +30,6 @@ services:
     volumes:
       - likes-db-data:/var/lib/postgresql/data
 
-  feed-db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: feed
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    ports:
-      - "5435:5432"
-    volumes:
-      - feed-db-data:/var/lib/postgresql/data
-
   users-db:
     image: postgres:16-alpine
     environment:
@@ -65,6 +51,19 @@ services:
       - "5437:5432"
     volumes:
       - notifications-db-data:/var/lib/postgresql/data
+
+  # --- Event Store ---
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ""
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "8123:8123"
+      - "9009:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
 
   # --- Message Broker ---
   redpanda:
@@ -92,12 +91,10 @@ services:
       - redpanda
 
   # --- Cache ---
-  redis:
-    image: redis:7-alpine
+  memcached:
+    image: memcached:1.6-alpine
     ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
+      - "11211:11211"
 
   # --- Object Storage ---
   minio:
@@ -147,11 +144,10 @@ volumes:
   posts-db-data:
   comments-db-data:
   likes-db-data:
-  feed-db-data:
   users-db-data:
   notifications-db-data:
+  clickhouse-data:
   redpanda-data:
-  redis-data:
   minio-data:
   prometheus-data:
   grafana-data:
