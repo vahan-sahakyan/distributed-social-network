@@ -11,6 +11,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/event-writer-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
 )
 
@@ -40,6 +41,9 @@ func main() {
 
 	// Health endpoint
 	app := fiber.New(fiber.Config{AppName: "event-writer-service"})
+	prometheus := fiberprometheus.NewWithDefaultRegistry("event-writer-service")
+	prometheus.RegisterAt(app, "/metrics")
+	app.Use(prometheus.Middleware)
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})

@@ -4,6 +4,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/proxy"
@@ -15,6 +16,10 @@ func main() {
 	})
 
 	app.Use(logger.New())
+
+	prometheus := fiberprometheus.NewWithDefaultRegistry("gateway-service")
+	prometheus.RegisterAt(app, "/metrics")
+	app.Use(prometheus.Middleware)
 
 	registerRoutes(app)
 

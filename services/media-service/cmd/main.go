@@ -12,6 +12,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/media-service/internal/storage"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 )
@@ -40,6 +41,9 @@ func main() {
 		AppName:   "media-service",
 		BodyLimit: 50 * 1024 * 1024, // 50MB
 	})
+	prometheus := fiberprometheus.NewWithDefaultRegistry("media-service")
+	prometheus.RegisterAt(app, "/metrics")
+	app.Use(prometheus.Middleware)
 	app.Use(logger.New())
 
 	api := app.Group("/api/v1/media")

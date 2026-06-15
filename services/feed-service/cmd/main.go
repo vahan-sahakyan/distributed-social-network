@@ -13,6 +13,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/service"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/cache"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 )
@@ -37,6 +38,9 @@ func main() {
 	go cons.Start(ctx)
 
 	app := fiber.New(fiber.Config{AppName: "feed-service"})
+	prometheus := fiberprometheus.NewWithDefaultRegistry("feed-service")
+	prometheus.RegisterAt(app, "/metrics")
+	app.Use(prometheus.Middleware)
 	app.Use(logger.New())
 
 	api := app.Group("/api/v1/feed")

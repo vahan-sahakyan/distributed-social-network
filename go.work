@@ -1,15 +1,15 @@
-go 1.24
+go 1.24.0
 
 use (
 	./pkg
-	./services/gateway-service
-	./services/posts-service
+	./services/cache-rebuilder-service
 	./services/comments-service
-	./services/likes-service
+	./services/event-writer-service
 	./services/feed-service
-	./services/users-service
+	./services/gateway-service
+	./services/likes-service
 	./services/media-service
 	./services/notification-service
-	./services/event-writer-service
-	./services/cache-rebuilder-service
+	./services/posts-service
+	./services/users-service
 )

@@ -13,6 +13,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
 
+	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 )
@@ -35,6 +36,9 @@ func main() {
 	h := handler.New(svc)
 
 	app := fiber.New(fiber.Config{AppName: "comments-service"})
+	prometheus := fiberprometheus.NewWithDefaultRegistry("comments-service")
+	prometheus.RegisterAt(app, "/metrics")
+	app.Use(prometheus.Middleware)
 	app.Use(logger.New())
 
 	api := app.Group("/api/v1/comments")
