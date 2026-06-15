@@ -127,6 +127,7 @@ services:
       KAFKA_BROKERS: redpanda:9092
       CLICKHOUSE_ADDR: clickhouse:9000
       CLICKHOUSE_DB: default
+      CLICKHOUSE_PASSWORD: clickhouse
     depends_on:
       - redpanda
       - clickhouse
@@ -140,6 +141,7 @@ services:
       PORT: "8089"
       CLICKHOUSE_ADDR: clickhouse:9000
       CLICKHOUSE_DB: default
+      CLICKHOUSE_PASSWORD: clickhouse
       MEMCACHED_ADDR: memcached:11211
     depends_on:
       - clickhouse
