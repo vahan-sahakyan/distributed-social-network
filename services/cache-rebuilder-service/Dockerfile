@@ -4,9 +4,9 @@ COPY pkg/ ./pkg/
 COPY services/cache-rebuilder-service/ ./services/cache-rebuilder-service/
 WORKDIR /app/services/cache-rebuilder-service
 RUN go mod download
-RUN CGO_ENABLED=0 go build -o /bin/service ./cmd/main.go
+RUN CGO_ENABLED=0 go build -o /bin/service ./cmd
 
-FROM alpine:3.19
+FROM alpine:3.20
 RUN apk --no-cache add ca-certificates
-COPY --from=builder /bin/service /bin/service
-ENTRYPOINT ["/bin/service"]
+COPY --from=builder /bin/service /service
+ENTRYPOINT ["/service"]

@@ -1,7 +1,6 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 WORKDIR /app
-COPY pkg/ pkg/
-COPY services/gateway-service/ services/gateway-service/
+COPY services/gateway-service/ ./services/gateway-service/
 WORKDIR /app/services/gateway-service
 RUN go mod download
 RUN CGO_ENABLED=0 go build -o /bin/service ./cmd

@@ -1,7 +1,7 @@
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 WORKDIR /app
-COPY pkg/ pkg/
-COPY services/media-service/ services/media-service/
+COPY pkg/ ./pkg/
+COPY services/media-service/ ./services/media-service/
 WORKDIR /app/services/media-service
 RUN go mod download
 RUN CGO_ENABLED=0 go build -o /bin/service ./cmd
