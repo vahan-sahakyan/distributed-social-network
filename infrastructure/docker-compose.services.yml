@@ -3,6 +3,7 @@ services:
     build:
       context: ../
       dockerfile: services/gateway-service/Dockerfile
+    restart: on-failure
     ports:
       - "8080:8080"
     environment:
@@ -27,6 +28,7 @@ services:
     build:
       context: ../
       dockerfile: services/posts-service/Dockerfile
+    restart: on-failure
     environment:
       PORT: "8081"
       SCYLLA_HOSTS: posts-db:9042
@@ -40,6 +42,7 @@ services:
     build:
       context: ../
       dockerfile: services/comments-service/Dockerfile
+    restart: on-failure
     environment:
       PORT: "8083"
       DATABASE_URL: postgres://postgres:postgres@comments-db:5432/comments?sslmode=disable
@@ -52,6 +55,7 @@ services:
     build:
       context: ../
       dockerfile: services/likes-service/Dockerfile
+    restart: on-failure
     environment:
       PORT: "8084"
       DATABASE_URL: postgres://postgres:postgres@likes-db:5432/likes?sslmode=disable
@@ -64,6 +68,7 @@ services:
     build:
       context: ../
       dockerfile: services/feed-service/Dockerfile
+    restart: on-failure
     environment:
       PORT: "8082"
       KAFKA_BROKERS: redpanda:9092
@@ -76,6 +81,7 @@ services:
     build:
       context: ../
       dockerfile: services/users-service/Dockerfile
+    restart: on-failure
     environment:
       PORT: "8085"
       DATABASE_URL: postgres://postgres:postgres@users-db:5432/users?sslmode=disable
@@ -86,6 +92,7 @@ services:
     build:
       context: ../
       dockerfile: services/media-service/Dockerfile
+    restart: on-failure
     environment:
       PORT: "8086"
       KAFKA_BROKERS: redpanda:9092
@@ -101,6 +108,7 @@ services:
     build:
       context: ../
       dockerfile: services/notification-service/Dockerfile
+    restart: on-failure
     environment:
       PORT: "8087"
       DATABASE_URL: postgres://postgres:postgres@notifications-db:5432/notifications?sslmode=disable
@@ -113,6 +121,7 @@ services:
     build:
       context: ../
       dockerfile: services/event-writer-service/Dockerfile
+    restart: on-failure
     environment:
       PORT: "8088"
       KAFKA_BROKERS: redpanda:9092
@@ -126,6 +135,7 @@ services:
     build:
       context: ../
       dockerfile: services/cache-rebuilder-service/Dockerfile
+    restart: on-failure
     environment:
       PORT: "8089"
       CLICKHOUSE_ADDR: clickhouse:9000

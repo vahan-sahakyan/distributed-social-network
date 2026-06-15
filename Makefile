@@ -1,6 +1,6 @@
-SERVICES = gateway-service posts-service comments-service likes-service feed-service users-service media-service notification-service
+SERVICES = gateway-service posts-service comments-service likes-service feed-service users-service media-service notification-service event-writer-service cache-rebuilder-service
 
-.PHONY: build run stop test lint
+.PHONY: build run stop test lint up down infra-up infra-down migrate demo fresh tidy
 
 build:
 	@for svc in $(SERVICES); do \
@@ -31,6 +31,23 @@ up:
 
 down:
 	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml down
+
+down-clean:
+	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml down -v
+
+migrate:
+	@bash scripts/migrate.sh
+
+demo:
+	@bash scripts/demo.sh
+
+# Full fresh start: wipe volumes, rebuild, migrate, demo
+fresh: down-clean up
+	@echo "Waiting for infrastructure to initialize..."
+	@sleep 10
+	@$(MAKE) migrate
+	@echo ""
+	@echo "System ready! Run 'make demo' to exercise all services."
 
 tidy:
 	@for svc in $(SERVICES); do \
