@@ -6,6 +6,7 @@ import (
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/proxy"
 )
@@ -14,6 +15,12 @@ func main() {
 	app := fiber.New(fiber.Config{
 		AppName: "gateway-service",
 	})
+
+	app.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowMethods: "GET,POST,PUT,DELETE,PATCH,OPTIONS",
+		AllowHeaders: "Content-Type,Authorization",
+	}))
 
 	app.Use(logger.New())
 
