@@ -36,6 +36,10 @@ func (s *Service) GetUser(ctx context.Context, userID string) (*model.User, erro
 	return s.repo.GetByID(ctx, userID)
 }
 
+func (s *Service) GetUserByUsername(ctx context.Context, username string) (*model.User, error) {
+	return s.repo.GetByUsername(ctx, username)
+}
+
 func (s *Service) Follow(ctx context.Context, followerID, followeeID string) error {
 	return s.repo.Follow(ctx, followerID, followeeID)
 }

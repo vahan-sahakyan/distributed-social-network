@@ -39,6 +39,7 @@ func main() {
 
 	api := app.Group("/api/v1/users")
 	api.Post("/", h.CreateUser)
+	api.Get("/by-username/:username", h.GetUserByUsername)
 	api.Get("/:id", h.GetUser)
 	api.Post("/:id/follow", h.FollowUser)
 	api.Get("/:id/followers", h.GetFollowers)

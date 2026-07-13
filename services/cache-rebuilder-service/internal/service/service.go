@@ -4,45 +4,125 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
+	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/vahan-sahakyan/distributed-social-network/cache-rebuilder-service/internal/repository"
 )
 
 type Service struct {
-	repo *repository.Repository
-	mc   *memcache.Client
+	repo     *repository.Repository
+	mc       *memcache.Client
+	usersURL string
+	postsURL string
 }
 
-func New(repo *repository.Repository, mc *memcache.Client) *Service {
-	return &Service{repo: repo, mc: mc}
+func New(repo *repository.Repository, mc *memcache.Client, usersURL, postsURL string) *Service {
+	return &Service{repo: repo, mc: mc, usersURL: usersURL, postsURL: postsURL}
+}
+
+type feedItem struct {
+	PostID        string    `json:"post_id"`
+	AuthorID      string    `json:"author_id"`
+	Text          string    `json:"text"`
+	ImageURL      string    `json:"image_url"`
+	LikesCount    int       `json:"likes_count"`
+	CommentsCount int       `json:"comments_count"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 func (s *Service) RebuildCache(ctx context.Context) error {
-	log.Println("starting cache rebuild from ClickHouse...")
+	log.Println("starting cache rebuild...")
 
-	states, err := s.repo.GetPostStates(ctx)
+	events, err := s.repo.GetRecentPostEvents(ctx, 1000)
 	if err != nil {
-		return fmt.Errorf("failed to get post states: %w", err)
+		return fmt.Errorf("failed to get post events: %w", err)
 	}
 
-	for _, state := range states {
-		key := fmt.Sprintf("post_state:%s", state.PostID)
-		data, err := json.Marshal(state)
+	// Build feed map: userID -> []feedItem
+	feeds := map[string][]feedItem{}
+
+	for _, event := range events {
+		post, err := s.fetchPost(event.PostID)
 		if err != nil {
-			log.Printf("error marshaling state for post %s: %v", state.PostID, err)
+			log.Printf("skipping post %s: %v", event.PostID, err)
 			continue
 		}
-		if err := s.mc.Set(&memcache.Item{
-			Key:        key,
-			Value:      data,
-			Expiration: 3600,
-		}); err != nil {
-			log.Printf("error setting cache for post %s: %v", state.PostID, err)
+
+		item := feedItem{
+			PostID:        post.ID,
+			AuthorID:      post.AuthorID,
+			Text:          post.Text,
+			ImageURL:      post.ImageID,
+			LikesCount:    post.Likes,
+			CommentsCount: post.Comments,
+			CreatedAt:     post.CreatedAt,
+		}
+
+		// Write to author's own feed
+		feeds[event.UserID] = append(feeds[event.UserID], item)
+
+		// Write to each follower's feed
+		followers := s.fetchFollowers(event.UserID)
+		for _, followerID := range followers {
+			feeds[followerID] = append(feeds[followerID], item)
 		}
 	}
 
-	log.Printf("cache rebuild complete: %d post states restored", len(states))
+	// Write all feeds to Memcached
+	for userID, items := range feeds {
+		key := fmt.Sprintf("feed:%s", userID)
+		data, err := json.Marshal(items)
+		if err != nil {
+			continue
+		}
+		s.mc.Set(&memcache.Item{Key: key, Value: data, Expiration: 3600})
+	}
+
+	log.Printf("cache rebuild complete: %d users' feeds populated from %d events", len(feeds), len(events))
 	return nil
+}
+
+type postResponse struct {
+	ID        string    `json:"id"`
+	Text      string    `json:"text"`
+	AuthorID  string    `json:"author_id"`
+	ImageID   string    `json:"image_id"`
+	Likes     int       `json:"likes"`
+	Comments  int       `json:"comments"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func (s *Service) fetchPost(postID string) (*postResponse, error) {
+	resp, err := http.Get(s.postsURL + "/api/v1/posts/" + postID)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("posts-service returned %d", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	var post postResponse
+	if err := json.Unmarshal(body, &post); err != nil {
+		return nil, err
+	}
+	return &post, nil
+}
+
+func (s *Service) fetchFollowers(userID string) []string {
+	resp, err := http.Get(s.usersURL + "/api/v1/users/" + userID + "/followers")
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var result struct {
+		Followers []string `json:"followers"`
+	}
+	json.Unmarshal(body, &result)
+	return result.Followers
 }

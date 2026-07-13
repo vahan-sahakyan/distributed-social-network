@@ -39,6 +39,20 @@ func (h *Handler) GetUser(c *fiber.Ctx) error {
 	return c.JSON(user)
 }
 
+func (h *Handler) GetUserByUsername(c *fiber.Ctx) error {
+	username := c.Params("username")
+	if username == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "username required"})
+	}
+
+	user, err := h.svc.GetUserByUsername(c.Context(), username)
+	if err != nil {
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": "user not found"})
+	}
+
+	return c.JSON(user)
+}
+
 func (h *Handler) FollowUser(c *fiber.Ctx) error {
 	var req model.FollowRequest
 	if err := c.BodyParser(&req); err != nil {

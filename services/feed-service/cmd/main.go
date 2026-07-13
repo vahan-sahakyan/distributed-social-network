@@ -34,7 +34,11 @@ func main() {
 	h := handler.New(svc)
 
 	// start event consumer for fanout-on-write
-	cons := consumer.New(svc, os.Getenv("KAFKA_BROKERS"))
+	usersURL := os.Getenv("USERS_SERVICE_URL")
+	if usersURL == "" {
+		usersURL = "http://localhost:8085"
+	}
+	cons := consumer.New(svc, os.Getenv("KAFKA_BROKERS"), usersURL)
 	go cons.Start(ctx)
 
 	app := fiber.New(fiber.Config{AppName: "feed-service"})

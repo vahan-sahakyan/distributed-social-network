@@ -15,6 +15,7 @@ services:
       USERS_SERVICE_URL: http://users-service:8085
       MEDIA_SERVICE_URL: http://media-service:8086
       NOTIFICATIONS_SERVICE_URL: http://notification-service:8087
+      CACHE_REBUILDER_SERVICE_URL: http://cache-rebuilder-service:8089
     depends_on:
       - posts-service
       - feed-service
@@ -23,6 +24,7 @@ services:
       - users-service
       - media-service
       - notification-service
+      - cache-rebuilder-service
 
   posts-service:
     build:
@@ -73,9 +75,11 @@ services:
       PORT: "8082"
       KAFKA_BROKERS: redpanda:9092
       MEMCACHED_ADDR: memcached:11211
+      USERS_SERVICE_URL: http://users-service:8085
     depends_on:
       - redpanda
       - memcached
+      - users-service
 
   users-service:
     build:
@@ -143,7 +147,11 @@ services:
       CLICKHOUSE_DB: default
       CLICKHOUSE_PASSWORD: clickhouse
       MEMCACHED_ADDR: memcached:11211
+      USERS_SERVICE_URL: http://users-service:8085
+      POSTS_SERVICE_URL: http://posts-service:8081
     depends_on:
       - clickhouse
       - memcached
+      - users-service
+      - posts-service
 

@@ -43,8 +43,17 @@ func main() {
 	}
 	mc := cache.NewMemcached(memcachedAddr)
 
+	usersURL := os.Getenv("USERS_SERVICE_URL")
+	if usersURL == "" {
+		usersURL = "http://localhost:8085"
+	}
+	postsURL := os.Getenv("POSTS_SERVICE_URL")
+	if postsURL == "" {
+		postsURL = "http://localhost:8081"
+	}
+
 	repo := repository.New(conn)
-	svc := service.New(repo, mc)
+	svc := service.New(repo, mc, usersURL, postsURL)
 	h := handler.New(svc)
 
 	app := fiber.New(fiber.Config{AppName: "cache-rebuilder-service"})

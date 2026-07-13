@@ -34,6 +34,17 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*model.User, error
 	return &user, nil
 }
 
+func (r *Repository) GetByUsername(ctx context.Context, username string) (*model.User, error) {
+	var user model.User
+	err := r.db.QueryRow(ctx,
+		`SELECT id, username, bio, created_at FROM users WHERE username = $1`, username,
+	).Scan(&user.ID, &user.Username, &user.Bio, &user.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
 func (r *Repository) Follow(ctx context.Context, followerID, followeeID string) error {
 	_, err := r.db.Exec(ctx,
 		`INSERT INTO follows (follower_id, followee_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
