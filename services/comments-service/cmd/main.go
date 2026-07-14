@@ -45,6 +45,10 @@ func main() {
 	api.Post("/", h.CreateComment)
 	api.Get("/entity/:entity_id", h.GetComments)
 
+	app.Post("/reset", func(c *fiber.Ctx) error {
+		db.Exec(c.Context(), "TRUNCATE comments")
+		return c.JSON(fiber.Map{"status": "reset"})
+	})
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})

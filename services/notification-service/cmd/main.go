@@ -45,6 +45,10 @@ func main() {
 	api := app.Group("/api/v1/notifications")
 	api.Get("/:user_id", h.GetNotifications)
 
+	app.Post("/reset", func(c *fiber.Ctx) error {
+		db.Exec(c.Context(), "TRUNCATE notifications")
+		return c.JSON(fiber.Map{"status": "reset"})
+	})
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})

@@ -44,6 +44,10 @@ func main() {
 	prometheus := fiberprometheus.NewWithDefaultRegistry("event-writer-service")
 	prometheus.RegisterAt(app, "/metrics")
 	app.Use(prometheus.Middleware)
+	app.Post("/reset", func(c *fiber.Ctx) error {
+		conn.Exec(c.Context(), "TRUNCATE TABLE IF EXISTS feed_events")
+		return c.JSON(fiber.Map{"status": "reset"})
+	})
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})

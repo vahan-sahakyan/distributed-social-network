@@ -63,6 +63,11 @@ func main() {
 	app.Use(logger.New())
 
 	app.Post("/api/v1/rebuild", h.TriggerRebuild)
+	app.Post("/reset", func(c *fiber.Ctx) error {
+		conn.Exec(c.Context(), "TRUNCATE TABLE IF EXISTS feed_events")
+		mc.FlushAll()
+		return c.JSON(fiber.Map{"status": "reset"})
+	})
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})

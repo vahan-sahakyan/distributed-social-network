@@ -49,6 +49,13 @@ fresh: down-clean up
 	@echo ""
 	@echo "System ready! Run 'make demo' to exercise all services."
 
+# Wipe all data and restart (no demo)
+reset: down-clean up
+	@echo "Waiting for infrastructure to initialize..."
+	@sleep 10
+	@$(MAKE) migrate
+	@echo "All data wiped and services restarted."
+
 tidy:
 	@for svc in $(SERVICES); do \
 		echo "Tidying $$svc..."; \

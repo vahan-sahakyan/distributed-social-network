@@ -46,6 +46,10 @@ func main() {
 	api.Get("/:id/followers", h.GetFollowers)
 	api.Get("/:id/following", h.GetFollowing)
 
+	app.Post("/reset", func(c *fiber.Ctx) error {
+		db.Exec(c.Context(), "TRUNCATE users, follows")
+		return c.JSON(fiber.Map{"status": "reset"})
+	})
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})

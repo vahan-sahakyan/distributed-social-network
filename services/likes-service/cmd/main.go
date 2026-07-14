@@ -44,6 +44,10 @@ func main() {
 	api := app.Group("/api/v1/likes")
 	api.Post("/", h.CreateLike)
 
+	app.Post("/reset", func(c *fiber.Ctx) error {
+		db.Exec(c.Context(), "TRUNCATE likes")
+		return c.JSON(fiber.Map{"status": "reset"})
+	})
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})

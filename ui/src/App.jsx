@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { Zap, Home, Bell, User, Plus, RefreshCw, LogIn, Play } from 'lucide-react'
+import { Zap, Home, Bell, User, Plus, RefreshCw, LogIn, Play, Trash2 } from 'lucide-react'
 import { runDemo } from './demo'
 import { Avatar } from './components/Avatar'
 import { Toasts } from './components/Toast'
@@ -20,7 +20,7 @@ function RequireUser({ children }) {
 function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentUser, users, notifications, setCurrentUser, addUser, toast } = useStore()
+  const { currentUser, users, notifications, setCurrentUser, addUser, toast, clearUsers } = useStore()
   const [health, setHealth] = useState(null)
   const [showNewUser, setShowNewUser] = useState(false)
   const [newUsername, setNewUsername] = useState('')
@@ -278,6 +278,18 @@ function AppLayout() {
               >
                 <RefreshCw size={11} className={rebuilding ? 'animate-spin' : ''} />
                 {rebuilding ? 'Rebuilding…' : 'Rebuild Feed Cache'}
+              </button>
+              <button
+                onClick={async () => {
+                  await api.resetAll().catch(() => {})
+                  clearUsers()
+                  navigate('/auth')
+                  toast('All data wiped.')
+                }}
+                className="w-full flex items-center justify-center gap-2 text-xs text-red-400/60 hover:text-red-400 border border-transparent hover:border-red-900/40 rounded-lg px-3 py-2 transition-colors"
+              >
+                <Trash2 size={11} />
+                Reset everything
               </button>
             </div>
           </div>

@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/ansrivas/fiberprometheus/v2"
@@ -86,6 +87,22 @@ func registerRoutes(app *fiber.App) {
 
 	app.All("/api/v1/rebuild", func(c *fiber.Ctx) error {
 		return proxy.Forward(cacheRebuilderURL + requestURI(c))(c)
+	})
+
+	app.Post("/api/v1/reset", func(c *fiber.Ctx) error {
+		targets := []string{
+			usersURL + "/reset",
+			postsURL + "/reset",
+			commentsURL + "/reset",
+			likesURL + "/reset",
+			notificationsURL + "/reset",
+			feedURL + "/reset",
+			cacheRebuilderURL + "/reset",
+		}
+		for _, url := range targets {
+			http.Post(url, "application/json", nil) //nolint
+		}
+		return c.JSON(fiber.Map{"status": "reset complete"})
 	})
 
 	app.Get("/health", func(c *fiber.Ctx) error {

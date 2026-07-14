@@ -51,6 +51,10 @@ func main() {
 	api.Get("/home", h.GetHomeFeed)
 	api.Get("/user/:user_id", h.GetUserFeed)
 
+	app.Post("/reset", func(c *fiber.Ctx) error {
+		mc.FlushAll()
+		return c.JSON(fiber.Map{"status": "reset"})
+	})
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
