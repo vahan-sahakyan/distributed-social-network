@@ -14,6 +14,12 @@ func New(svc *service.Service) *Handler {
 }
 
 func (h *Handler) TriggerRebuild(c *fiber.Ctx) error {
+	if userID := c.Query("user_id"); userID != "" {
+		if err := h.svc.RebuildUserFeed(c.Context(), userID); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(fiber.Map{"status": "user feed rebuilt"})
+	}
 	if err := h.svc.RebuildCache(c.Context()); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
 	}

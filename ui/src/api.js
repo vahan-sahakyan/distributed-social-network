@@ -60,4 +60,5 @@ export const api = {
 
   // System
   rebuildCache: () => req('POST', '/rebuild'),
+  rebuildUserFeed: (userId) => req('POST', `/rebuild?user_id=${userId}`),
 }

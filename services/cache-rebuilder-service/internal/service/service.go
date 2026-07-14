@@ -86,6 +86,54 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 	return nil
 }
 
+// RebuildUserFeed rebuilds the feed for a single user based on who they currently follow.
+func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
+	log.Printf("rebuilding feed for user %s...", userID)
+
+	following := s.fetchFollowing(userID)
+	// include the user's own posts too
+	authors := append(following, userID)
+
+	events, err := s.repo.GetRecentPostEvents(ctx, 1000)
+	if err != nil {
+		return fmt.Errorf("failed to get events: %w", err)
+	}
+
+	authorSet := map[string]bool{}
+	for _, a := range authors {
+		authorSet[a] = true
+	}
+
+	var items []feedItem
+	for _, event := range events {
+		if !authorSet[event.UserID] {
+			continue
+		}
+		post, err := s.fetchPost(event.PostID)
+		if err != nil {
+			continue
+		}
+		items = append(items, feedItem{
+			PostID:        post.ID,
+			AuthorID:      post.AuthorID,
+			Text:          post.Text,
+			ImageURL:      post.ImageID,
+			LikesCount:    post.Likes,
+			CommentsCount: post.Comments,
+			CreatedAt:     post.CreatedAt,
+		})
+	}
+
+	key := fmt.Sprintf("feed:%s", userID)
+	data, err := json.Marshal(items)
+	if err != nil {
+		return err
+	}
+	s.mc.Set(&memcache.Item{Key: key, Value: data, Expiration: 3600})
+	log.Printf("user feed rebuilt: %d posts for %s", len(items), userID)
+	return nil
+}
+
 type postResponse struct {
 	ID        string    `json:"id"`
 	Text      string    `json:"text"`
@@ -125,4 +173,18 @@ func (s *Service) fetchFollowers(userID string) []string {
 	}
 	json.Unmarshal(body, &result)
 	return result.Followers
+}
+
+func (s *Service) fetchFollowing(userID string) []string {
+	resp, err := http.Get(s.usersURL + "/api/v1/users/" + userID + "/following")
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	var result struct {
+		Following []string `json:"following"`
+	}
+	json.Unmarshal(body, &result)
+	return result.Following
 }

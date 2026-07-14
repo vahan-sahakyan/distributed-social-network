@@ -6,11 +6,10 @@ import { Avatar } from '../components/Avatar'
 import { api } from '../api'
 import { useStore } from '../store'
 import { normalizePost, shortId } from '../utils'
-
 export function ProfilePage() {
   const navigate = useNavigate()
   const { userId: profileUserId } = useParams()
-  const { currentUser, usersById, addUser, toast } = useStore()
+  const { currentUser, usersById, addUser, setFeed, toast } = useStore()
   const [user, setUser] = useState(usersById[profileUserId] || null)
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -51,6 +50,12 @@ export function ProfilePage() {
         await api.unfollowUser(profileUserId, currentUser.id)
         setFollowers(f => f.filter(id => id !== currentUser.id))
         toast(`Unfollowed @${user?.username}`)
+        // rebuild only this user's feed then clear local state so home reloads
+        api.rebuildUserFeed(currentUser.id).catch(() => {})
+        setFeed([])
+        // rebuild only this user's feed and clear local cache
+        api.rebuildUserFeed(currentUser.id).catch(() => {})
+        setFeed([])
       } else {
         await api.followUser(profileUserId, currentUser.id)
         setFollowers(f => [...f, currentUser.id])
