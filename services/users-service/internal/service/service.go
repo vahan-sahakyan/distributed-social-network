@@ -44,6 +44,10 @@ func (s *Service) Follow(ctx context.Context, followerID, followeeID string) err
 	return s.repo.Follow(ctx, followerID, followeeID)
 }
 
+func (s *Service) Unfollow(ctx context.Context, followerID, followeeID string) error {
+	return s.repo.Unfollow(ctx, followerID, followeeID)
+}
+
 func (s *Service) GetFollowers(ctx context.Context, userID string) ([]string, error) {
 	return s.repo.GetFollowers(ctx, userID)
 }

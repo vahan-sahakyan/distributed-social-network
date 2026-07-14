@@ -67,6 +67,20 @@ func (h *Handler) FollowUser(c *fiber.Ctx) error {
 	return c.Status(fiber.StatusNoContent).Send(nil)
 }
 
+func (h *Handler) UnfollowUser(c *fiber.Ctx) error {
+	var req model.FollowRequest
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid request body"})
+	}
+
+	targetID := c.Params("id")
+	if err := h.svc.Unfollow(c.Context(), req.FollowerID, targetID); err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": "failed to unfollow"})
+	}
+
+	return c.Status(fiber.StatusNoContent).Send(nil)
+}
+
 func (h *Handler) GetFollowers(c *fiber.Ctx) error {
 	id := c.Params("id")
 

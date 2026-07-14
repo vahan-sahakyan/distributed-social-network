@@ -53,6 +53,14 @@ func (r *Repository) Follow(ctx context.Context, followerID, followeeID string) 
 	return err
 }
 
+func (r *Repository) Unfollow(ctx context.Context, followerID, followeeID string) error {
+	_, err := r.db.Exec(ctx,
+		`DELETE FROM follows WHERE follower_id = $1 AND followee_id = $2`,
+		followerID, followeeID,
+	)
+	return err
+}
+
 func (r *Repository) GetFollowers(ctx context.Context, userID string) ([]string, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT follower_id FROM follows WHERE followee_id = $1`, userID,

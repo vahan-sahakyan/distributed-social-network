@@ -42,6 +42,7 @@ func main() {
 	api.Get("/by-username/:username", h.GetUserByUsername)
 	api.Get("/:id", h.GetUser)
 	api.Post("/:id/follow", h.FollowUser)
+	api.Delete("/:id/follow", h.UnfollowUser)
 	api.Get("/:id/followers", h.GetFollowers)
 	api.Get("/:id/following", h.GetFollowing)
 

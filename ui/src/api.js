@@ -25,6 +25,8 @@ export const api = {
   getUserByUsername: (username) => req('GET', `/users/by-username/${encodeURIComponent(username)}`),
   followUser: (targetId, followerId) =>
     req('POST', `/users/${targetId}/follow`, { follower_id: followerId }),
+  unfollowUser: (targetId, followerId) =>
+    req('DELETE', `/users/${targetId}/follow`, { follower_id: followerId }),
   getFollowers: (id) => req('GET', `/users/${id}/followers`),
   getFollowing: (id) => req('GET', `/users/${id}/following`),
 

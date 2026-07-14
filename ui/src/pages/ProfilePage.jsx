@@ -47,9 +47,15 @@ export function ProfilePage() {
     if (!currentUser) return toast('Select a user first', 'error')
     setFollowLoading(true)
     try {
-      await api.followUser(profileUserId, currentUser.id)
-      setFollowers(f => [...f, currentUser.id])
-      toast(`Now following @${user?.username}!`)
+      if (isFollowing) {
+        await api.unfollowUser(profileUserId, currentUser.id)
+        setFollowers(f => f.filter(id => id !== currentUser.id))
+        toast(`Unfollowed @${user?.username}`)
+      } else {
+        await api.followUser(profileUserId, currentUser.id)
+        setFollowers(f => [...f, currentUser.id])
+        toast(`Now following @${user?.username}!`)
+      }
     } catch (err) {
       toast(err.message, 'error')
     } finally {
@@ -91,10 +97,10 @@ export function ProfilePage() {
           {!isSelf && currentUser && (
             <button
               onClick={handleFollow}
-              disabled={isFollowing || followLoading}
+              disabled={followLoading}
               className={`flex items-center gap-2 text-sm font-semibold px-5 py-2 rounded-full transition-colors shrink-0
                 ${isFollowing
-                  ? 'border border-border text-muted cursor-default'
+                  ? 'border border-border text-muted hover:border-red-800 hover:text-red-400'
                   : 'bg-text text-bg hover:bg-text/90'
                 }`}
             >
