@@ -30,3 +30,17 @@ func (s *Service) FanoutPost(item *model.FeedItem, followerIDs []string) error {
 	}
 	return nil
 }
+
+// IncrementLikes increments the like count for a post in the given users' feed caches.
+func (s *Service) IncrementLikes(postID string, userIDs []string) {
+	for _, userID := range userIDs {
+		s.repo.IncrementCount(userID, postID, true)
+	}
+}
+
+// IncrementComments increments the comment count for a post in the given users' feed caches.
+func (s *Service) IncrementComments(postID string, userIDs []string) {
+	for _, userID := range userIDs {
+		s.repo.IncrementCount(userID, postID, false)
+	}
+}

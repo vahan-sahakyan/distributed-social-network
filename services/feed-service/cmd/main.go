@@ -38,7 +38,11 @@ func main() {
 	if usersURL == "" {
 		usersURL = "http://localhost:8085"
 	}
-	cons := consumer.New(svc, os.Getenv("KAFKA_BROKERS"), usersURL)
+	postsURL := os.Getenv("POSTS_SERVICE_URL")
+	if postsURL == "" {
+		postsURL = "http://localhost:8081"
+	}
+	cons := consumer.New(svc, os.Getenv("KAFKA_BROKERS"), usersURL, postsURL)
 	go cons.Start(ctx)
 
 	app := fiber.New(fiber.Config{AppName: "feed-service"})

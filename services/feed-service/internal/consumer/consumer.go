@@ -18,17 +18,24 @@ type Consumer struct {
 	svc      *service.Service
 	brokers  string
 	usersURL string
+	postsURL string
 }
 
-func New(svc *service.Service, brokers, usersURL string) *Consumer {
-	return &Consumer{svc: svc, brokers: brokers, usersURL: usersURL}
+func New(svc *service.Service, brokers, usersURL, postsURL string) *Consumer {
+	return &Consumer{svc: svc, brokers: brokers, usersURL: usersURL, postsURL: postsURL}
 }
 
 func (c *Consumer) Start(ctx context.Context) {
+	go c.startReader(ctx, "post.created", "feed-service-posts", c.handlePostCreated)
+	go c.startReader(ctx, "like.created", "feed-service-likes", c.handleLikeCreated)
+	c.startReader(ctx, "comment.created", "feed-service-comments", c.handleCommentCreated)
+}
+
+func (c *Consumer) startReader(ctx context.Context, topic, groupID string, handler func([]byte)) {
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: strings.Split(c.brokers, ","),
-		Topic:   "post.created",
-		GroupID: "feed-service",
+		Topic:   topic,
+		GroupID: groupID,
 	})
 	defer reader.Close()
 
@@ -39,10 +46,10 @@ func (c *Consumer) Start(ctx context.Context) {
 		default:
 			msg, err := reader.ReadMessage(ctx)
 			if err != nil {
-				log.Printf("error reading message: %v", err)
+				log.Printf("[%s] error reading message: %v", topic, err)
 				continue
 			}
-			c.handlePostCreated(msg.Value)
+			handler(msg.Value)
 		}
 	}
 }
@@ -55,7 +62,6 @@ func (c *Consumer) handlePostCreated(data []byte) {
 		ImageID   string    `json:"image_id"`
 		CreatedAt time.Time `json:"created_at"`
 	}
-
 	if err := json.Unmarshal(data, &post); err != nil {
 		log.Printf("error unmarshaling post: %v", err)
 		return
@@ -69,13 +75,44 @@ func (c *Consumer) handlePostCreated(data []byte) {
 		CreatedAt: post.CreatedAt,
 	}
 
-	// Fetch followers from users-service and include author's own feed
 	followerIDs := c.fetchFollowers(post.AuthorID)
 	followerIDs = append(followerIDs, post.AuthorID)
 
 	if err := c.svc.FanoutPost(item, followerIDs); err != nil {
 		log.Printf("error fanning out post: %v", err)
 	}
+}
+
+func (c *Consumer) handleLikeCreated(data []byte) {
+	var event struct {
+		UserID   string `json:"user_id"`
+		EntityID string `json:"entity_id"`
+	}
+	if err := json.Unmarshal(data, &event); err != nil {
+		return
+	}
+	authorID, ok := c.fetchPostAuthor(event.EntityID)
+	if !ok {
+		return
+	}
+	users := append(c.fetchFollowers(authorID), authorID)
+	c.svc.IncrementLikes(event.EntityID, users)
+}
+
+func (c *Consumer) handleCommentCreated(data []byte) {
+	var event struct {
+		UserID   string `json:"user_id"`
+		EntityID string `json:"entity_id"`
+	}
+	if err := json.Unmarshal(data, &event); err != nil {
+		return
+	}
+	authorID, ok := c.fetchPostAuthor(event.EntityID)
+	if !ok {
+		return
+	}
+	users := append(c.fetchFollowers(authorID), authorID)
+	c.svc.IncrementComments(event.EntityID, users)
 }
 
 func (c *Consumer) fetchFollowers(userID string) []string {
@@ -85,7 +122,6 @@ func (c *Consumer) fetchFollowers(userID string) []string {
 		return nil
 	}
 	defer resp.Body.Close()
-
 	body, _ := io.ReadAll(resp.Body)
 	var result struct {
 		Followers []string `json:"followers"`
@@ -94,4 +130,22 @@ func (c *Consumer) fetchFollowers(userID string) []string {
 		return nil
 	}
 	return result.Followers
+}
+
+func (c *Consumer) fetchPostAuthor(postID string) (string, bool) {
+	resp, err := http.Get(c.postsURL + "/api/v1/posts/" + postID)
+	if err != nil {
+		return "", false
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return "", false
+	}
+	var post struct {
+		AuthorID string `json:"author_id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&post); err != nil || post.AuthorID == "" {
+		return "", false
+	}
+	return post.AuthorID, true
 }

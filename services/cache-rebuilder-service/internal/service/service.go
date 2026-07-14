@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
+	"github.com/vahan-sahakyan/distributed-social-network/cache-rebuilder-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/cache-rebuilder-service/internal/repository"
 )
 
@@ -34,6 +35,19 @@ type feedItem struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+func (s *Service) loadPostStates(ctx context.Context) map[string]model.PostState {
+	states, err := s.repo.GetPostStates(ctx)
+	if err != nil {
+		log.Printf("warning: could not load post states from ClickHouse: %v", err)
+		return map[string]model.PostState{}
+	}
+	m := make(map[string]model.PostState, len(states))
+	for _, st := range states {
+		m[st.PostID] = st
+	}
+	return m
+}
+
 func (s *Service) RebuildCache(ctx context.Context) error {
 	log.Println("starting cache rebuild...")
 
@@ -41,6 +55,8 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to get post events: %w", err)
 	}
+
+	postStates := s.loadPostStates(ctx)
 
 	// Build feed map: userID -> []feedItem
 	feeds := map[string][]feedItem{}
@@ -52,13 +68,14 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 			continue
 		}
 
+		st := postStates[event.PostID]
 		item := feedItem{
 			PostID:        post.ID,
 			AuthorID:      post.AuthorID,
 			Text:          post.Text,
 			ImageURL:      post.ImageID,
-			LikesCount:    post.Likes,
-			CommentsCount: post.Comments,
+			LikesCount:    int(st.Likes),
+			CommentsCount: int(st.Comments),
 			CreatedAt:     post.CreatedAt,
 		}
 
@@ -104,6 +121,8 @@ func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
 		authorSet[a] = true
 	}
 
+	postStates := s.loadPostStates(ctx)
+
 	var items []feedItem
 	for _, event := range events {
 		if !authorSet[event.UserID] {
@@ -113,13 +132,14 @@ func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
 		if err != nil {
 			continue
 		}
+		st := postStates[event.PostID]
 		items = append(items, feedItem{
 			PostID:        post.ID,
 			AuthorID:      post.AuthorID,
 			Text:          post.Text,
 			ImageURL:      post.ImageID,
-			LikesCount:    post.Likes,
-			CommentsCount: post.Comments,
+			LikesCount:    int(st.Likes),
+			CommentsCount: int(st.Comments),
 			CreatedAt:     post.CreatedAt,
 		})
 	}

@@ -65,6 +65,7 @@ func main() {
 	app.Post("/api/v1/rebuild", h.TriggerRebuild)
 	app.Post("/reset", func(c *fiber.Ctx) error {
 		conn.Exec(c.Context(), "TRUNCATE TABLE IF EXISTS feed_events")
+		conn.Exec(c.Context(), "TRUNCATE TABLE IF EXISTS current_post_state")
 		mc.FlushAll()
 		return c.JSON(fiber.Map{"status": "reset"})
 	})

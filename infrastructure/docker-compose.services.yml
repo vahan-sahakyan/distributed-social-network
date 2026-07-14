@@ -76,10 +76,12 @@ services:
       KAFKA_BROKERS: redpanda:9092
       MEMCACHED_ADDR: memcached:11211
       USERS_SERVICE_URL: http://users-service:8085
+      POSTS_SERVICE_URL: http://posts-service:8081
     depends_on:
       - redpanda
       - memcached
       - users-service
+      - posts-service
 
   users-service:
     build:

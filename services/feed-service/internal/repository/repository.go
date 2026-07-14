@@ -58,3 +58,22 @@ func (r *Repository) AppendToFeed(userID string, item *model.FeedItem) error {
 	}
 	return r.SetFeed(userID, items)
 }
+
+// IncrementCount increments the like (isLike=true) or comment count for a post in a user's feed.
+func (r *Repository) IncrementCount(userID, postID string, isLike bool) {
+	items, err := r.GetFeed(userID)
+	if err != nil || len(items) == 0 {
+		return
+	}
+	for i, item := range items {
+		if item.PostID == postID {
+			if isLike {
+				items[i].LikesCount++
+			} else {
+				items[i].CommentsCount++
+			}
+			r.SetFeed(userID, items) //nolint
+			return
+		}
+	}
+}

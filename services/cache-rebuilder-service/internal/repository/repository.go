@@ -40,8 +40,17 @@ func (r *Repository) GetRecentPostEvents(ctx context.Context, limit int) ([]mode
 }
 
 func (r *Repository) GetPostStates(ctx context.Context) ([]model.PostState, error) {
-	rows, err := r.conn.Query(ctx,
-		`SELECT post_id, likes, comments, last_update FROM current_post_state ORDER BY last_update DESC LIMIT 1000`,
+	rows, err := r.conn.Query(ctx, `
+		SELECT
+			post_id,
+			countIf(event_type = 'like.created')    AS likes,
+			countIf(event_type = 'comment.created') AS comments,
+			max(created_at) AS last_update
+		FROM feed_events
+		WHERE post_id != ''
+		GROUP BY post_id
+		ORDER BY last_update DESC
+		LIMIT 1000`,
 	)
 	if err != nil {
 		return nil, err

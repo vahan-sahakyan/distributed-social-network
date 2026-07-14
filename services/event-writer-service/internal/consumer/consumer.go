@@ -59,6 +59,7 @@ func (c *Consumer) handleEvent(ctx context.Context, eventType string, data []byt
 	var payload struct {
 		ID       string `json:"id"`
 		PostID   string `json:"post_id"`
+		EntityID string `json:"entity_id"` // likes and comments use entity_id
 		UserID   string `json:"user_id"`
 		AuthorID string `json:"author_id"`
 	}
@@ -76,10 +77,12 @@ func (c *Consumer) handleEvent(ctx context.Context, eventType string, data []byt
 		CreatedAt: time.Now().UTC(),
 	}
 
-	// For post.created, the post ID is "id" and user is "author_id"
-	if eventType == "post.created" {
+	switch eventType {
+	case "post.created":
 		event.PostID = payload.ID
 		event.UserID = payload.AuthorID
+	case "like.created", "comment.created":
+		event.PostID = payload.EntityID
 	}
 
 	switch eventType {
