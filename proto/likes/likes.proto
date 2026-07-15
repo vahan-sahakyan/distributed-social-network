@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package likes;
+
+option go_package = "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/likes;likespb";
+
+message Like {
+  string id = 1;
+  string user_id = 2;
+  string entity_id = 3;
+}
+
+message CreateLikeRequest {
+  string user_id = 1;
+  string entity_id = 2;
+}
+
+message CreateLikeResponse {
+  Like like = 1;
+}
+
+message ResetRequest {}
+
+message ResetResponse {
+  string status = 1;
+}
+
+service LikesService {
+  rpc CreateLike(CreateLikeRequest) returns (CreateLikeResponse);
+  rpc Reset(ResetRequest) returns (ResetResponse);
+}

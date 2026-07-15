@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package media;
+
+option go_package = "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/media;mediapb";
+
+// First message in the stream must be metadata; subsequent messages are chunks.
+message UploadChunk {
+  oneof content {
+    UploadMeta meta = 1;
+    bytes chunk_data = 2;
+  }
+}
+
+message UploadMeta {
+  string filename = 1;
+  string content_type = 2;
+  int64 size = 3;
+}
+
+message UploadResponse {
+  string id = 1;
+  string url = 2;
+}
+
+message GetURLRequest {
+  string id = 1;
+}
+
+message GetURLResponse {
+  string id = 1;
+  string url = 2;
+}
+
+service MediaService {
+  rpc Upload(stream UploadChunk) returns (UploadResponse);
+  rpc GetURL(GetURLRequest) returns (GetURLResponse);
+}

@@ -8,14 +8,14 @@ services:
       - "8080:8080"
     environment:
       PORT: "8080"
-      POSTS_SERVICE_URL: http://posts-service:8081
-      FEED_SERVICE_URL: http://feed-service:8082
-      COMMENTS_SERVICE_URL: http://comments-service:8083
-      LIKES_SERVICE_URL: http://likes-service:8084
-      USERS_SERVICE_URL: http://users-service:8085
-      MEDIA_SERVICE_URL: http://media-service:8086
-      NOTIFICATIONS_SERVICE_URL: http://notification-service:8087
-      CACHE_REBUILDER_SERVICE_URL: http://cache-rebuilder-service:8089
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
+      FEED_SERVICE_GRPC_ADDR: feed-service:9082
+      COMMENTS_SERVICE_GRPC_ADDR: comments-service:9083
+      LIKES_SERVICE_GRPC_ADDR: likes-service:9084
+      USERS_SERVICE_GRPC_ADDR: users-service:9085
+      MEDIA_SERVICE_GRPC_ADDR: media-service:9086
+      NOTIFICATIONS_SERVICE_GRPC_ADDR: notification-service:9087
+      CACHE_REBUILDER_SERVICE_GRPC_ADDR: cache-rebuilder-service:9089
     depends_on:
       - posts-service
       - feed-service
@@ -33,6 +33,7 @@ services:
     restart: on-failure
     environment:
       PORT: "8081"
+      GRPC_PORT: "9081"
       SCYLLA_HOSTS: posts-db:9042
       SCYLLA_KEYSPACE: posts
       KAFKA_BROKERS: redpanda:9092
@@ -47,6 +48,7 @@ services:
     restart: on-failure
     environment:
       PORT: "8083"
+      GRPC_PORT: "9083"
       DATABASE_URL: postgres://postgres:postgres@comments-db:5432/comments?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
     depends_on:
@@ -60,6 +62,7 @@ services:
     restart: on-failure
     environment:
       PORT: "8084"
+      GRPC_PORT: "9084"
       DATABASE_URL: postgres://postgres:postgres@likes-db:5432/likes?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
     depends_on:
@@ -73,10 +76,11 @@ services:
     restart: on-failure
     environment:
       PORT: "8082"
+      GRPC_PORT: "9082"
       KAFKA_BROKERS: redpanda:9092
       MEMCACHED_ADDR: memcached:11211
-      USERS_SERVICE_URL: http://users-service:8085
-      POSTS_SERVICE_URL: http://posts-service:8081
+      USERS_SERVICE_GRPC_ADDR: users-service:9085
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
     depends_on:
       - redpanda
       - memcached
@@ -90,6 +94,7 @@ services:
     restart: on-failure
     environment:
       PORT: "8085"
+      GRPC_PORT: "9085"
       DATABASE_URL: postgres://postgres:postgres@users-db:5432/users?sslmode=disable
     depends_on:
       - users-db
@@ -101,6 +106,7 @@ services:
     restart: on-failure
     environment:
       PORT: "8086"
+      GRPC_PORT: "9086"
       KAFKA_BROKERS: redpanda:9092
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
@@ -117,6 +123,7 @@ services:
     restart: on-failure
     environment:
       PORT: "8087"
+      GRPC_PORT: "9087"
       DATABASE_URL: postgres://postgres:postgres@notifications-db:5432/notifications?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
     depends_on:
@@ -145,12 +152,13 @@ services:
     restart: on-failure
     environment:
       PORT: "8089"
+      GRPC_PORT: "9089"
       CLICKHOUSE_ADDR: clickhouse:9000
       CLICKHOUSE_DB: default
       CLICKHOUSE_PASSWORD: clickhouse
       MEMCACHED_ADDR: memcached:11211
-      USERS_SERVICE_URL: http://users-service:8085
-      POSTS_SERVICE_URL: http://posts-service:8081
+      USERS_SERVICE_GRPC_ADDR: users-service:9085
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
     depends_on:
       - clickhouse
       - memcached

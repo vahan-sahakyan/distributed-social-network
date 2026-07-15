@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package posts;
+
+option go_package = "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts;postspb";
+
+import "google/protobuf/timestamp.proto";
+
+message Post {
+  string id = 1;
+  string text = 2;
+  string author_id = 3;
+  string image_id = 4;
+  int32 likes = 5;
+  int32 comments = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message CreatePostRequest {
+  string text = 1;
+  string author_id = 2;
+  string image_id = 3;
+}
+
+message CreatePostResponse {
+  Post post = 1;
+}
+
+message GetPostRequest {
+  string id = 1;
+}
+
+message GetPostResponse {
+  Post post = 1;
+}
+
+message ResetRequest {}
+
+message ResetResponse {
+  string status = 1;
+}
+
+service PostsService {
+  rpc CreatePost(CreatePostRequest) returns (CreatePostResponse);
+  rpc GetPost(GetPostRequest) returns (GetPostResponse);
+  rpc Reset(ResetRequest) returns (ResetResponse);
+}

@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package cache_rebuilder;
+
+option go_package = "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/cache_rebuilder;cacherebpb";
+
+// user_id is optional; empty string means rebuild all users.
+message TriggerRebuildRequest {
+  string user_id = 1;
+}
+
+message TriggerRebuildResponse {
+  string status = 1;
+}
+
+message ResetRequest {}
+
+message ResetResponse {
+  string status = 1;
+}
+
+service CacheRebuilderService {
+  rpc TriggerRebuild(TriggerRebuildRequest) returns (TriggerRebuildResponse);
+  rpc Reset(ResetRequest) returns (ResetResponse);
+}

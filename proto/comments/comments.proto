@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package comments;
+
+option go_package = "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/comments;commentspb";
+
+import "google/protobuf/timestamp.proto";
+
+message Comment {
+  string id = 1;
+  string user_id = 2;
+  string entity_id = 3;
+  string text = 4;
+  int32 likes = 5;
+  google.protobuf.Timestamp created_at = 6;
+}
+
+message CreateCommentRequest {
+  string user_id = 1;
+  string entity_id = 2;
+  string text = 3;
+}
+
+message CreateCommentResponse {
+  Comment comment = 1;
+}
+
+message GetCommentsRequest {
+  string entity_id = 1;
+}
+
+message GetCommentsResponse {
+  repeated Comment comments = 1;
+}
+
+message ResetRequest {}
+
+message ResetResponse {
+  string status = 1;
+}
+
+service CommentsService {
+  rpc CreateComment(CreateCommentRequest) returns (CreateCommentResponse);
+  rpc GetComments(GetCommentsRequest) returns (GetCommentsResponse);
+  rpc Reset(ResetRequest) returns (ResetResponse);
+}
