@@ -20,11 +20,13 @@ export function PostCard({ post }) {
   async function handleLike() {
     if (!currentUser) return toast('Select a user first', 'error')
     if (liked) return
+    setLiked(true)
+    setLikes(l => l + 1)
     try {
       await api.like(currentUser.id, post.id)
-      setLiked(true)
-      setLikes(l => l + 1)
     } catch (err) {
+      setLiked(false)
+      setLikes(l => l - 1)
       toast(err.message, 'error')
     }
   }
