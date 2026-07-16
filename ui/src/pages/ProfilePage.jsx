@@ -29,7 +29,7 @@ export function ProfilePage() {
     Promise.all([
       api.getUser(profileUserId).then(u => { setUser(u); addUser(u) }),
       api.getUserFeed(profileUserId)
-        .then(d => setPosts((d?.posts || []).map(normalizePost)))
+        .then(d => setPosts((Array.isArray(d) ? d : []).map(normalizePost)))
         .catch(() => setPosts([])),
       api.getFollowers(profileUserId)
         .then(d => setFollowers(d?.followers || []))
