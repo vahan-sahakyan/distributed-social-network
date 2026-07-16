@@ -46,6 +46,7 @@ export const api = {
 
   // Likes
   like: (userId, entityId) => req('POST', '/likes/', { user_id: userId, entity_id: entityId }),
+  unlike: (userId, entityId) => req('DELETE', '/likes/', { user_id: userId, entity_id: entityId }),
   hasLiked: (userId, entityId) => req('GET', `/likes/check?user_id=${userId}&entity_id=${entityId}`).then(r => r.liked),
 
   // Notifications

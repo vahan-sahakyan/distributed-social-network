@@ -23,6 +23,15 @@ export function initials(name = '') {
   return (name || '?').slice(0, 2).toUpperCase()
 }
 
+export function parseTimestamp(ts) {
+  if (!ts) return null
+  // protobuf Timestamp: { seconds: number, nanos: number }
+  if (typeof ts === 'object' && 'seconds' in ts) {
+    return new Date(ts.seconds * 1000 + (ts.nanos ?? 0) / 1e6).toISOString()
+  }
+  return ts
+}
+
 export function normalizePost(p) {
   return {
     id: p.post_id || p.id,
@@ -31,7 +40,7 @@ export function normalizePost(p) {
     imageId: p.image_id || null,
     likesCount: p.likes_count ?? p.likes ?? 0,
     commentsCount: p.comments_count ?? p.comments ?? 0,
-    createdAt: p.created_at,
+    createdAt: parseTimestamp(p.created_at),
   }
 }
 

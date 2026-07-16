@@ -22,6 +22,10 @@ func (s *Service) HasLiked(ctx context.Context, userID, entityID string) (bool, 
 	return s.repo.HasLiked(ctx, userID, entityID)
 }
 
+func (s *Service) Unlike(ctx context.Context, userID, entityID string) error {
+	return s.repo.Delete(ctx, userID, entityID)
+}
+
 func (s *Service) CreateLike(ctx context.Context, req *model.CreateLikeRequest) (*model.Like, error) {
 	like := &model.Like{
 		ID:       id.New(),

@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	LikesService_CreateLike_FullMethodName = "/likes.LikesService/CreateLike"
 	LikesService_HasLiked_FullMethodName   = "/likes.LikesService/HasLiked"
+	LikesService_Unlike_FullMethodName     = "/likes.LikesService/Unlike"
 	LikesService_Reset_FullMethodName      = "/likes.LikesService/Reset"
 )
 
@@ -30,6 +31,7 @@ const (
 type LikesServiceClient interface {
 	CreateLike(ctx context.Context, in *CreateLikeRequest, opts ...grpc.CallOption) (*CreateLikeResponse, error)
 	HasLiked(ctx context.Context, in *HasLikedRequest, opts ...grpc.CallOption) (*HasLikedResponse, error)
+	Unlike(ctx context.Context, in *UnlikeRequest, opts ...grpc.CallOption) (*UnlikeResponse, error)
 	Reset(ctx context.Context, in *ResetRequest, opts ...grpc.CallOption) (*ResetResponse, error)
 }
 
@@ -61,6 +63,16 @@ func (c *likesServiceClient) HasLiked(ctx context.Context, in *HasLikedRequest, 
 	return out, nil
 }
 
+func (c *likesServiceClient) Unlike(ctx context.Context, in *UnlikeRequest, opts ...grpc.CallOption) (*UnlikeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnlikeResponse)
+	err := c.cc.Invoke(ctx, LikesService_Unlike_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *likesServiceClient) Reset(ctx context.Context, in *ResetRequest, opts ...grpc.CallOption) (*ResetResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ResetResponse)
@@ -77,6 +89,7 @@ func (c *likesServiceClient) Reset(ctx context.Context, in *ResetRequest, opts .
 type LikesServiceServer interface {
 	CreateLike(context.Context, *CreateLikeRequest) (*CreateLikeResponse, error)
 	HasLiked(context.Context, *HasLikedRequest) (*HasLikedResponse, error)
+	Unlike(context.Context, *UnlikeRequest) (*UnlikeResponse, error)
 	Reset(context.Context, *ResetRequest) (*ResetResponse, error)
 	mustEmbedUnimplementedLikesServiceServer()
 }
@@ -93,6 +106,9 @@ func (UnimplementedLikesServiceServer) CreateLike(context.Context, *CreateLikeRe
 }
 func (UnimplementedLikesServiceServer) HasLiked(context.Context, *HasLikedRequest) (*HasLikedResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method HasLiked not implemented")
+}
+func (UnimplementedLikesServiceServer) Unlike(context.Context, *UnlikeRequest) (*UnlikeResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Unlike not implemented")
 }
 func (UnimplementedLikesServiceServer) Reset(context.Context, *ResetRequest) (*ResetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Reset not implemented")
@@ -154,6 +170,24 @@ func _LikesService_HasLiked_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LikesService_Unlike_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnlikeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LikesServiceServer).Unlike(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LikesService_Unlike_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LikesServiceServer).Unlike(ctx, req.(*UnlikeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _LikesService_Reset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ResetRequest)
 	if err := dec(in); err != nil {
@@ -186,6 +220,10 @@ var LikesService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HasLiked",
 			Handler:    _LikesService_HasLiked_Handler,
+		},
+		{
+			MethodName: "Unlike",
+			Handler:    _LikesService_Unlike_Handler,
 		},
 		{
 			MethodName: "Reset",

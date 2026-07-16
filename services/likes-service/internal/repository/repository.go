@@ -32,3 +32,11 @@ func (r *Repository) HasLiked(ctx context.Context, userID, entityID string) (boo
 	).Scan(&exists)
 	return exists, err
 }
+
+func (r *Repository) Delete(ctx context.Context, userID, entityID string) error {
+	_, err := r.db.Exec(ctx,
+		`DELETE FROM likes WHERE user_id=$1 AND entity_id=$2`,
+		userID, entityID,
+	)
+	return err
+}

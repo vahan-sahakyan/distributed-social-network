@@ -273,6 +273,94 @@ func (x *HasLikedResponse) GetLiked() bool {
 	return false
 }
 
+type UnlikeRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	EntityId      string                 `protobuf:"bytes,2,opt,name=entity_id,json=entityId,proto3" json:"entity_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnlikeRequest) Reset() {
+	*x = UnlikeRequest{}
+	mi := &file_likes_likes_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnlikeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnlikeRequest) ProtoMessage() {}
+
+func (x *UnlikeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_likes_likes_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnlikeRequest.ProtoReflect.Descriptor instead.
+func (*UnlikeRequest) Descriptor() ([]byte, []int) {
+	return file_likes_likes_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *UnlikeRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *UnlikeRequest) GetEntityId() string {
+	if x != nil {
+		return x.EntityId
+	}
+	return ""
+}
+
+type UnlikeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnlikeResponse) Reset() {
+	*x = UnlikeResponse{}
+	mi := &file_likes_likes_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnlikeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnlikeResponse) ProtoMessage() {}
+
+func (x *UnlikeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_likes_likes_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnlikeResponse.ProtoReflect.Descriptor instead.
+func (*UnlikeResponse) Descriptor() ([]byte, []int) {
+	return file_likes_likes_proto_rawDescGZIP(), []int{6}
+}
+
 type ResetRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -281,7 +369,7 @@ type ResetRequest struct {
 
 func (x *ResetRequest) Reset() {
 	*x = ResetRequest{}
-	mi := &file_likes_likes_proto_msgTypes[5]
+	mi := &file_likes_likes_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -293,7 +381,7 @@ func (x *ResetRequest) String() string {
 func (*ResetRequest) ProtoMessage() {}
 
 func (x *ResetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_likes_likes_proto_msgTypes[5]
+	mi := &file_likes_likes_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -306,7 +394,7 @@ func (x *ResetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetRequest.ProtoReflect.Descriptor instead.
 func (*ResetRequest) Descriptor() ([]byte, []int) {
-	return file_likes_likes_proto_rawDescGZIP(), []int{5}
+	return file_likes_likes_proto_rawDescGZIP(), []int{7}
 }
 
 type ResetResponse struct {
@@ -318,7 +406,7 @@ type ResetResponse struct {
 
 func (x *ResetResponse) Reset() {
 	*x = ResetResponse{}
-	mi := &file_likes_likes_proto_msgTypes[6]
+	mi := &file_likes_likes_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -330,7 +418,7 @@ func (x *ResetResponse) String() string {
 func (*ResetResponse) ProtoMessage() {}
 
 func (x *ResetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_likes_likes_proto_msgTypes[6]
+	mi := &file_likes_likes_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -343,7 +431,7 @@ func (x *ResetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResetResponse.ProtoReflect.Descriptor instead.
 func (*ResetResponse) Descriptor() ([]byte, []int) {
-	return file_likes_likes_proto_rawDescGZIP(), []int{6}
+	return file_likes_likes_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ResetResponse) GetStatus() string {
@@ -371,14 +459,19 @@ const file_likes_likes_proto_rawDesc = "" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
 	"\tentity_id\x18\x02 \x01(\tR\bentityId\"(\n" +
 	"\x10HasLikedResponse\x12\x14\n" +
-	"\x05liked\x18\x01 \x01(\bR\x05liked\"\x0e\n" +
+	"\x05liked\x18\x01 \x01(\bR\x05liked\"E\n" +
+	"\rUnlikeRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1b\n" +
+	"\tentity_id\x18\x02 \x01(\tR\bentityId\"\x10\n" +
+	"\x0eUnlikeResponse\"\x0e\n" +
 	"\fResetRequest\"'\n" +
 	"\rResetResponse\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status2\xc2\x01\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status2\xf9\x01\n" +
 	"\fLikesService\x12A\n" +
 	"\n" +
 	"CreateLike\x12\x18.likes.CreateLikeRequest\x1a\x19.likes.CreateLikeResponse\x12;\n" +
-	"\bHasLiked\x12\x16.likes.HasLikedRequest\x1a\x17.likes.HasLikedResponse\x122\n" +
+	"\bHasLiked\x12\x16.likes.HasLikedRequest\x1a\x17.likes.HasLikedResponse\x125\n" +
+	"\x06Unlike\x12\x14.likes.UnlikeRequest\x1a\x15.likes.UnlikeResponse\x122\n" +
 	"\x05Reset\x12\x13.likes.ResetRequest\x1a\x14.likes.ResetResponseBMZKgithub.com/vahan-sahakyan/distributed-social-network/pkg/grpc/likes;likespbb\x06proto3"
 
 var (
@@ -393,26 +486,30 @@ func file_likes_likes_proto_rawDescGZIP() []byte {
 	return file_likes_likes_proto_rawDescData
 }
 
-var file_likes_likes_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_likes_likes_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
 var file_likes_likes_proto_goTypes = []any{
 	(*Like)(nil),               // 0: likes.Like
 	(*CreateLikeRequest)(nil),  // 1: likes.CreateLikeRequest
 	(*CreateLikeResponse)(nil), // 2: likes.CreateLikeResponse
 	(*HasLikedRequest)(nil),    // 3: likes.HasLikedRequest
 	(*HasLikedResponse)(nil),   // 4: likes.HasLikedResponse
-	(*ResetRequest)(nil),       // 5: likes.ResetRequest
-	(*ResetResponse)(nil),      // 6: likes.ResetResponse
+	(*UnlikeRequest)(nil),      // 5: likes.UnlikeRequest
+	(*UnlikeResponse)(nil),     // 6: likes.UnlikeResponse
+	(*ResetRequest)(nil),       // 7: likes.ResetRequest
+	(*ResetResponse)(nil),      // 8: likes.ResetResponse
 }
 var file_likes_likes_proto_depIdxs = []int32{
 	0, // 0: likes.CreateLikeResponse.like:type_name -> likes.Like
 	1, // 1: likes.LikesService.CreateLike:input_type -> likes.CreateLikeRequest
 	3, // 2: likes.LikesService.HasLiked:input_type -> likes.HasLikedRequest
-	5, // 3: likes.LikesService.Reset:input_type -> likes.ResetRequest
-	2, // 4: likes.LikesService.CreateLike:output_type -> likes.CreateLikeResponse
-	4, // 5: likes.LikesService.HasLiked:output_type -> likes.HasLikedResponse
-	6, // 6: likes.LikesService.Reset:output_type -> likes.ResetResponse
-	4, // [4:7] is the sub-list for method output_type
-	1, // [1:4] is the sub-list for method input_type
+	5, // 3: likes.LikesService.Unlike:input_type -> likes.UnlikeRequest
+	7, // 4: likes.LikesService.Reset:input_type -> likes.ResetRequest
+	2, // 5: likes.LikesService.CreateLike:output_type -> likes.CreateLikeResponse
+	4, // 6: likes.LikesService.HasLiked:output_type -> likes.HasLikedResponse
+	6, // 7: likes.LikesService.Unlike:output_type -> likes.UnlikeResponse
+	8, // 8: likes.LikesService.Reset:output_type -> likes.ResetResponse
+	5, // [5:9] is the sub-list for method output_type
+	1, // [1:5] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
 	1, // [1:1] is the sub-list for extension extendee
 	0, // [0:1] is the sub-list for field type_name
@@ -429,7 +526,7 @@ func file_likes_likes_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_likes_likes_proto_rawDesc), len(file_likes_likes_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   9,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -221,6 +221,16 @@ func registerRoutes(app *fiber.App, cl *clients) {
 		}
 		return c.JSON(fiber.Map{"liked": resp.Liked})
 	})
+	app.Delete("/api/v1/likes/", func(c *fiber.Ctx) error {
+		var req likespb.UnlikeRequest
+		if err := c.BodyParser(&req); err != nil {
+			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid body"})
+		}
+		if _, err := cl.likes.Unlike(c.Context(), &req); err != nil {
+			return grpcErrStatus(c, err)
+		}
+		return c.SendStatus(fiber.StatusNoContent)
+	})
 
 	// --- feed ---
 	app.Get("/api/v1/feed/home", func(c *fiber.Ctx) error {
