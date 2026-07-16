@@ -1,6 +1,6 @@
 SERVICES = gateway-service posts-service comments-service likes-service feed-service users-service media-service notification-service event-writer-service cache-rebuilder-service
 
-.PHONY: build run stop test lint up down infra-up infra-down migrate demo fresh tidy proto
+.PHONY: build run stop test lint up down infra-up infra-down migrate demo fresh tidy proto ui
 
 proto:
 	@export PATH="$${PATH}:/opt/homebrew/bin:$$(go env GOPATH)/bin" && \
@@ -58,6 +58,9 @@ migrate:
 
 demo:
 	@bash scripts/demo.sh
+
+ui:
+	cd ui && npm run dev
 
 # Full fresh start: wipe volumes, rebuild, migrate, demo
 fresh: down-clean up
