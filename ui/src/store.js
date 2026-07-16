@@ -61,8 +61,7 @@ export const useStore = create(
     }),
     {
       name: 'socialnet-store',
-      // only persist user registry — session state is always fresh
-      partialize: s => ({ users: s.users, usersById: s.usersById }),
+      partialize: s => ({ users: s.users, usersById: s.usersById, currentUser: s.currentUser }),
     }
   )
 )

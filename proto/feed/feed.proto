@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package feed;
+
+option go_package = "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/feed;feedpb";
+
+import "google/protobuf/timestamp.proto";
+
+message FeedItem {
+  string post_id = 1;
+  string author_id = 2;
+  string text = 3;
+  int32 likes_count = 4;
+  int32 comments_count = 5;
+  string image_url = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message GetHomeFeedRequest {
+  string user_id = 1;
+}
+
+message GetUserFeedRequest {
+  string user_id = 1;
+}
+
+message GetFeedResponse {
+  repeated FeedItem items = 1;
+}
+
+message ResetRequest {}
+
+message ResetResponse {
+  string status = 1;
+}
+
+service FeedService {
+  rpc GetHomeFeed(GetHomeFeedRequest) returns (GetFeedResponse);
+  rpc GetUserFeed(GetUserFeedRequest) returns (GetFeedResponse);
+  rpc Reset(ResetRequest) returns (ResetResponse);
+}

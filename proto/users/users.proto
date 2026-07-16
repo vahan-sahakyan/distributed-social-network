@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package users;
+
+option go_package = "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users;userspb";
+
+import "google/protobuf/timestamp.proto";
+
+message User {
+  string id = 1;
+  string username = 2;
+  string bio = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string bio = 2;
+}
+
+message CreateUserResponse {
+  User user = 1;
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+message GetUserByUsernameRequest {
+  string username = 1;
+}
+
+message GetUserByUsernameResponse {
+  User user = 1;
+}
+
+message FollowUserRequest {
+  string target_id = 1;
+  string follower_id = 2;
+}
+
+message FollowUserResponse {}
+
+message UnfollowUserRequest {
+  string target_id = 1;
+  string follower_id = 2;
+}
+
+message UnfollowUserResponse {}
+
+message GetFollowersRequest {
+  string user_id = 1;
+}
+
+message GetFollowersResponse {
+  repeated string followers = 1;
+}
+
+message GetFollowingRequest {
+  string user_id = 1;
+}
+
+message GetFollowingResponse {
+  repeated string following = 1;
+}
+
+message ResetRequest {}
+
+message ResetResponse {
+  string status = 1;
+}
+
+service UsersService {
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+  rpc GetUserByUsername(GetUserByUsernameRequest) returns (GetUserByUsernameResponse);
+  rpc FollowUser(FollowUserRequest) returns (FollowUserResponse);
+  rpc UnfollowUser(UnfollowUserRequest) returns (UnfollowUserResponse);
+  rpc GetFollowers(GetFollowersRequest) returns (GetFollowersResponse);
+  rpc GetFollowing(GetFollowingRequest) returns (GetFollowingResponse);
+  rpc Reset(ResetRequest) returns (ResetResponse);
+}

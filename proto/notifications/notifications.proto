@@ -1,0 +1,36 @@
+syntax = "proto3";
+
+package notifications;
+
+option go_package = "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/notifications;notificationspb";
+
+import "google/protobuf/timestamp.proto";
+
+message Notification {
+  string id = 1;
+  string user_id = 2;
+  string type = 3;
+  string actor_id = 4;
+  string entity_id = 5;
+  bool read = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message GetNotificationsRequest {
+  string user_id = 1;
+}
+
+message GetNotificationsResponse {
+  repeated Notification notifications = 1;
+}
+
+message ResetRequest {}
+
+message ResetResponse {
+  string status = 1;
+}
+
+service NotificationService {
+  rpc GetNotifications(GetNotificationsRequest) returns (GetNotificationsResponse);
+  rpc Reset(ResetRequest) returns (ResetResponse);
+}

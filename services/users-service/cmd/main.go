@@ -3,18 +3,21 @@ package main
 import (
 	"context"
 	"log"
+	"net"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
-	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/handler"
+	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
+	grpcserver "github.com/vahan-sahakyan/distributed-social-network/users-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/service"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"google.golang.org/grpc"
 )
 
 func main() {
@@ -29,27 +32,35 @@ func main() {
 
 	repo := repository.New(db)
 	svc := service.New(repo)
-	h := handler.New(svc)
 
+	// gRPC server
+	grpcPort := os.Getenv("GRPC_PORT")
+	if grpcPort == "" {
+		grpcPort = "9085"
+	}
+	lis, err := net.Listen("tcp", ":"+grpcPort)
+	if err != nil {
+		log.Fatalf("failed to listen on grpc port: %v", err)
+	}
+	grpcSrv := grpc.NewServer()
+	userspb.RegisterUsersServiceServer(grpcSrv, grpcserver.New(svc, func(ctx context.Context) error {
+		_, err := db.Exec(ctx, "TRUNCATE users, follows")
+		return err
+	}))
+	go func() {
+		log.Printf("gRPC server listening on :%s", grpcPort)
+		if err := grpcSrv.Serve(lis); err != nil {
+			log.Fatalf("gRPC server failed: %v", err)
+		}
+	}()
+
+	// HTTP server (health + metrics only)
 	app := fiber.New(fiber.Config{AppName: "users-service"})
 	prometheus := fiberprometheus.NewWithDefaultRegistry("users-service")
 	prometheus.RegisterAt(app, "/metrics")
 	app.Use(prometheus.Middleware)
 	app.Use(logger.New())
 
-	api := app.Group("/api/v1/users")
-	api.Post("/", h.CreateUser)
-	api.Get("/by-username/:username", h.GetUserByUsername)
-	api.Get("/:id", h.GetUser)
-	api.Post("/:id/follow", h.FollowUser)
-	api.Delete("/:id/follow", h.UnfollowUser)
-	api.Get("/:id/followers", h.GetFollowers)
-	api.Get("/:id/following", h.GetFollowing)
-
-	app.Post("/reset", func(c *fiber.Ctx) error {
-		db.Exec(c.Context(), "TRUNCATE users, follows")
-		return c.JSON(fiber.Map{"status": "reset"})
-	})
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
@@ -61,10 +72,11 @@ func main() {
 
 	go func() {
 		if err := app.Listen(":" + port); err != nil {
-			log.Fatalf("failed to start server: %v", err)
+			log.Fatalf("failed to start HTTP server: %v", err)
 		}
 	}()
 
 	<-ctx.Done()
+	grpcSrv.GracefulStop()
 	_ = app.Shutdown()
 }

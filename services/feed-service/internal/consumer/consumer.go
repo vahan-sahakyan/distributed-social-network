@@ -3,26 +3,32 @@ package consumer
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"log"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/service"
+	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
+	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
+	"google.golang.org/grpc"
 )
 
 type Consumer struct {
-	svc      *service.Service
-	brokers  string
-	usersURL string
-	postsURL string
+	svc         *service.Service
+	brokers     string
+	usersClient userspb.UsersServiceClient
+	postsClient postspb.PostsServiceClient
 }
 
-func New(svc *service.Service, brokers, usersURL, postsURL string) *Consumer {
-	return &Consumer{svc: svc, brokers: brokers, usersURL: usersURL, postsURL: postsURL}
+func New(svc *service.Service, brokers string, usersConn, postsConn *grpc.ClientConn) *Consumer {
+	return &Consumer{
+		svc:         svc,
+		brokers:     brokers,
+		usersClient: userspb.NewUsersServiceClient(usersConn),
+		postsClient: postspb.NewPostsServiceClient(postsConn),
+	}
 }
 
 func (c *Consumer) Start(ctx context.Context) {
@@ -116,36 +122,18 @@ func (c *Consumer) handleCommentCreated(data []byte) {
 }
 
 func (c *Consumer) fetchFollowers(userID string) []string {
-	resp, err := http.Get(c.usersURL + "/api/v1/users/" + userID + "/followers")
+	resp, err := c.usersClient.GetFollowers(context.Background(), &userspb.GetFollowersRequest{UserId: userID})
 	if err != nil {
 		log.Printf("error fetching followers for %s: %v", userID, err)
 		return nil
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	var result struct {
-		Followers []string `json:"followers"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil
-	}
-	return result.Followers
+	return resp.Followers
 }
 
 func (c *Consumer) fetchPostAuthor(postID string) (string, bool) {
-	resp, err := http.Get(c.postsURL + "/api/v1/posts/" + postID)
-	if err != nil {
+	resp, err := c.postsClient.GetPost(context.Background(), &postspb.GetPostRequest{Id: postID})
+	if err != nil || resp.Post == nil || resp.Post.AuthorId == "" {
 		return "", false
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", false
-	}
-	var post struct {
-		AuthorID string `json:"author_id"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&post); err != nil || post.AuthorID == "" {
-		return "", false
-	}
-	return post.AuthorID, true
+	return resp.Post.AuthorId, true
 }

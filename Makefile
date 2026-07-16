@@ -1,6 +1,24 @@
 SERVICES = gateway-service posts-service comments-service likes-service feed-service users-service media-service notification-service event-writer-service cache-rebuilder-service
 
-.PHONY: build run stop test lint up down infra-up infra-down migrate demo fresh tidy
+.PHONY: build run stop test lint up down infra-up infra-down migrate demo fresh tidy proto ui
+
+proto:
+	@export PATH="$${PATH}:/opt/homebrew/bin:$$(go env GOPATH)/bin" && \
+	protoc \
+		--go_out=./pkg \
+		--go_opt=module=github.com/vahan-sahakyan/distributed-social-network/pkg \
+		--go-grpc_out=./pkg \
+		--go-grpc_opt=module=github.com/vahan-sahakyan/distributed-social-network/pkg \
+		-I proto \
+		proto/users/users.proto \
+		proto/posts/posts.proto \
+		proto/comments/comments.proto \
+		proto/likes/likes.proto \
+		proto/feed/feed.proto \
+		proto/media/media.proto \
+		proto/notifications/notifications.proto \
+		proto/cache_rebuilder/cache_rebuilder.proto
+	@echo "gRPC code generation complete."
 
 build:
 	@for svc in $(SERVICES); do \
@@ -40,6 +58,9 @@ migrate:
 
 demo:
 	@bash scripts/demo.sh
+
+ui:
+	cd ui && npm run dev
 
 # Full fresh start: wipe volumes, rebuild, migrate, demo
 fresh: down-clean up

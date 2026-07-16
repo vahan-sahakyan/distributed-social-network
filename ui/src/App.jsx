@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { Zap, Home, Bell, User, Plus, RefreshCw, LogIn, Play, Trash2 } from 'lucide-react'
+import { Zap, Home, Bell, User, Plus, RefreshCw, LogIn, Play, Trash2, BarChart2 } from 'lucide-react'
 import { runDemo } from './demo'
 import { Avatar } from './components/Avatar'
 import { Toasts } from './components/Toast'
@@ -8,6 +8,7 @@ import { HomePage } from './pages/HomePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { AuthPage } from './pages/AuthPage'
+import { LoadTestPage } from './pages/LoadTestPage'
 import { api } from './api'
 import { useStore } from './store'
 
@@ -127,6 +128,9 @@ function AppLayout() {
                   {() => <><User size={15} />My Profile</>}
                 </NavLink>
               )}
+              <NavLink to="/loadtest" className={navLinkClass}>
+                {() => <><BarChart2 size={15} />Load Test</>}
+              </NavLink>
             </nav>
 
             {/* Users section */}
@@ -204,6 +208,7 @@ function AppLayout() {
             <Route path="/home" element={<RequireUser><HomePage /></RequireUser>} />
             <Route path="/profile/:userId" element={<ProfilePage />} />
             <Route path="/notifications" element={<RequireUser><NotificationsPage /></RequireUser>} />
+            <Route path="/loadtest" element={<LoadTestPage />} />
           </Routes>
         </main>
 

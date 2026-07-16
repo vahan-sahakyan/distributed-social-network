@@ -1,0 +1,750 @@
+{
+  "info": {
+    "_postman_id": "dsn-grpc-collection-v1",
+    "name": "Distributed Social Network — gRPC",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "users_host",
+      "value": "localhost:9085"
+    },
+    {
+      "key": "posts_host",
+      "value": "localhost:9081"
+    },
+    {
+      "key": "comments_host",
+      "value": "localhost:9083"
+    },
+    {
+      "key": "likes_host",
+      "value": "localhost:9084"
+    },
+    {
+      "key": "feed_host",
+      "value": "localhost:9082"
+    },
+    {
+      "key": "media_host",
+      "value": "localhost:9086"
+    },
+    {
+      "key": "notifications_host",
+      "value": "localhost:9087"
+    },
+    {
+      "key": "cache_rebuilder_host",
+      "value": "localhost:9089"
+    }
+  ],
+  "protoDef": [
+    {
+      "id": "pd_users",
+      "name": "users.proto",
+      "definition": "syntax = \"proto3\";\n\npackage users;\n\noption go_package = \"github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users;userspb\";\n\nimport \"google/protobuf/timestamp.proto\";\n\nmessage User {\n  string id = 1;\n  string username = 2;\n  string bio = 3;\n  google.protobuf.Timestamp created_at = 4;\n}\n\nmessage CreateUserRequest {\n  string username = 1;\n  string bio = 2;\n}\n\nmessage CreateUserResponse {\n  User user = 1;\n}\n\nmessage GetUserRequest {\n  string id = 1;\n}\n\nmessage GetUserResponse {\n  User user = 1;\n}\n\nmessage GetUserByUsernameRequest {\n  string username = 1;\n}\n\nmessage GetUserByUsernameResponse {\n  User user = 1;\n}\n\nmessage FollowUserRequest {\n  string target_id = 1;\n  string follower_id = 2;\n}\n\nmessage FollowUserResponse {}\n\nmessage UnfollowUserRequest {\n  string target_id = 1;\n  string follower_id = 2;\n}\n\nmessage UnfollowUserResponse {}\n\nmessage GetFollowersRequest {\n  string user_id = 1;\n}\n\nmessage GetFollowersResponse {\n  repeated string followers = 1;\n}\n\nmessage GetFollowingRequest {\n  string user_id = 1;\n}\n\nmessage GetFollowingResponse {\n  repeated string following = 1;\n}\n\nmessage ResetRequest {}\n\nmessage ResetResponse {\n  string status = 1;\n}\n\nservice UsersService {\n  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);\n  rpc GetUser(GetUserRequest) returns (GetUserResponse);\n  rpc GetUserByUsername(GetUserByUsernameRequest) returns (GetUserByUsernameResponse);\n  rpc FollowUser(FollowUserRequest) returns (FollowUserResponse);\n  rpc UnfollowUser(UnfollowUserRequest) returns (UnfollowUserResponse);\n  rpc GetFollowers(GetFollowersRequest) returns (GetFollowersResponse);\n  rpc GetFollowing(GetFollowingRequest) returns (GetFollowingResponse);\n  rpc Reset(ResetRequest) returns (ResetResponse);\n}\n"
+    },
+    {
+      "id": "pd_posts",
+      "name": "posts.proto",
+      "definition": "syntax = \"proto3\";\n\npackage posts;\n\noption go_package = \"github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts;postspb\";\n\nimport \"google/protobuf/timestamp.proto\";\n\nmessage Post {\n  string id = 1;\n  string text = 2;\n  string author_id = 3;\n  string image_id = 4;\n  int32 likes = 5;\n  int32 comments = 6;\n  google.protobuf.Timestamp created_at = 7;\n}\n\nmessage CreatePostRequest {\n  string text = 1;\n  string author_id = 2;\n  string image_id = 3;\n}\n\nmessage CreatePostResponse {\n  Post post = 1;\n}\n\nmessage GetPostRequest {\n  string id = 1;\n}\n\nmessage GetPostResponse {\n  Post post = 1;\n}\n\nmessage ResetRequest {}\n\nmessage ResetResponse {\n  string status = 1;\n}\n\nservice PostsService {\n  rpc CreatePost(CreatePostRequest) returns (CreatePostResponse);\n  rpc GetPost(GetPostRequest) returns (GetPostResponse);\n  rpc Reset(ResetRequest) returns (ResetResponse);\n}\n"
+    },
+    {
+      "id": "pd_comments",
+      "name": "comments.proto",
+      "definition": "syntax = \"proto3\";\n\npackage comments;\n\noption go_package = \"github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/comments;commentspb\";\n\nimport \"google/protobuf/timestamp.proto\";\n\nmessage Comment {\n  string id = 1;\n  string user_id = 2;\n  string entity_id = 3;\n  string text = 4;\n  int32 likes = 5;\n  google.protobuf.Timestamp created_at = 6;\n}\n\nmessage CreateCommentRequest {\n  string user_id = 1;\n  string entity_id = 2;\n  string text = 3;\n}\n\nmessage CreateCommentResponse {\n  Comment comment = 1;\n}\n\nmessage GetCommentsRequest {\n  string entity_id = 1;\n}\n\nmessage GetCommentsResponse {\n  repeated Comment comments = 1;\n}\n\nmessage ResetRequest {}\n\nmessage ResetResponse {\n  string status = 1;\n}\n\nservice CommentsService {\n  rpc CreateComment(CreateCommentRequest) returns (CreateCommentResponse);\n  rpc GetComments(GetCommentsRequest) returns (GetCommentsResponse);\n  rpc Reset(ResetRequest) returns (ResetResponse);\n}\n"
+    },
+    {
+      "id": "pd_likes",
+      "name": "likes.proto",
+      "definition": "syntax = \"proto3\";\n\npackage likes;\n\noption go_package = \"github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/likes;likespb\";\n\nmessage Like {\n  string id = 1;\n  string user_id = 2;\n  string entity_id = 3;\n}\n\nmessage CreateLikeRequest {\n  string user_id = 1;\n  string entity_id = 2;\n}\n\nmessage CreateLikeResponse {\n  Like like = 1;\n}\n\nmessage ResetRequest {}\n\nmessage ResetResponse {\n  string status = 1;\n}\n\nservice LikesService {\n  rpc CreateLike(CreateLikeRequest) returns (CreateLikeResponse);\n  rpc Reset(ResetRequest) returns (ResetResponse);\n}\n"
+    },
+    {
+      "id": "pd_feed",
+      "name": "feed.proto",
+      "definition": "syntax = \"proto3\";\n\npackage feed;\n\noption go_package = \"github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/feed;feedpb\";\n\nimport \"google/protobuf/timestamp.proto\";\n\nmessage FeedItem {\n  string post_id = 1;\n  string author_id = 2;\n  string text = 3;\n  int32 likes_count = 4;\n  int32 comments_count = 5;\n  string image_url = 6;\n  google.protobuf.Timestamp created_at = 7;\n}\n\nmessage GetHomeFeedRequest {\n  string user_id = 1;\n}\n\nmessage GetUserFeedRequest {\n  string user_id = 1;\n}\n\nmessage GetFeedResponse {\n  repeated FeedItem items = 1;\n}\n\nmessage ResetRequest {}\n\nmessage ResetResponse {\n  string status = 1;\n}\n\nservice FeedService {\n  rpc GetHomeFeed(GetHomeFeedRequest) returns (GetFeedResponse);\n  rpc GetUserFeed(GetUserFeedRequest) returns (GetFeedResponse);\n  rpc Reset(ResetRequest) returns (ResetResponse);\n}\n"
+    },
+    {
+      "id": "pd_media",
+      "name": "media.proto",
+      "definition": "syntax = \"proto3\";\n\npackage media;\n\noption go_package = \"github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/media;mediapb\";\n\n// First message in the stream must be metadata; subsequent messages are chunks.\nmessage UploadChunk {\n  oneof content {\n    UploadMeta meta = 1;\n    bytes chunk_data = 2;\n  }\n}\n\nmessage UploadMeta {\n  string filename = 1;\n  string content_type = 2;\n  int64 size = 3;\n}\n\nmessage UploadResponse {\n  string id = 1;\n  string url = 2;\n}\n\nmessage GetURLRequest {\n  string id = 1;\n}\n\nmessage GetURLResponse {\n  string id = 1;\n  string url = 2;\n}\n\nservice MediaService {\n  rpc Upload(stream UploadChunk) returns (UploadResponse);\n  rpc GetURL(GetURLRequest) returns (GetURLResponse);\n}\n"
+    },
+    {
+      "id": "pd_notifications",
+      "name": "notifications.proto",
+      "definition": "syntax = \"proto3\";\n\npackage notifications;\n\noption go_package = \"github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/notifications;notificationspb\";\n\nimport \"google/protobuf/timestamp.proto\";\n\nmessage Notification {\n  string id = 1;\n  string user_id = 2;\n  string type = 3;\n  string actor_id = 4;\n  string entity_id = 5;\n  bool read = 6;\n  google.protobuf.Timestamp created_at = 7;\n}\n\nmessage GetNotificationsRequest {\n  string user_id = 1;\n}\n\nmessage GetNotificationsResponse {\n  repeated Notification notifications = 1;\n}\n\nmessage ResetRequest {}\n\nmessage ResetResponse {\n  string status = 1;\n}\n\nservice NotificationService {\n  rpc GetNotifications(GetNotificationsRequest) returns (GetNotificationsResponse);\n  rpc Reset(ResetRequest) returns (ResetResponse);\n}\n"
+    },
+    {
+      "id": "pd_cache_rebuilder",
+      "name": "cache_rebuilder.proto",
+      "definition": "syntax = \"proto3\";\n\npackage cache_rebuilder;\n\noption go_package = \"github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/cache_rebuilder;cacherebpb\";\n\n// user_id is optional; empty string means rebuild all users.\nmessage TriggerRebuildRequest {\n  string user_id = 1;\n}\n\nmessage TriggerRebuildResponse {\n  string status = 1;\n}\n\nmessage ResetRequest {}\n\nmessage ResetResponse {\n  string status = 1;\n}\n\nservice CacheRebuilderService {\n  rpc TriggerRebuild(TriggerRebuildRequest) returns (TriggerRebuildResponse);\n  rpc Reset(ResetRequest) returns (ResetResponse);\n}\n"
+    }
+  ],
+  "item": [
+    {
+      "name": "UsersService",
+      "item": [
+        {
+          "name": "CreateUser",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{users_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{users_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"alice\",\n  \"bio\": \"Senior engineer @ DistributedSystems Co.\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_users",
+          "selectedOperation": {
+            "id": "CreateUser",
+            "name": "CreateUser",
+            "serviceName": "UsersService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "GetUser",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{users_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{users_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"<user_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_users",
+          "selectedOperation": {
+            "id": "GetUser",
+            "name": "GetUser",
+            "serviceName": "UsersService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "GetUserByUsername",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{users_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{users_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"alice\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_users",
+          "selectedOperation": {
+            "id": "GetUserByUsername",
+            "name": "GetUserByUsername",
+            "serviceName": "UsersService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "FollowUser",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{users_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{users_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"target_id\": \"<target_user_id>\",\n  \"follower_id\": \"<follower_user_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_users",
+          "selectedOperation": {
+            "id": "FollowUser",
+            "name": "FollowUser",
+            "serviceName": "UsersService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "UnfollowUser",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{users_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{users_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"target_id\": \"<target_user_id>\",\n  \"follower_id\": \"<follower_user_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_users",
+          "selectedOperation": {
+            "id": "UnfollowUser",
+            "name": "UnfollowUser",
+            "serviceName": "UsersService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "GetFollowers",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{users_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{users_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"<user_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_users",
+          "selectedOperation": {
+            "id": "GetFollowers",
+            "name": "GetFollowers",
+            "serviceName": "UsersService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "GetFollowing",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{users_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{users_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"<user_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_users",
+          "selectedOperation": {
+            "id": "GetFollowing",
+            "name": "GetFollowing",
+            "serviceName": "UsersService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "Reset",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{users_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{users_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_users",
+          "selectedOperation": {
+            "id": "Reset",
+            "name": "Reset",
+            "serviceName": "UsersService",
+            "type": "unary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "PostsService",
+      "item": [
+        {
+          "name": "CreatePost",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{posts_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{posts_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"Just deployed our new distributed cache layer. Latency dropped 80% 🚀\",\n  \"author_id\": \"<user_id>\",\n  \"image_id\": \"\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_posts",
+          "selectedOperation": {
+            "id": "CreatePost",
+            "name": "CreatePost",
+            "serviceName": "PostsService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "GetPost",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{posts_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{posts_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"<post_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_posts",
+          "selectedOperation": {
+            "id": "GetPost",
+            "name": "GetPost",
+            "serviceName": "PostsService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "Reset",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{posts_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{posts_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_posts",
+          "selectedOperation": {
+            "id": "Reset",
+            "name": "Reset",
+            "serviceName": "PostsService",
+            "type": "unary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "CommentsService",
+      "item": [
+        {
+          "name": "CreateComment",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{comments_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{comments_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"<user_id>\",\n  \"entity_id\": \"<post_id>\",\n  \"text\": \"What keyspace strategy are you using in ScyllaDB?\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_comments",
+          "selectedOperation": {
+            "id": "CreateComment",
+            "name": "CreateComment",
+            "serviceName": "CommentsService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "GetComments",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{comments_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{comments_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entity_id\": \"<post_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_comments",
+          "selectedOperation": {
+            "id": "GetComments",
+            "name": "GetComments",
+            "serviceName": "CommentsService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "Reset",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{comments_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{comments_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_comments",
+          "selectedOperation": {
+            "id": "Reset",
+            "name": "Reset",
+            "serviceName": "CommentsService",
+            "type": "unary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "LikesService",
+      "item": [
+        {
+          "name": "CreateLike",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{likes_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{likes_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"<user_id>\",\n  \"entity_id\": \"<post_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_likes",
+          "selectedOperation": {
+            "id": "CreateLike",
+            "name": "CreateLike",
+            "serviceName": "LikesService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "Reset",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{likes_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{likes_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_likes",
+          "selectedOperation": {
+            "id": "Reset",
+            "name": "Reset",
+            "serviceName": "LikesService",
+            "type": "unary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "FeedService",
+      "item": [
+        {
+          "name": "GetHomeFeed",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{feed_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{feed_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"<user_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_feed",
+          "selectedOperation": {
+            "id": "GetHomeFeed",
+            "name": "GetHomeFeed",
+            "serviceName": "FeedService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "GetUserFeed",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{feed_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{feed_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"<user_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_feed",
+          "selectedOperation": {
+            "id": "GetUserFeed",
+            "name": "GetUserFeed",
+            "serviceName": "FeedService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "Reset",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{feed_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{feed_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_feed",
+          "selectedOperation": {
+            "id": "Reset",
+            "name": "Reset",
+            "serviceName": "FeedService",
+            "type": "unary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MediaService",
+      "item": [
+        {
+          "name": "Upload",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{media_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{media_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"meta\": {\n    \"filename\": \"photo.jpg\",\n    \"content_type\": \"image/jpeg\",\n    \"size\": 102400\n  }\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_media",
+          "selectedOperation": {
+            "id": "Upload",
+            "name": "Upload",
+            "serviceName": "MediaService",
+            "type": "client_streaming"
+          }
+        },
+        {
+          "name": "GetURL",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{media_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{media_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"<image_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_media",
+          "selectedOperation": {
+            "id": "GetURL",
+            "name": "GetURL",
+            "serviceName": "MediaService",
+            "type": "unary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "NotificationService",
+      "item": [
+        {
+          "name": "GetNotifications",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{notifications_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{notifications_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"<user_id>\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_notifications",
+          "selectedOperation": {
+            "id": "GetNotifications",
+            "name": "GetNotifications",
+            "serviceName": "NotificationService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "Reset",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{notifications_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{notifications_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_notifications",
+          "selectedOperation": {
+            "id": "Reset",
+            "name": "Reset",
+            "serviceName": "NotificationService",
+            "type": "unary"
+          }
+        }
+      ]
+    },
+    {
+      "name": "CacheRebuilderService",
+      "item": [
+        {
+          "name": "TriggerRebuild",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{cache_rebuilder_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{cache_rebuilder_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"user_id\": \"\"\n}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_cache_rebuilder",
+          "selectedOperation": {
+            "id": "TriggerRebuild",
+            "name": "TriggerRebuild",
+            "serviceName": "CacheRebuilderService",
+            "type": "unary"
+          }
+        },
+        {
+          "name": "Reset",
+          "request": {
+            "method": "GRPC",
+            "url": {
+              "raw": "grpc://{{cache_rebuilder_host}}",
+              "protocol": "grpc",
+              "host": [
+                "{{cache_rebuilder_host}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "protoFileSource": "collection",
+          "protoDefinition": "pd_cache_rebuilder",
+          "selectedOperation": {
+            "id": "Reset",
+            "name": "Reset",
+            "serviceName": "CacheRebuilderService",
+            "type": "unary"
+          }
+        }
+      ]
+    }
+  ]
+}

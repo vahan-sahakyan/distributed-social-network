@@ -4,25 +4,25 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/vahan-sahakyan/distributed-social-network/cache-rebuilder-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/cache-rebuilder-service/internal/repository"
+	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
+	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
 )
 
 type Service struct {
-	repo     *repository.Repository
-	mc       *memcache.Client
-	usersURL string
-	postsURL string
+	repo        *repository.Repository
+	mc          *memcache.Client
+	usersClient userspb.UsersServiceClient
+	postsClient postspb.PostsServiceClient
 }
 
-func New(repo *repository.Repository, mc *memcache.Client, usersURL, postsURL string) *Service {
-	return &Service{repo: repo, mc: mc, usersURL: usersURL, postsURL: postsURL}
+func New(repo *repository.Repository, mc *memcache.Client, usersClient userspb.UsersServiceClient, postsClient postspb.PostsServiceClient) *Service {
+	return &Service{repo: repo, mc: mc, usersClient: usersClient, postsClient: postsClient}
 }
 
 type feedItem struct {
@@ -165,46 +165,40 @@ type postResponse struct {
 }
 
 func (s *Service) fetchPost(postID string) (*postResponse, error) {
-	resp, err := http.Get(s.postsURL + "/api/v1/posts/" + postID)
+	resp, err := s.postsClient.GetPost(context.Background(), &postspb.GetPostRequest{Id: postID})
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("posts-service returned %d", resp.StatusCode)
+	if resp.Post == nil {
+		return nil, fmt.Errorf("post not found: %s", postID)
 	}
-	body, _ := io.ReadAll(resp.Body)
-	var post postResponse
-	if err := json.Unmarshal(body, &post); err != nil {
-		return nil, err
+	p := resp.Post
+	post := &postResponse{
+		ID:       p.Id,
+		Text:     p.Text,
+		AuthorID: p.AuthorId,
+		ImageID:  p.ImageId,
+		Likes:    int(p.Likes),
+		Comments: int(p.Comments),
 	}
-	return &post, nil
+	if p.CreatedAt != nil {
+		post.CreatedAt = p.CreatedAt.AsTime()
+	}
+	return post, nil
 }
 
 func (s *Service) fetchFollowers(userID string) []string {
-	resp, err := http.Get(s.usersURL + "/api/v1/users/" + userID + "/followers")
+	resp, err := s.usersClient.GetFollowers(context.Background(), &userspb.GetFollowersRequest{UserId: userID})
 	if err != nil {
 		return nil
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	var result struct {
-		Followers []string `json:"followers"`
-	}
-	json.Unmarshal(body, &result)
-	return result.Followers
+	return resp.Followers
 }
 
 func (s *Service) fetchFollowing(userID string) []string {
-	resp, err := http.Get(s.usersURL + "/api/v1/users/" + userID + "/following")
+	resp, err := s.usersClient.GetFollowing(context.Background(), &userspb.GetFollowingRequest{UserId: userID})
 	if err != nil {
 		return nil
 	}
-	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
-	var result struct {
-		Following []string `json:"following"`
-	}
-	json.Unmarshal(body, &result)
-	return result.Following
+	return resp.Following
 }
