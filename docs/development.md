@@ -10,6 +10,12 @@
 - **Go 1.24+** (for local builds/tests)
 - **curl** (for testing APIs)
 - **python3** (used by demo script for JSON formatting)
+- **protoc v7.35.1** (`brew install protobuf` / `brew upgrade protobuf` → 35.1)
+- **protoc-gen-go v1.36.11** (`go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11`)
+- **protoc-gen-go-grpc v1.5.1** (`go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1`)
+
+> These exact versions ensure generated stubs match what's committed under `pkg/grpc/`.
+> After changing any `.proto` file, regenerate with `make proto`.
 
 ## First-Time Setup
 

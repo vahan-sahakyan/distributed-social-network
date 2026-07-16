@@ -18,6 +18,10 @@ func New(repo *repository.Repository, producer *broker.Producer) *Service {
 	return &Service{repo: repo, producer: producer}
 }
 
+func (s *Service) HasLiked(ctx context.Context, userID, entityID string) (bool, error) {
+	return s.repo.HasLiked(ctx, userID, entityID)
+}
+
 func (s *Service) CreateLike(ctx context.Context, req *model.CreateLikeRequest) (*model.Like, error) {
 	like := &model.Like{
 		ID:       id.New(),

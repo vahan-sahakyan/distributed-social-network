@@ -35,6 +35,14 @@ func (s *Server) CreateLike(ctx context.Context, req *likespb.CreateLikeRequest)
 	}}, nil
 }
 
+func (s *Server) HasLiked(ctx context.Context, req *likespb.HasLikedRequest) (*likespb.HasLikedResponse, error) {
+	liked, err := s.svc.HasLiked(ctx, req.UserId, req.EntityId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to check like: %v", err)
+	}
+	return &likespb.HasLikedResponse{Liked: liked}, nil
+}
+
 func (s *Server) Reset(ctx context.Context, _ *likespb.ResetRequest) (*likespb.ResetResponse, error) {
 	if err := s.resetFn(ctx); err != nil {
 		return nil, status.Errorf(codes.Internal, "reset failed: %v", err)

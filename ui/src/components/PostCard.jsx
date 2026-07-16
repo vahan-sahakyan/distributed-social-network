@@ -17,6 +17,13 @@ export function PostCard({ post }) {
   const author = usersById[post.authorId]
   const username = author?.username || shortId(post.authorId)
 
+  useEffect(() => {
+    if (!currentUser) return
+    api.hasLiked(currentUser.id, post.id)
+      .then(v => setLiked(v))
+      .catch(() => {})
+  }, [currentUser?.id, post.id])
+
   async function handleLike() {
     if (!currentUser) return toast('Select a user first', 'error')
     if (liked) return
