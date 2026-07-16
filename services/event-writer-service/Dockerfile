@@ -1,6 +1,8 @@
 FROM golang:1.24-alpine AS builder
 WORKDIR /app
-COPY pkg/ ./pkg/
+COPY pkg/go.mod pkg/go.sum ./pkg/
+COPY pkg/database/ ./pkg/database/
+COPY pkg/id/ ./pkg/id/
 COPY services/event-writer-service/ ./services/event-writer-service/
 WORKDIR /app/services/event-writer-service
 RUN go mod download

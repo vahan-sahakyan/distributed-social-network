@@ -3,7 +3,7 @@ import { Heart, MessageCircle, RefreshCw } from 'lucide-react'
 import { Avatar } from '../components/Avatar'
 import { api } from '../api'
 import { useStore } from '../store'
-import { timeAgo, shortId } from '../utils'
+import { timeAgo, shortId, parseTimestamp } from '../utils'
 
 const TYPE_ICON = {
   like: <Heart size={13} className="text-red-400" fill="currentColor" />,
@@ -81,7 +81,7 @@ export function NotificationsPage() {
             {n.entity_id && (
               <p className="text-xs text-muted/60 mt-0.5 font-mono truncate">{n.entity_id}</p>
             )}
-            <p className="text-xs text-muted mt-1">{timeAgo(n.created_at)}</p>
+            <p className="text-xs text-muted mt-1">{timeAgo(parseTimestamp(n.created_at))}</p>
           </div>
           {!n.read && (
             <div className="w-2 h-2 rounded-full bg-accent shrink-0 mt-2" />

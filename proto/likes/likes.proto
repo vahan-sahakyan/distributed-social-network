@@ -19,6 +19,22 @@ message CreateLikeResponse {
   Like like = 1;
 }
 
+message HasLikedRequest {
+  string user_id = 1;
+  string entity_id = 2;
+}
+
+message HasLikedResponse {
+  bool liked = 1;
+}
+
+message UnlikeRequest {
+  string user_id = 1;
+  string entity_id = 2;
+}
+
+message UnlikeResponse {}
+
 message ResetRequest {}
 
 message ResetResponse {
@@ -27,5 +43,7 @@ message ResetResponse {
 
 service LikesService {
   rpc CreateLike(CreateLikeRequest) returns (CreateLikeResponse);
+  rpc HasLiked(HasLikedRequest) returns (HasLikedResponse);
+  rpc Unlike(UnlikeRequest) returns (UnlikeResponse);
   rpc Reset(ResetRequest) returns (ResetResponse);
 }

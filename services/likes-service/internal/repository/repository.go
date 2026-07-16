@@ -23,3 +23,20 @@ func (r *Repository) Create(ctx context.Context, like *model.Like) error {
 	)
 	return err
 }
+
+func (r *Repository) HasLiked(ctx context.Context, userID, entityID string) (bool, error) {
+	var exists bool
+	err := r.db.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM likes WHERE user_id=$1 AND entity_id=$2)`,
+		userID, entityID,
+	).Scan(&exists)
+	return exists, err
+}
+
+func (r *Repository) Delete(ctx context.Context, userID, entityID string) error {
+	_, err := r.db.Exec(ctx,
+		`DELETE FROM likes WHERE user_id=$1 AND entity_id=$2`,
+		userID, entityID,
+	)
+	return err
+}

@@ -17,17 +17,35 @@ export function PostCard({ post }) {
   const author = usersById[post.authorId]
   const username = author?.username || shortId(post.authorId)
 
+  useEffect(() => {
+    if (!currentUser) return
+    api.hasLiked(currentUser.id, post.id)
+      .then(v => setLiked(v))
+      .catch(() => {})
+  }, [currentUser?.id, post.id])
+
   async function handleLike() {
     if (!currentUser) return toast('Select a user first', 'error')
-    if (liked) return
-    setLiked(true)
-    setLikes(l => l + 1)
-    try {
-      await api.like(currentUser.id, post.id)
-    } catch (err) {
+    if (liked) {
       setLiked(false)
       setLikes(l => l - 1)
-      toast(err.message, 'error')
+      try {
+        await api.unlike(currentUser.id, post.id)
+      } catch (err) {
+        setLiked(true)
+        setLikes(l => l + 1)
+        toast(err.message, 'error')
+      }
+    } else {
+      setLiked(true)
+      setLikes(l => l + 1)
+      try {
+        await api.like(currentUser.id, post.id)
+      } catch (err) {
+        setLiked(false)
+        setLikes(l => l - 1)
+        toast(err.message, 'error')
+      }
     }
   }
 

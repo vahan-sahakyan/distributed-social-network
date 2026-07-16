@@ -1,6 +1,11 @@
 FROM golang:1.24-alpine AS builder
 WORKDIR /app
-COPY pkg/ ./pkg/
+COPY pkg/go.mod pkg/go.sum ./pkg/
+COPY pkg/cache/ ./pkg/cache/
+COPY pkg/database/ ./pkg/database/
+COPY pkg/grpc/cache_rebuilder/ ./pkg/grpc/cache_rebuilder/
+COPY pkg/grpc/posts/ ./pkg/grpc/posts/
+COPY pkg/grpc/users/ ./pkg/grpc/users/
 COPY services/cache-rebuilder-service/ ./services/cache-rebuilder-service/
 WORKDIR /app/services/cache-rebuilder-service
 RUN go mod download

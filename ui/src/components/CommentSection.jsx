@@ -3,7 +3,7 @@ import { Send } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { api } from '../api'
 import { useStore } from '../store'
-import { timeAgo, shortId } from '../utils'
+import { timeAgo, shortId, parseTimestamp } from '../utils'
 
 export function CommentSection({ postId }) {
   const { currentUser, usersById, toast } = useStore()
@@ -49,7 +49,7 @@ export function CommentSection({ postId }) {
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline gap-1.5">
               <span className="text-xs font-semibold text-text">@{username(c.user_id)}</span>
-              <span className="text-xs text-muted">{timeAgo(c.created_at)}</span>
+              <span className="text-xs text-muted">{timeAgo(parseTimestamp(c.created_at))}</span>
             </div>
             <p className="text-xs text-text/90 mt-0.5 leading-relaxed">{c.text}</p>
           </div>

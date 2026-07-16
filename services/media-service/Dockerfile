@@ -1,6 +1,9 @@
 FROM golang:1.24-alpine AS builder
 WORKDIR /app
-COPY pkg/ ./pkg/
+COPY pkg/go.mod pkg/go.sum ./pkg/
+COPY pkg/broker/ ./pkg/broker/
+COPY pkg/grpc/media/ ./pkg/grpc/media/
+COPY pkg/id/ ./pkg/id/
 COPY services/media-service/ ./services/media-service/
 WORKDIR /app/services/media-service
 RUN go mod download

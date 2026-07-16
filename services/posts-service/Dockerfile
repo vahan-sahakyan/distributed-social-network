@@ -1,6 +1,10 @@
 FROM golang:1.24-alpine AS builder
 WORKDIR /app
-COPY pkg/ ./pkg/
+COPY pkg/go.mod pkg/go.sum ./pkg/
+COPY pkg/broker/ ./pkg/broker/
+COPY pkg/database/ ./pkg/database/
+COPY pkg/grpc/posts/ ./pkg/grpc/posts/
+COPY pkg/id/ ./pkg/id/
 COPY services/posts-service/ ./services/posts-service/
 WORKDIR /app/services/posts-service
 RUN go mod download
