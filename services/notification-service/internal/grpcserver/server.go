@@ -1,12 +1,11 @@
 package grpcserver
-package grpcserver
 
 import (
 	"context"
 
-	notificationspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/notifications"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/service"
+	notificationspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/notifications"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"

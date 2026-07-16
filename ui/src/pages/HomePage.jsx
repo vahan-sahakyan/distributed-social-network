@@ -19,7 +19,7 @@ export function HomePage() {
     setLoading(true)
     try {
       const data = await api.getHomeFeed(currentUser.id)
-      setFeed((data?.posts || []).map(normalizePost))
+      setFeed((Array.isArray(data) ? data : []).map(normalizePost))
     } catch (err) {
       toast(err.message, 'error')
     } finally {

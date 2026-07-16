@@ -1,11 +1,10 @@
 package grpcserver
-package grpcserver
 
 import (
 	"context"
 
-	cacherebpb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/cache_rebuilder"
 	"github.com/vahan-sahakyan/distributed-social-network/cache-rebuilder-service/internal/service"
+	cacherebpb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/cache_rebuilder"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
