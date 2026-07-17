@@ -8,7 +8,13 @@ spec:
   selector:
     app: {{ $name }}-service
   ports:
-    - port: {{ $svc.port }}
+    - name: http
+      port: {{ $svc.port }}
       targetPort: {{ $svc.port }}
+    {{- if $svc.grpcPort }}
+    - name: grpc
+      port: {{ $svc.grpcPort }}
+      targetPort: {{ $svc.grpcPort }}
+    {{- end }}
   type: ClusterIP
 {{- end }}

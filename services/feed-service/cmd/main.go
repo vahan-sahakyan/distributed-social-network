@@ -31,7 +31,7 @@ func main() {
 		memcachedAddr = "localhost:11211"
 	}
 
-	mc := cache.NewMemcached(memcachedAddr)
+	mc := cache.NewMemcached(ctx, memcachedAddr)
 
 	repo := repository.New(mc)
 	svc := service.New(repo)

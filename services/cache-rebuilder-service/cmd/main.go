@@ -47,7 +47,7 @@ func main() {
 	if memcachedAddr == "" {
 		memcachedAddr = "localhost:11211"
 	}
-	mc := cache.NewMemcached(memcachedAddr)
+	mc := cache.NewMemcached(ctx, memcachedAddr)
 
 	// gRPC clients for upstream services
 	usersAddr := os.Getenv("USERS_SERVICE_GRPC_ADDR")

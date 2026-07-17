@@ -1,0 +1,5 @@
+apiVersion: v2
+name: distributed-social-network-infra
+description: Infrastructure dependencies for the distributed social network
+version: 0.1.0
+appVersion: "1.0.0"
