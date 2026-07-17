@@ -1,6 +1,6 @@
 SERVICES = gateway-service posts-service comments-service likes-service feed-service users-service media-service notification-service event-writer-service cache-rebuilder-service
 
-.PHONY: build run stop test lint up down infra-up infra-down migrate demo fresh tidy proto ui
+.PHONY: build run stop test lint up down infra-up infra-down migrate demo fresh tidy proto dockerfiles ui
 
 proto:
 	@export PATH="$${PATH}:/opt/homebrew/bin:$$(go env GOPATH)/bin" && \
@@ -19,6 +19,7 @@ proto:
 		proto/notifications/notifications.proto \
 		proto/cache_rebuilder/cache_rebuilder.proto
 	@echo "gRPC code generation complete."
+	@$(MAKE) dockerfiles
 
 build:
 	@for svc in $(SERVICES); do \
@@ -76,6 +77,9 @@ reset: down-clean up
 	@sleep 10
 	@$(MAKE) migrate
 	@echo "All data wiped and services restarted."
+
+dockerfiles:
+	@bash scripts/gen-dockerfiles.sh
 
 tidy:
 	@for svc in $(SERVICES); do \
