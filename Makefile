@@ -1,6 +1,6 @@
 SERVICES = gateway-service posts-service comments-service likes-service feed-service users-service media-service notification-service event-writer-service cache-rebuilder-service
 
-.PHONY: build run stop test lint up down infra-up infra-down migrate demo fresh tidy proto dockerfiles ui
+.PHONY: build run stop test lint up down infra-up infra-down demo fresh tidy proto dockerfiles images k3d-load k8s-infra-up k8s-infra-down k8s-up k8s-down ui
 
 proto:
 	@export PATH="$${PATH}:/opt/homebrew/bin:$$(go env GOPATH)/bin" && \
@@ -54,13 +54,11 @@ down:
 down-clean:
 	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml down -v
 
-migrate:
-	@bash scripts/migrate.sh
-
 demo:
 	@bash scripts/demo.sh
 
 ui:
+	kubectl port-forward service/gateway-service 8080:8080 &
 	cd ui && npm run dev
 
 # Full fresh start: wipe volumes, rebuild, migrate, demo
@@ -80,6 +78,33 @@ reset: down-clean up
 
 dockerfiles:
 	@bash scripts/gen-dockerfiles.sh
+
+images:
+	@for svc in $(SERVICES); do \
+		echo "Building image $$svc..."; \
+		docker build -t distributed-social-network/$$svc:latest -f services/$$svc/Dockerfile . ; \
+	done
+
+k3d-load:
+	@for svc in $(SERVICES); do \
+		echo "Loading $$svc into k3d..."; \
+		k3d image import distributed-social-network/$$svc:latest -c dsn; \
+	done
+
+k8s-infra-up:
+	helm upgrade --install dsn-infra deploy/kubernetes/infra/
+
+k8s-infra-down:
+	helm uninstall dsn-infra
+
+k8s-up: k3d-load
+	helm upgrade --install dsn-infra deploy/kubernetes/infra/
+	helm upgrade --install dsn deploy/kubernetes/services/
+
+
+k8s-down:
+	helm uninstall dsn dsn-infra
+
 
 tidy:
 	@for svc in $(SERVICES); do \

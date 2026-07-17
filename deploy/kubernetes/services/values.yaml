@@ -1,0 +1,91 @@
+replicaCount: 1
+
+image:
+  tag: latest
+  pullPolicy: IfNotPresent
+
+services:
+  gateway:
+    port: 8080
+    env:
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
+      FEED_SERVICE_GRPC_ADDR: feed-service:9082
+      COMMENTS_SERVICE_GRPC_ADDR: comments-service:9083
+      LIKES_SERVICE_GRPC_ADDR: likes-service:9084
+      USERS_SERVICE_GRPC_ADDR: users-service:9085
+      MEDIA_SERVICE_GRPC_ADDR: media-service:9086
+      NOTIFICATIONS_SERVICE_GRPC_ADDR: notification-service:9087
+      CACHE_REBUILDER_SERVICE_GRPC_ADDR: cache-rebuilder-service:9089
+
+  posts:
+    port: 8081
+    grpcPort: 9081
+    env:
+      SCYLLA_HOSTS: posts-db:9042
+      SCYLLA_KEYSPACE: posts
+      KAFKA_BROKERS: redpanda:9092
+
+  feed:
+    port: 8082
+    grpcPort: 9082
+    env:
+      KAFKA_BROKERS: redpanda:9092
+      MEMCACHED_ADDR: memcached:11211
+      USERS_SERVICE_GRPC_ADDR: users-service:9085
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
+
+  comments:
+    port: 8083
+    grpcPort: 9083
+    env:
+      DATABASE_URL: postgres://postgres:postgres@comments-db:5432/comments?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+
+  likes:
+    port: 8084
+    grpcPort: 9084
+    env:
+      DATABASE_URL: postgres://postgres:postgres@likes-db:5432/likes?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+
+  users:
+    port: 8085
+    grpcPort: 9085
+    env:
+      DATABASE_URL: postgres://postgres:postgres@users-db:5432/users?sslmode=disable
+
+  media:
+    port: 8086
+    grpcPort: 9086
+    env:
+      KAFKA_BROKERS: redpanda:9092
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: images
+
+  notification:
+    port: 8087
+    grpcPort: 9087
+    env:
+      DATABASE_URL: postgres://postgres:postgres@notifications-db:5432/notifications?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
+
+  event-writer:
+    port: 8088
+    env:
+      KAFKA_BROKERS: redpanda:9092
+      CLICKHOUSE_ADDR: clickhouse:9000
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_PASSWORD: clickhouse
+
+  cache-rebuilder:
+    port: 8089
+    grpcPort: 9089
+    env:
+      CLICKHOUSE_ADDR: clickhouse:9000
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_PASSWORD: clickhouse
+      MEMCACHED_ADDR: memcached:11211
+      USERS_SERVICE_GRPC_ADDR: users-service:9085
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081

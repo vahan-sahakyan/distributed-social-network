@@ -14,6 +14,7 @@ import (
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/posts-service/migrations"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
@@ -32,6 +33,10 @@ func main() {
 	scyllaKeyspace := os.Getenv("SCYLLA_KEYSPACE")
 	if scyllaKeyspace == "" {
 		scyllaKeyspace = "posts"
+	}
+
+	if err := database.MigrateScylla(scyllaHosts, migrations.SQL); err != nil {
+		log.Fatalf("failed to run scylla migration: %v", err)
 	}
 
 	db, err := database.NewScyllaDB(scyllaHosts, scyllaKeyspace)

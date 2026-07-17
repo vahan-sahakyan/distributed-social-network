@@ -21,10 +21,23 @@ spec:
           image: "distributed-social-network/{{ $name }}-service:{{ $.Values.image.tag }}"
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           ports:
-            - containerPort: {{ $svc.port }}
+            - name: http
+              containerPort: {{ $svc.port }}
+            {{- if $svc.grpcPort }}
+            - name: grpc
+              containerPort: {{ $svc.grpcPort }}
+            {{- end }}
           env:
             - name: PORT
               value: "{{ $svc.port }}"
+            {{- if $svc.grpcPort }}
+            - name: GRPC_PORT
+              value: "{{ $svc.grpcPort }}"
+            {{- end }}
+            {{- range $key, $val := $svc.env }}
+            - name: {{ $key }}
+              value: {{ $val | quote }}
+            {{- end }}
           livenessProbe:
             httpGet:
               path: /health

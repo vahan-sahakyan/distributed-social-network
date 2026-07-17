@@ -1,0 +1,35 @@
+postgres:
+  image: postgres:16-alpine
+  user: postgres
+  password: postgres
+  storage: 1Gi
+  instances:
+    comments-db:
+      database: comments
+    likes-db:
+      database: likes
+    users-db:
+      database: users
+    notifications-db:
+      database: notifications
+
+scylla:
+  image: scylladb/scylla:latest
+  storage: 2Gi
+
+redpanda:
+  image: redpandadata/redpanda:latest
+  storage: 1Gi
+
+memcached:
+  image: memcached:1.6-alpine
+
+clickhouse:
+  image: clickhouse/clickhouse-server:latest
+  storage: 2Gi
+
+minio:
+  image: minio/minio:latest
+  rootUser: minioadmin
+  rootPassword: minioadmin
+  storage: 5Gi

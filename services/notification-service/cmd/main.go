@@ -12,6 +12,7 @@ import (
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/notification-service/migrations"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
 	notificationspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/notifications"
 
@@ -30,6 +31,10 @@ func main() {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	if err := database.MigratePostgres(ctx, db, migrations.SQL); err != nil {
+		log.Fatalf("failed to run migration: %v", err)
+	}
 
 	repo := repository.New(db)
 	svc := service.New(repo)

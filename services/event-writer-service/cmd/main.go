@@ -9,6 +9,7 @@ import (
 
 	"github.com/vahan-sahakyan/distributed-social-network/event-writer-service/internal/consumer"
 	"github.com/vahan-sahakyan/distributed-social-network/event-writer-service/internal/repository"
+	"github.com/vahan-sahakyan/distributed-social-network/event-writer-service/migrations"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
 
 	"github.com/ansrivas/fiberprometheus/v2"
@@ -33,6 +34,10 @@ func main() {
 		log.Fatalf("failed to connect to clickhouse: %v", err)
 	}
 	defer conn.Close()
+
+	if err := database.MigrateClickHouse(ctx, conn, migrations.SQL); err != nil {
+		log.Fatalf("failed to run migration: %v", err)
+	}
 
 	repo := repository.New(conn)
 	cons := consumer.New(repo, os.Getenv("KAFKA_BROKERS"))

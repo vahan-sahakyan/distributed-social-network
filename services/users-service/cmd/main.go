@@ -13,6 +13,7 @@ import (
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/users-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/users-service/migrations"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
@@ -29,6 +30,10 @@ func main() {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	if err := database.MigratePostgres(ctx, db, migrations.SQL); err != nil {
+		log.Fatalf("failed to run migration: %v", err)
+	}
 
 	repo := repository.New(db)
 	svc := service.New(repo)

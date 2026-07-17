@@ -11,6 +11,7 @@ import (
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/comments-service/migrations"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
 	commentspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/comments"
@@ -30,6 +31,10 @@ func main() {
 		log.Fatalf("failed to connect to database: %v", err)
 	}
 	defer db.Close()
+
+	if err := database.MigratePostgres(ctx, db, migrations.SQL); err != nil {
+		log.Fatalf("failed to run migration: %v", err)
+	}
 
 	producer := broker.NewProducer(os.Getenv("KAFKA_BROKERS"))
 	defer producer.Close()
