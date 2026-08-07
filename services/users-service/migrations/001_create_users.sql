@@ -11,4 +11,4 @@ CREATE TABLE IF NOT EXISTS follows (
     PRIMARY KEY (follower_id, followee_id)
 );
 
-CREATE INDEX idx_follows_followee ON follows (followee_id);
+CREATE INDEX IF NOT EXISTS idx_follows_followee ON follows (followee_id);
