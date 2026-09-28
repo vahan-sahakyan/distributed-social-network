@@ -69,13 +69,25 @@ func (r *Repository) SetFeed(key string, items []model.FeedItem) error {
 
 func (r *Repository) AppendToFeed(key string, item *model.FeedItem) error {
 	return r.update(key, func(items []model.FeedItem) ([]model.FeedItem, bool) {
-		items = append([]model.FeedItem{*item}, items...)
-		// Keep max 100 items in feed cache
-		if len(items) > 100 {
-			items = items[:100]
-		}
-		return items, true
+		return prependItem(items, item)
 	})
+}
+
+// prependItem puts item at the head of the feed, capped at 100 entries. It is a
+// no-op when the post is already there: a redelivered post.created re-runs the
+// fanout, and feeds that took the post the first time must not show it twice.
+func prependItem(items []model.FeedItem, item *model.FeedItem) ([]model.FeedItem, bool) {
+	for _, existing := range items {
+		if existing.PostID == item.PostID {
+			return items, false
+		}
+	}
+	items = append([]model.FeedItem{*item}, items...)
+	// Keep max 100 items in feed cache
+	if len(items) > 100 {
+		items = items[:100]
+	}
+	return items, true
 }
 
 // AdjustCounts applies the like and comment deltas to a post in the feed stored under key.

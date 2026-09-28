@@ -101,7 +101,11 @@ func (c *Consumer) countsHandler(likesDelta, commentsDelta int) broker.Handler {
 			return err
 		}
 
-		return c.svc.AdjustCounts(event.EntityID, authorID, append(followers, authorID), likesDelta, commentsDelta)
+		// Lookup failures above are retried, but once deltas start landing a retry
+		// would apply them twice to the feeds that already took them. A partial
+		// failure is logged by AdjustCounts and left for the cache rebuild.
+		_ = c.svc.AdjustCounts(event.EntityID, authorID, append(followers, authorID), likesDelta, commentsDelta)
+		return nil
 	}
 }
 
