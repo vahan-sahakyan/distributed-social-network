@@ -1,0 +1,153 @@
+name: Publish
+
+on:
+  push:
+    branches: ["**"]
+    paths-ignore: ["docs/**", "**.md"]
+  workflow_dispatch:
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+  MINIO_RELEASE: RELEASE.2025-09-07T16-13-09Z
+  GITOPS_REPO: vahan-sahakyan/distributed-social-network-gitops
+
+jobs:
+  images:
+    name: image (${{ matrix.name }})
+    runs-on: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        name:
+          - gateway-service
+          - posts-service
+          - comments-service
+          - likes-service
+          - feed-service
+          - users-service
+          - media-service
+          - notification-service
+          - event-writer-service
+          - cache-rebuilder-service
+        include:
+          - name: ui
+            context: ui
+            file: ui/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context || '.' }}
+          file: ${{ matrix.file || format('services/{0}/Dockerfile', matrix.name) }}
+          platforms: linux/arm64
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:${{ github.sha }}
+            ${{ github.ref == 'refs/heads/main' && format('{0}/{1}:main', env.IMAGE_PREFIX, matrix.name) || '' }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  # minio is built once per release, for both archs so compose works on any machine
+  minio-check:
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.check.outputs.exists }}
+    steps:
+      - id: check
+        run: |
+          if docker manifest inspect "$IMAGE_PREFIX/minio:$MINIO_RELEASE" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  minio-build:
+    needs: minio-check
+    if: needs.minio-check.outputs.exists != 'true'
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        include:
+          - {runner: ubuntu-24.04, arch: amd64}
+          - {runner: ubuntu-24.04-arm, arch: arm64}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: deploy/images/minio
+          platforms: linux/${{ matrix.arch }}
+          push: true
+          tags: ${{ env.IMAGE_PREFIX }}/minio:${{ env.MINIO_RELEASE }}-${{ matrix.arch }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+
+  minio-merge:
+    needs: minio-build
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - run: |
+          docker buildx imagetools create -t "$IMAGE_PREFIX/minio:$MINIO_RELEASE" \
+            "$IMAGE_PREFIX/minio:$MINIO_RELEASE-amd64" "$IMAGE_PREFIX/minio:$MINIO_RELEASE-arm64"
+
+  # points the gitops repo at this commit: images and charts move together
+  deploy:
+    needs: [images, minio-merge]
+    if: >-
+      always() && github.ref == 'refs/heads/main'
+      && needs.images.result == 'success'
+      && contains(fromJSON('["success", "skipped"]'), needs.minio-merge.result)
+    runs-on: ubuntu-latest
+    concurrency:
+      group: gitops-deploy
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.GITOPS_REPO }}
+          ssh-key: ${{ secrets.GITOPS_DEPLOY_KEY }}
+      - name: bump prod to ${{ github.sha }}
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          yq -i '.image.tag = strenv(SHA)' envs/prod/services-values.yaml
+          for app in apps/infra.yaml apps/services.yaml; do
+            yq -i '(.spec.sources[] | select(.repoURL == "https://github.com/${{ github.repository }}.git")).targetRevision = strenv(SHA)' "$app"
+          done
+          git diff --quiet && { echo "already at $SHA"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "[deploy] prod ${SHA:0:7}"
+          for _ in 1 2 3; do git push && exit 0; git pull --rebase; done
+          exit 1
