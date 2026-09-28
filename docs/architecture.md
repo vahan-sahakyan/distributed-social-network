@@ -77,10 +77,11 @@ Services communicate asynchronously through Redpanda (Kafka-compatible) topics:
 | Topic | Producer | Consumers |
 |-------|----------|-----------|
 | `post.created` | posts-service | feed-service, event-writer-service |
-| `like.created` | likes-service | notification-service, event-writer-service |
-| `comment.created` | comments-service | notification-service, event-writer-service |
+| `like.created` | likes-service | feed-service, notification-service, event-writer-service |
+| `like.deleted` | likes-service | feed-service, event-writer-service |
+| `comment.created` | comments-service | feed-service, notification-service, event-writer-service |
 
-Each consumer uses a dedicated **consumer group** ensuring exactly-once processing per group:
+Topics are created on startup by `pkg/broker.EnsureTopics`. Each consumer uses a dedicated **consumer group**, so every service receives every event:
 - `feed-service` — fans out posts to follower caches
 - `notification-service` — generates notifications for content owners
 - `event-writer-service` — persists all events to ClickHouse for analytics
@@ -127,24 +128,17 @@ CREATE TABLE feed_events (
     event_type String,     -- 'post.created', 'like.created', 'comment.created'
     post_id String,
     user_id String,
-    likes_delta Int32,     -- +1 for like events
+    likes_delta Int32,     -- +1 for like.created, -1 for like.deleted
     comments_delta Int32,  -- +1 for comment events
     created_at DateTime
 ) ENGINE = MergeTree()
 ORDER BY (post_id, created_at);
 ```
 
-A materialized view aggregates current post state:
+cache-rebuilder-service aggregates current post state at query time:
 
 ```sql
-CREATE MATERIALIZED VIEW current_post_state
-ENGINE = AggregatingMergeTree()
-ORDER BY post_id
-AS SELECT
-    post_id,
-    countIf(event_type='like.created') as likes,
-    countIf(event_type='comment.created') as comments,
-    max(created_at) as last_update
+SELECT post_id, sum(likes_delta) AS likes, sum(comments_delta) AS comments, max(created_at) AS last_update
 FROM feed_events
 GROUP BY post_id;
 ```

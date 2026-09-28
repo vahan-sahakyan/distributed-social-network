@@ -5,7 +5,6 @@ import (
 	"io"
 
 	"github.com/vahan-sahakyan/distributed-social-network/media-service/internal/storage"
-	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 )
 
@@ -15,12 +14,11 @@ type Image struct {
 }
 
 type Service struct {
-	store    *storage.MinioStorage
-	producer *broker.Producer
+	store *storage.MinioStorage
 }
 
-func New(store *storage.MinioStorage, producer *broker.Producer) *Service {
-	return &Service{store: store, producer: producer}
+func New(store *storage.MinioStorage) *Service {
+	return &Service{store: store}
 }
 
 func (s *Service) Upload(ctx context.Context, reader io.Reader, size int64, contentType string) (*Image, error) {
@@ -31,10 +29,7 @@ func (s *Service) Upload(ctx context.Context, reader io.Reader, size int64, cont
 		return nil, err
 	}
 
-	img := &Image{ID: imageID, URL: url}
-	_ = s.producer.Publish(ctx, "image.uploaded", img)
-
-	return img, nil
+	return &Image{ID: imageID, URL: url}, nil
 }
 
 func (s *Service) GetURL(ctx context.Context, imageID string) (string, error) {

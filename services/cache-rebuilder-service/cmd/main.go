@@ -86,7 +86,6 @@ func main() {
 	grpcSrv := grpc.NewServer()
 	cacherebpb.RegisterCacheRebuilderServiceServer(grpcSrv, grpcserver.New(svc, func(ctx context.Context) error {
 		conn.Exec(ctx, "TRUNCATE TABLE IF EXISTS feed_events")
-		conn.Exec(ctx, "TRUNCATE TABLE IF EXISTS current_post_state")
 		mc.FlushAll()
 		return nil
 	}))

@@ -16,6 +16,8 @@ services:
       MEDIA_SERVICE_GRPC_ADDR: media-service:9086
       NOTIFICATIONS_SERVICE_GRPC_ADDR: notification-service:9087
       CACHE_REBUILDER_SERVICE_GRPC_ADDR: cache-rebuilder-service:9089
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET: images
 
   posts:
     port: 8081
@@ -58,7 +60,6 @@ services:
     port: 8086
     grpcPort: 9086
     env:
-      KAFKA_BROKERS: redpanda:9092
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
@@ -70,6 +71,7 @@ services:
     env:
       DATABASE_URL: postgres://postgres:postgres@notifications-db:5432/notifications?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
 
   event-writer:
     port: 8088
@@ -77,7 +79,6 @@ services:
       KAFKA_BROKERS: redpanda:9092
       CLICKHOUSE_ADDR: clickhouse:9000
       CLICKHOUSE_DB: default
-      CLICKHOUSE_PASSWORD: clickhouse
 
   cache-rebuilder:
     port: 8089
@@ -85,7 +86,6 @@ services:
     env:
       CLICKHOUSE_ADDR: clickhouse:9000
       CLICKHOUSE_DB: default
-      CLICKHOUSE_PASSWORD: clickhouse
       MEMCACHED_ADDR: memcached:11211
       USERS_SERVICE_GRPC_ADDR: users-service:9085
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081

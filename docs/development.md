@@ -36,9 +36,6 @@ make demo
 # Start the system (rebuilds changed services)
 make up
 
-# Apply migrations (idempotent, safe to re-run)
-make migrate
-
 # Stop everything (preserves data)
 make down
 
@@ -57,7 +54,6 @@ services/<name>/
 ├── cmd/
 │   └── main.go        Entry point, wiring, server setup
 ├── internal/
-│   ├── handler/       HTTP handlers (Fiber routes)
 │   ├── service/       Business logic
 │   ├── repository/    Database access layer
 │   ├── model/         Data structures
@@ -109,7 +105,7 @@ replace github.com/vahan-sahakyan/distributed-social-network/pkg => ../../pkg
 
 1. Create the directory structure:
    ```bash
-   mkdir -p services/my-service/{cmd,internal/{handler,service,repository,model},migrations}
+   mkdir -p services/my-service/{cmd,internal/{grpcserver,service,repository,model},migrations}
    ```
 
 2. Initialize the module:
@@ -150,7 +146,7 @@ replace github.com/vahan-sahakyan/distributed-social-network/pkg => ../../pkg
 
 9. Add to `SERVICES` list in `Makefile`
 
-10. Add migration SQL to `scripts/migrate.sh`
+10. Add migration SQL under `services/my-service/migrations/`, embed it via `migrations/sql.go`, and apply it on startup with the matching `pkg/database.Migrate*` helper
 
 ## Running Tests
 
@@ -244,11 +240,11 @@ Services may fail to connect if databases aren't ready yet. The `restart: on-fai
 
 ### Tables not found
 
-Run `make migrate` after starting containers. The migration script waits for databases to be ready before applying schemas.
+Each service applies its own embedded migrations on startup. If a database was not ready yet, the service exits and `restart: on-failure` retries it.
 
 ### ScyllaDB slow to start
 
-ScyllaDB takes 30-60 seconds to initialize. The migrate script waits up to 120 seconds for it.
+ScyllaDB takes 30-60 seconds to initialize. posts-service restarts until it can connect and migrate.
 
 ### Port conflicts
 

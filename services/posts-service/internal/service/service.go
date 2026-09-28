@@ -2,9 +2,11 @@ package service
 
 import (
 	"context"
+	"log"
 	"time"
 
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/repository"
@@ -32,7 +34,9 @@ func (s *Service) CreatePost(ctx context.Context, req *model.CreatePostRequest) 
 		return nil, err
 	}
 
-	_ = s.producer.Publish(ctx, "post.created", post)
+	if err := s.producer.Publish(ctx, events.PostCreated, post.ID, post); err != nil {
+		log.Printf("failed to publish post.created for %s: %v", post.ID, err)
+	}
 
 	return post, nil
 }

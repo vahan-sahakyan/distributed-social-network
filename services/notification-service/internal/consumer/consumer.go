@@ -3,68 +3,88 @@ package consumer
 import (
 	"context"
 	"encoding/json"
-	"log"
-	"strings"
+	"fmt"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
+	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
+	"google.golang.org/grpc"
 )
 
-type Consumer struct {
-	svc     *service.Service
-	brokers string
+// notification types keyed by source topic
+var notifTypes = map[string]string{
+	events.LikeCreated:    "like",
+	events.CommentCreated: "comment",
 }
 
-func New(svc *service.Service, brokers string) *Consumer {
-	return &Consumer{svc: svc, brokers: brokers}
+// Topics is every topic this consumer reads.
+func Topics() []string {
+	return []string{events.LikeCreated, events.CommentCreated}
+}
+
+type Consumer struct {
+	svc         *service.Service
+	brokers     string
+	dlq         *broker.Producer
+	postsClient postspb.PostsServiceClient
+}
+
+func New(svc *service.Service, brokers string, dlq *broker.Producer, postsConn *grpc.ClientConn) *Consumer {
+	return &Consumer{
+		svc:         svc,
+		brokers:     brokers,
+		dlq:         dlq,
+		postsClient: postspb.NewPostsServiceClient(postsConn),
+	}
 }
 
 func (c *Consumer) Start(ctx context.Context) {
-	topics := []string{"like.created", "comment.created"}
-
-	for _, topic := range topics {
-		go c.consume(ctx, topic)
+	for _, topic := range Topics() {
+		go broker.Consume(ctx, broker.ConsumerConfig{
+			Brokers: c.brokers,
+			Topic:   topic,
+			GroupID: "notification-service",
+			DLQ:     c.dlq,
+		}, c.handler(topic))
 	}
 
 	<-ctx.Done()
 }
 
-func (c *Consumer) consume(ctx context.Context, topic string) {
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: strings.Split(c.brokers, ","),
-		Topic:   topic,
-		GroupID: "notification-service",
-	})
-	defer reader.Close()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			msg, err := reader.ReadMessage(ctx)
-			if err != nil {
-				log.Printf("error reading from %s: %v", topic, err)
-				continue
-			}
-			c.handle(ctx, topic, msg.Value)
-		}
+func (c *Consumer) handler(topic string) broker.Handler {
+	return func(ctx context.Context, msg kafka.Message) error {
+		return c.handle(ctx, topic, msg.Value)
 	}
 }
 
-func (c *Consumer) handle(ctx context.Context, topic string, data []byte) {
+// handle returns an error when the notification could not be created, so a
+// posts-service blip is retried instead of losing the notification.
+func (c *Consumer) handle(ctx context.Context, topic string, data []byte) error {
 	var event struct {
 		UserID   string `json:"user_id"`
 		EntityID string `json:"entity_id"`
 	}
 
 	if err := json.Unmarshal(data, &event); err != nil {
-		log.Printf("error unmarshaling event: %v", err)
-		return
+		return fmt.Errorf("unmarshaling event: %w", err)
 	}
 
-	notifType := strings.Replace(topic, ".", "_", -1)
+	resp, err := c.postsClient.GetPost(ctx, &postspb.GetPostRequest{Id: event.EntityID})
+	if err != nil {
+		return fmt.Errorf("resolving author of %s: %w", event.EntityID, err)
+	}
+	if resp.Post == nil || resp.Post.AuthorId == "" {
+		return fmt.Errorf("resolving author of %s: post not found", event.EntityID)
+	}
+	authorID := resp.Post.AuthorId
+	if authorID == event.UserID {
+		return nil
+	}
 
-	// TODO: resolve target user from entity
-	_ = c.svc.CreateNotification(ctx, "", notifType, event.UserID, event.EntityID)
+	if err := c.svc.CreateNotification(ctx, authorID, notifTypes[topic], event.UserID, event.EntityID); err != nil {
+		return fmt.Errorf("creating notification: %w", err)
+	}
+	return nil
 }

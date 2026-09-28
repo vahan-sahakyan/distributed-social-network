@@ -77,8 +77,7 @@ After startup, these dashboards are available:
 |---------|-------------|
 | `make up` | Build and start all containers |
 | `make down` | Stop all containers |
-| `make fresh` | Clean slate: wipe volumes → rebuild → migrate |
-| `make migrate` | Apply database schemas (idempotent) |
+| `make fresh` | Clean slate: wipe volumes → rebuild (services migrate on startup) |
 | `make demo` | Run end-to-end demo script |
 | `make build` | Compile all service binaries locally |
 | `make test` | Run tests across all services |
@@ -96,7 +95,7 @@ After startup, these dashboards are available:
 │   └── prometheus/prometheus.yml    Scrape config for all services
 ├── pkg/                     Shared library (database, cache, broker, ID generation)
 ├── scripts/
-│   ├── migrate.sh           Database migration script
+│   ├── gen-dockerfiles.sh   Regenerates Dockerfile pkg/ COPY lines
 │   └── demo.sh              End-to-end demo script
 ├── services/
 │   ├── gateway-service/     API gateway (reverse proxy)

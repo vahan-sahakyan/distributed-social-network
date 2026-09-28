@@ -53,9 +53,6 @@ export function ProfilePage() {
         // rebuild only this user's feed then clear local state so home reloads
         api.rebuildUserFeed(currentUser.id).catch(() => {})
         setFeed([])
-        // rebuild only this user's feed and clear local cache
-        api.rebuildUserFeed(currentUser.id).catch(() => {})
-        setFeed([])
       } else {
         await api.followUser(profileUserId, currentUser.id)
         setFollowers(f => [...f, currentUser.id])

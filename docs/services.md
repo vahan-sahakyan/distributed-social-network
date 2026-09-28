@@ -93,8 +93,10 @@ type Post struct {
 
 **Pattern:** Fanout-on-write — when a post is created, the consumer writes it to each follower's cached feed.
 
-**Consumer group:** `feed-service`  
-**Topics consumed:** `post.created`
+**Consumer groups:** `feed-service-posts`, `feed-service-likes`, `feed-service-unlikes`, `feed-service-comments`  
+**Topics consumed:** `post.created`, `like.created`, `like.deleted`, `comment.created`
+
+**Cache keys:** `feed:<user_id>` (home feed), `userposts:<user_id>` (user's own posts)
 
 **Environment:**
 | Variable | Default | Description |
@@ -136,7 +138,7 @@ type Comment struct {
 
 ## likes-service
 
-**Role:** Like creation (idempotent via unique constraint). Publishes `like.created` events.
+**Role:** Like creation (idempotent via unique constraint). Publishes `like.created` when a like is added and `like.deleted` when one is removed.
 
 **Stack:** Go Fiber + PostgreSQL (pgx) + Redpanda producer
 
@@ -149,7 +151,7 @@ type Like struct {
 }
 ```
 
-**Event published:** `like.created` → full Like JSON
+**Events published:** `like.created`, `like.deleted` → Like JSON
 
 **Environment:**
 | Variable | Default | Description |
@@ -190,13 +192,12 @@ type User struct {
 
 **Role:** File uploads to MinIO object storage. Returns a URL for retrieval.
 
-**Stack:** Go Fiber + MinIO SDK + Redpanda producer
+**Stack:** Go Fiber + MinIO SDK
 
 **Environment:**
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 8086 | Listen port |
-| `KAFKA_BROKERS` | localhost:19092 | Redpanda brokers |
 | `MINIO_ENDPOINT` | localhost:9000 | MinIO server |
 | `MINIO_ACCESS_KEY` | minioadmin | MinIO access key |
 | `MINIO_SECRET_KEY` | minioadmin | MinIO secret key |
@@ -211,7 +212,7 @@ type User struct {
 **Stack:** Go Fiber + PostgreSQL (pgx) + Redpanda consumer
 
 **Consumer group:** `notification-service`  
-**Topics consumed:** `like.created`, `comment.created`
+**Topics consumed:** `like.created`, `comment.created` (recipient = post author, resolved via posts-service; self-actions skipped)
 
 **Data model:**
 ```go
@@ -232,6 +233,7 @@ type Notification struct {
 | `PORT` | 8087 | Listen port |
 | `DATABASE_URL` | — | PostgreSQL connection string |
 | `KAFKA_BROKERS` | localhost:19092 | Redpanda brokers |
+| `POSTS_SERVICE_GRPC_ADDR` | localhost:9081 | posts-service gRPC address |
 
 ---
 
@@ -242,7 +244,7 @@ type Notification struct {
 **Stack:** Go Fiber (health/metrics only) + ClickHouse + Redpanda consumer
 
 **Consumer group:** `event-writer-service`  
-**Topics consumed:** `post.created`, `like.created`, `comment.created`
+**Topics consumed:** `post.created`, `like.created`, `like.deleted`, `comment.created`
 
 **Writes to ClickHouse:**
 ```sql

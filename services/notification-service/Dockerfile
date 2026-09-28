@@ -1,8 +1,11 @@
 FROM golang:1.24-alpine AS builder
 WORKDIR /app
 COPY pkg/go.mod pkg/go.sum ./pkg/
+COPY pkg/broker/ ./pkg/broker/
 COPY pkg/database/ ./pkg/database/
+COPY pkg/events/ ./pkg/events/
 COPY pkg/grpc/notifications/ ./pkg/grpc/notifications/
+COPY pkg/grpc/posts/ ./pkg/grpc/posts/
 COPY pkg/id/ ./pkg/id/
 COPY services/notification-service/ ./services/notification-service/
 WORKDIR /app/services/notification-service

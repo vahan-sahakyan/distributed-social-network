@@ -13,6 +13,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/service"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/migrations"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
 	notificationspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/notifications"
 
@@ -20,6 +21,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
@@ -39,9 +41,15 @@ func main() {
 	repo := repository.New(db)
 	svc := service.New(repo)
 
-	// start event consumers
-	cons := consumer.New(svc, os.Getenv("KAFKA_BROKERS"))
-	go cons.Start(ctx)
+	postsAddr := os.Getenv("POSTS_SERVICE_GRPC_ADDR")
+	if postsAddr == "" {
+		postsAddr = "localhost:9081"
+	}
+	postsConn, err := grpc.NewClient(postsAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		log.Fatalf("failed to connect to posts-service: %v", err)
+	}
+	defer postsConn.Close()
 
 	// gRPC server
 	grpcPort := os.Getenv("GRPC_PORT")
@@ -84,6 +92,19 @@ func main() {
 		if err := app.Listen(":" + port); err != nil {
 			log.Fatalf("failed to start HTTP server: %v", err)
 		}
+	}()
+
+	// Kafka setup runs after /health is serving so a cold broker does not fail the liveness probe.
+	go func() {
+		brokers := os.Getenv("KAFKA_BROKERS")
+		if err := broker.EnsureTopics(ctx, brokers, consumer.Topics()...); err != nil {
+			log.Fatalf("failed to ensure kafka topics: %v", err)
+		}
+
+		dlq := broker.NewProducer(brokers)
+		defer dlq.Close()
+
+		consumer.New(svc, brokers, dlq, postsConn).Start(ctx)
 	}()
 
 	<-ctx.Done()

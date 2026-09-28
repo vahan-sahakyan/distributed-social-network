@@ -25,15 +25,16 @@ proto:
 build:
 	@for svc in $(SERVICES); do \
 		echo "Building $$svc..."; \
-		cd services/$$svc && go build -o ../../bin/$$svc ./cmd && cd ../..; \
+		(cd services/$$svc && go build -o ../../bin/$$svc ./cmd) || exit 1; \
 	done
 
 
 .PHONY: test
 test:
+	@echo "Testing pkg..." && (cd pkg && go test ./...) || exit 1
 	@for svc in $(SERVICES); do \
 		echo "Testing $$svc..."; \
-		cd services/$$svc && go test ./... && cd ../..; \
+		(cd services/$$svc && go test ./...) || exit 1; \
 	done
 
 
@@ -41,7 +42,7 @@ test:
 lint:
 	@for svc in $(SERVICES); do \
 		echo "Linting $$svc..."; \
-		cd services/$$svc && golangci-lint run ./... && cd ../..; \
+		(cd services/$$svc && golangci-lint run ./...) || exit 1; \
 	done
 
 
@@ -81,22 +82,16 @@ ui:
 	cd ui && npm run dev
 
 
-# Full fresh start: wipe volumes, rebuild, migrate, demo
+# Full fresh start: wipe volumes, rebuild (services apply their own migrations on startup)
 .PHONY: fresh
 fresh: down-clean up
-	@echo "Waiting for infrastructure to initialize..."
-	@sleep 10
-	@$(MAKE) migrate
 	@echo ""
-	@echo "System ready! Run 'make demo' to exercise all services."
+	@echo "System starting! Run 'make demo' once services are healthy."
 
 
 # Wipe all data and restart (no demo)
 .PHONY: reset
 reset: down-clean up
-	@echo "Waiting for infrastructure to initialize..."
-	@sleep 10
-	@$(MAKE) migrate
 	@echo "All data wiped and services restarted."
 
 
@@ -146,6 +141,6 @@ k8s-down:
 tidy:
 	@for svc in $(SERVICES); do \
 		echo "Tidying $$svc..."; \
-		cd services/$$svc && go mod tidy && cd ../..; \
+		(cd services/$$svc && go mod tidy) || exit 1; \
 	done
 	cd pkg && go mod tidy

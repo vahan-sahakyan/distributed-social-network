@@ -8,8 +8,7 @@ set -euo pipefail
 # Usage: ./scripts/demo.sh
 #
 # Prerequisites:
-#   make up          # start all containers
-#   make migrate     # run database migrations
+#   make up          # start all containers (services apply migrations on startup)
 
 BASE_URL="${GATEWAY_URL:-http://localhost:8080}"
 API="$BASE_URL/api/v1"

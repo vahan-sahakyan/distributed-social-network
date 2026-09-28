@@ -3,6 +3,7 @@ WORKDIR /app
 COPY pkg/go.mod pkg/go.sum ./pkg/
 COPY pkg/broker/ ./pkg/broker/
 COPY pkg/database/ ./pkg/database/
+COPY pkg/events/ ./pkg/events/
 COPY pkg/grpc/comments/ ./pkg/grpc/comments/
 COPY pkg/id/ ./pkg/id/
 COPY services/comments-service/ ./services/comments-service/

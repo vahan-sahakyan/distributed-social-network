@@ -10,6 +10,7 @@ import (
 
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/repository"
@@ -91,6 +92,14 @@ func main() {
 	go func() {
 		if err := app.Listen(":" + port); err != nil {
 			log.Fatalf("failed to start HTTP server: %v", err)
+		}
+	}()
+
+	// Topics are created after /health is serving so a cold broker does not fail
+	// the liveness probe. Publishes fail while Kafka is unreachable either way.
+	go func() {
+		if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), events.PostCreated); err != nil {
+			log.Fatalf("failed to ensure kafka topics: %v", err)
 		}
 	}()
 
