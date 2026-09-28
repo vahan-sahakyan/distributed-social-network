@@ -17,6 +17,8 @@ metadata:
     app: minio
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: minio
@@ -28,12 +30,12 @@ spec:
       containers:
         - name: minio
           image: {{ .Values.minio.image }}
+          resources:
+            {{- toYaml .Values.minio.resources | nindent 12 }}
           args: [server, /data, --console-address, ":9001"]
-          env:
-            - name: MINIO_ROOT_USER
-              value: {{ .Values.minio.rootUser }}
-            - name: MINIO_ROOT_PASSWORD
-              value: {{ .Values.minio.rootPassword }}
+          envFrom:
+            - secretRef:
+                name: minio-credentials
           ports:
             - name: api
               containerPort: 9000

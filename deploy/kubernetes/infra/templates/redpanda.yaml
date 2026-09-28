@@ -17,6 +17,8 @@ metadata:
     app: redpanda
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: redpanda
@@ -28,6 +30,8 @@ spec:
       containers:
         - name: redpanda
           image: {{ .Values.redpanda.image }}
+          resources:
+            {{- toYaml .Values.redpanda.resources | nindent 12 }}
           args:
             - redpanda
             - start

@@ -17,6 +17,8 @@ metadata:
     app: posts-db
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: posts-db
@@ -28,6 +30,8 @@ spec:
       containers:
         - name: posts-db
           image: {{ .Values.scylla.image }}
+          resources:
+            {{- toYaml .Values.scylla.resources | nindent 12 }}
           args: [--smp, "1", --memory, 512M, --overprovisioned, "1"]
           ports:
             - containerPort: 9042
