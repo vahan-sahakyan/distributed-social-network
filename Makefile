@@ -31,6 +31,7 @@ build:
 
 .PHONY: test
 test:
+	@echo "Testing pkg..." && (cd pkg && go test ./...) || exit 1
 	@for svc in $(SERVICES); do \
 		echo "Testing $$svc..."; \
 		(cd services/$$svc && go test ./...) || exit 1; \

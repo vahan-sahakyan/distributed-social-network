@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  go:
+    name: go (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        module:
+          - pkg
+          - services/gateway-service
+          - services/posts-service
+          - services/comments-service
+          - services/likes-service
+          - services/feed-service
+          - services/users-service
+          - services/media-service
+          - services/notification-service
+          - services/event-writer-service
+          - services/cache-rebuilder-service
+    defaults:
+      run:
+        working-directory: ${{ matrix.module }}
+    env:
+      # Docker images build each module without go.work, so CI does too.
+      GOWORK: "off"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ matrix.module }}/go.mod
+          cache-dependency-path: ${{ matrix.module }}/go.sum
+      - name: gofmt
+        run: |
+          unformatted=$(gofmt -l . | grep -v '\.pb\.go$' || true)
+          if [ -n "$unformatted" ]; then echo "$unformatted"; exit 1; fi
+      - run: go vet ./...
+      - run: go test -race ./...
+
+  dockerfiles:
+    name: dockerfiles in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: pkg/go.mod
+      # Each Dockerfile copies only the pkg/ dirs its service imports; a new
+      # import without regenerating breaks the image build, not go build.
+      - run: ./scripts/gen-dockerfiles.sh
+      - run: git diff --exit-code -- 'services/*/Dockerfile'
+
+  ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
