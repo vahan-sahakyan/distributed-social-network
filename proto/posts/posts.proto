@@ -11,8 +11,8 @@ message Post {
   string text = 2;
   string author_id = 3;
   string image_id = 4;
-  int32 likes = 5;
-  int32 comments = 6;
+  reserved 5, 6;
+  reserved "likes", "comments";
   google.protobuf.Timestamp created_at = 7;
 }
 

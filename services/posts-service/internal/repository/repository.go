@@ -17,17 +17,17 @@ func New(db *gocql.Session) *Repository {
 
 func (r *Repository) Create(ctx context.Context, post *model.Post) error {
 	return r.db.Query(
-		`INSERT INTO posts (id, text, author_id, image_id, likes, comments, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		post.ID, post.Text, post.AuthorID, post.ImageID, post.Likes, post.Comments, post.CreatedAt,
+		`INSERT INTO posts (id, text, author_id, image_id, created_at)
+		 VALUES (?, ?, ?, ?, ?)`,
+		post.ID, post.Text, post.AuthorID, post.ImageID, post.CreatedAt,
 	).WithContext(ctx).Exec()
 }
 
 func (r *Repository) GetByID(ctx context.Context, id string) (*model.Post, error) {
 	var post model.Post
 	err := r.db.Query(
-		`SELECT id, text, author_id, image_id, likes, comments, created_at FROM posts WHERE id = ?`, id,
-	).WithContext(ctx).Scan(&post.ID, &post.Text, &post.AuthorID, &post.ImageID, &post.Likes, &post.Comments, &post.CreatedAt)
+		`SELECT id, text, author_id, image_id, created_at FROM posts WHERE id = ?`, id,
+	).WithContext(ctx).Scan(&post.ID, &post.Text, &post.AuthorID, &post.ImageID, &post.CreatedAt)
 	if err != nil {
 		return nil, err
 	}

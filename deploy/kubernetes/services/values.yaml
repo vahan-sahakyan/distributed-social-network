@@ -60,7 +60,6 @@ services:
     port: 8086
     grpcPort: 9086
     env:
-      KAFKA_BROKERS: redpanda:9092
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
@@ -80,7 +79,6 @@ services:
       KAFKA_BROKERS: redpanda:9092
       CLICKHOUSE_ADDR: clickhouse:9000
       CLICKHOUSE_DB: default
-      CLICKHOUSE_PASSWORD: clickhouse
 
   cache-rebuilder:
     port: 8089
@@ -88,7 +86,6 @@ services:
     env:
       CLICKHOUSE_ADDR: clickhouse:9000
       CLICKHOUSE_DB: default
-      CLICKHOUSE_PASSWORD: clickhouse
       MEMCACHED_ADDR: memcached:11211
       USERS_SERVICE_GRPC_ADDR: users-service:9085
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081

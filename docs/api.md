@@ -129,8 +129,6 @@ Content-Type: application/json
   "text": "Hello distributed world!",
   "author_id": "30a46156e6b96a2a9d2c96bc765ab511",
   "image_id": "",
-  "likes": 0,
-  "comments": 0,
   "created_at": "2026-06-15T01:59:55.290Z"
 }
 ```
@@ -149,8 +147,6 @@ GET /api/v1/posts/:id
   "id": "8316cac68f930d1006c9bcac26a6b3c9",
   "text": "Hello distributed world!",
   "author_id": "30a46156e6b96a2a9d2c96bc765ab511",
-  "likes": 0,
-  "comments": 0,
   "created_at": "2026-06-15T01:59:55.29Z"
 }
 ```

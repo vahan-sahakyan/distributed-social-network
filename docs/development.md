@@ -54,7 +54,6 @@ services/<name>/
 ├── cmd/
 │   └── main.go        Entry point, wiring, server setup
 ├── internal/
-│   ├── handler/       HTTP handlers (Fiber routes)
 │   ├── service/       Business logic
 │   ├── repository/    Database access layer
 │   ├── model/         Data structures
@@ -106,7 +105,7 @@ replace github.com/vahan-sahakyan/distributed-social-network/pkg => ../../pkg
 
 1. Create the directory structure:
    ```bash
-   mkdir -p services/my-service/{cmd,internal/{handler,service,repository,model},migrations}
+   mkdir -p services/my-service/{cmd,internal/{grpcserver,service,repository,model},migrations}
    ```
 
 2. Initialize the module:

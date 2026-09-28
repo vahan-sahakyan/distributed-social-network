@@ -11,7 +11,6 @@ import (
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/media-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/media-service/internal/service"
 	"github.com/vahan-sahakyan/distributed-social-network/media-service/internal/storage"
-	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	mediapb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/media"
 
 	"github.com/ansrivas/fiberprometheus/v2"
@@ -34,14 +33,7 @@ func main() {
 		log.Fatalf("failed to initialize storage: %v", err)
 	}
 
-	if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), "image.uploaded"); err != nil {
-		log.Fatalf("failed to ensure kafka topics: %v", err)
-	}
-
-	producer := broker.NewProducer(os.Getenv("KAFKA_BROKERS"))
-	defer producer.Close()
-
-	svc := service.New(store, producer)
+	svc := service.New(store)
 
 	// gRPC server
 	grpcPort := os.Getenv("GRPC_PORT")

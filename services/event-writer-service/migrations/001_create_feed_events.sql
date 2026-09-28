@@ -11,15 +11,5 @@ CREATE TABLE IF NOT EXISTS feed_events
 ENGINE = MergeTree()
 ORDER BY (post_id, created_at);
 
--- Materialized view for current post state (aggregated)
-CREATE MATERIALIZED VIEW IF NOT EXISTS current_post_state
-ENGINE = AggregatingMergeTree()
-ORDER BY post_id
-AS
-SELECT
-    post_id,
-    countIf(event_type='like.created') as likes,
-    countIf(event_type='comment.created') as comments,
-    max(created_at) as last_update
-FROM feed_events
-GROUP BY post_id;
+-- post state is aggregated from feed_events at query time; drop the unused view older volumes still have
+DROP VIEW IF EXISTS current_post_state;

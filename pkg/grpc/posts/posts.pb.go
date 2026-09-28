@@ -28,8 +28,6 @@ type Post struct {
 	Text          string                 `protobuf:"bytes,2,opt,name=text,proto3" json:"text,omitempty"`
 	AuthorId      string                 `protobuf:"bytes,3,opt,name=author_id,json=authorId,proto3" json:"author_id,omitempty"`
 	ImageId       string                 `protobuf:"bytes,4,opt,name=image_id,json=imageId,proto3" json:"image_id,omitempty"`
-	Likes         int32                  `protobuf:"varint,5,opt,name=likes,proto3" json:"likes,omitempty"`
-	Comments      int32                  `protobuf:"varint,6,opt,name=comments,proto3" json:"comments,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -91,20 +89,6 @@ func (x *Post) GetImageId() string {
 		return x.ImageId
 	}
 	return ""
-}
-
-func (x *Post) GetLikes() int32 {
-	if x != nil {
-		return x.Likes
-	}
-	return 0
-}
-
-func (x *Post) GetComments() int32 {
-	if x != nil {
-		return x.Comments
-	}
-	return 0
 }
 
 func (x *Post) GetCreatedAt() *timestamppb.Timestamp {
@@ -390,16 +374,14 @@ var File_posts_posts_proto protoreflect.FileDescriptor
 
 const file_posts_posts_proto_rawDesc = "" +
 	"\n" +
-	"\x11posts/posts.proto\x12\x05posts\x1a\x1fgoogle/protobuf/timestamp.proto\"\xcf\x01\n" +
+	"\x11posts/posts.proto\x12\x05posts\x1a\x1fgoogle/protobuf/timestamp.proto\"\xba\x01\n" +
 	"\x04Post\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04text\x18\x02 \x01(\tR\x04text\x12\x1b\n" +
 	"\tauthor_id\x18\x03 \x01(\tR\bauthorId\x12\x19\n" +
-	"\bimage_id\x18\x04 \x01(\tR\aimageId\x12\x14\n" +
-	"\x05likes\x18\x05 \x01(\x05R\x05likes\x12\x1a\n" +
-	"\bcomments\x18\x06 \x01(\x05R\bcomments\x129\n" +
+	"\bimage_id\x18\x04 \x01(\tR\aimageId\x129\n" +
 	"\n" +
-	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"_\n" +
+	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAtJ\x04\b\x05\x10\x06J\x04\b\x06\x10\aR\x05likesR\bcomments\"_\n" +
 	"\x11CreatePostRequest\x12\x12\n" +
 	"\x04text\x18\x01 \x01(\tR\x04text\x12\x1b\n" +
 	"\tauthor_id\x18\x02 \x01(\tR\bauthorId\x12\x19\n" +

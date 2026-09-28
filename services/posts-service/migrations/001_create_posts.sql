@@ -6,8 +6,6 @@ CREATE TABLE IF NOT EXISTS posts.posts (
     text TEXT,
     author_id TEXT,
     image_id TEXT,
-    likes INT,
-    comments INT,
     created_at TIMESTAMP
 );
 

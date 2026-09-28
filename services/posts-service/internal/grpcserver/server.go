@@ -54,8 +54,6 @@ func toProto(p *model.Post) *postspb.Post {
 		Text:      p.Text,
 		AuthorId:  p.AuthorID,
 		ImageId:   p.ImageID,
-		Likes:     int32(p.Likes),
-		Comments:  int32(p.Comments),
 		CreatedAt: timestamppb.New(p.CreatedAt),
 	}
 }
