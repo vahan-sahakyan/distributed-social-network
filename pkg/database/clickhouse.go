@@ -29,8 +29,10 @@ func NewClickHouse(ctx context.Context, addr string, database string) (driver.Co
 }
 
 // MigrateClickHouse runs each semicolon-separated statement in sql against conn.
+// Line comments are stripped first, since a semicolon inside one would otherwise
+// split a single statement into two invalid fragments.
 func MigrateClickHouse(ctx context.Context, conn driver.Conn, sql string) error {
-	for _, stmt := range strings.Split(sql, ";") {
+	for _, stmt := range strings.Split(stripLineComments(sql), ";") {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" {
 			continue
@@ -40,4 +42,26 @@ func MigrateClickHouse(ctx context.Context, conn driver.Conn, sql string) error 
 		}
 	}
 	return nil
+}
+
+// stripLineComments removes "--" comments, leaving "--" inside single-quoted
+// string literals alone.
+func stripLineComments(sql string) string {
+	var out strings.Builder
+	for _, line := range strings.Split(sql, "\n") {
+		inQuote := false
+		for i := 0; i < len(line); i++ {
+			if line[i] == '\'' {
+				inQuote = !inQuote
+				continue
+			}
+			if !inQuote && line[i] == '-' && i+1 < len(line) && line[i+1] == '-' {
+				line = line[:i]
+				break
+			}
+		}
+		out.WriteString(line)
+		out.WriteByte('\n')
+	}
+	return out.String()
 }
