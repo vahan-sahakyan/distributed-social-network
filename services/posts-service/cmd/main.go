@@ -45,6 +45,10 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), "post.created"); err != nil {
+		log.Fatalf("failed to ensure kafka topics: %v", err)
+	}
+
 	producer := broker.NewProducer(os.Getenv("KAFKA_BROKERS"))
 	defer producer.Close()
 

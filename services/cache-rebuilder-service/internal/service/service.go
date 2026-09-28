@@ -58,7 +58,7 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 
 	postStates := s.loadPostStates(ctx)
 
-	// Build feed map: userID -> []feedItem
+	// Build feed map: cache key -> []feedItem
 	feeds := map[string][]feedItem{}
 
 	for _, event := range events {
@@ -79,19 +79,19 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 			CreatedAt:     post.CreatedAt,
 		}
 
-		// Write to author's own feed
-		feeds[event.UserID] = append(feeds[event.UserID], item)
+		// Write to author's own feed and posts
+		feeds[homeFeedKey(event.UserID)] = append(feeds[homeFeedKey(event.UserID)], item)
+		feeds[userPostsKey(event.UserID)] = append(feeds[userPostsKey(event.UserID)], item)
 
 		// Write to each follower's feed
 		followers := s.fetchFollowers(event.UserID)
 		for _, followerID := range followers {
-			feeds[followerID] = append(feeds[followerID], item)
+			feeds[homeFeedKey(followerID)] = append(feeds[homeFeedKey(followerID)], item)
 		}
 	}
 
 	// Write all feeds to Memcached
-	for userID, items := range feeds {
-		key := fmt.Sprintf("feed:%s", userID)
+	for key, items := range feeds {
 		data, err := json.Marshal(items)
 		if err != nil {
 			continue
@@ -99,7 +99,7 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 		s.mc.Set(&memcache.Item{Key: key, Value: data, Expiration: 3600})
 	}
 
-	log.Printf("cache rebuild complete: %d users' feeds populated from %d events", len(feeds), len(events))
+	log.Printf("cache rebuild complete: %d feeds populated from %d events", len(feeds), len(events))
 	return nil
 }
 
@@ -144,7 +144,7 @@ func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
 		})
 	}
 
-	key := fmt.Sprintf("feed:%s", userID)
+	key := homeFeedKey(userID)
 	data, err := json.Marshal(items)
 	if err != nil {
 		return err
@@ -152,6 +152,15 @@ func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
 	s.mc.Set(&memcache.Item{Key: key, Value: data, Expiration: 3600})
 	log.Printf("user feed rebuilt: %d posts for %s", len(items), userID)
 	return nil
+}
+
+// homeFeedKey and userPostsKey must match the keys feed-service reads.
+func homeFeedKey(userID string) string {
+	return fmt.Sprintf("feed:%s", userID)
+}
+
+func userPostsKey(userID string) string {
+	return fmt.Sprintf("userposts:%s", userID)
 }
 
 type postResponse struct {

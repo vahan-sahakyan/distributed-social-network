@@ -16,6 +16,8 @@ services:
       MEDIA_SERVICE_GRPC_ADDR: media-service:9086
       NOTIFICATIONS_SERVICE_GRPC_ADDR: notification-service:9087
       CACHE_REBUILDER_SERVICE_GRPC_ADDR: cache-rebuilder-service:9089
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET: images
     depends_on:
       - posts-service
       - feed-service
@@ -140,9 +142,11 @@ services:
       GRPC_PORT: "9087"
       DATABASE_URL: postgres://postgres:postgres@notifications-db:5432/notifications?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
     depends_on:
       - notifications-db
       - redpanda
+      - posts-service
 
   event-writer-service:
     build:

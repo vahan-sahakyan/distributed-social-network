@@ -34,6 +34,10 @@ func main() {
 		log.Fatalf("failed to initialize storage: %v", err)
 	}
 
+	if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), "image.uploaded"); err != nil {
+		log.Fatalf("failed to ensure kafka topics: %v", err)
+	}
+
 	producer := broker.NewProducer(os.Getenv("KAFKA_BROKERS"))
 	defer producer.Close()
 

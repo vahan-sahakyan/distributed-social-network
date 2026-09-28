@@ -36,6 +36,10 @@ func main() {
 		log.Fatalf("failed to run migration: %v", err)
 	}
 
+	if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), "like.created", "like.deleted"); err != nil {
+		log.Fatalf("failed to ensure kafka topics: %v", err)
+	}
+
 	producer := broker.NewProducer(os.Getenv("KAFKA_BROKERS"))
 	defer producer.Close()
 

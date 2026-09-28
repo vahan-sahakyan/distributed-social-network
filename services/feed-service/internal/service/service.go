@@ -14,33 +14,30 @@ func New(repo *repository.Repository) *Service {
 }
 
 func (s *Service) GetHomeFeed(userID string) ([]model.FeedItem, error) {
-	return s.repo.GetFeed(userID)
+	return s.repo.GetFeed(repository.HomeFeedKey(userID))
 }
 
 func (s *Service) GetUserFeed(userID string) ([]model.FeedItem, error) {
-	return s.repo.GetFeed(userID)
+	return s.repo.GetFeed(repository.UserPostsKey(userID))
 }
 
-// FanoutPost distributes a new post to follower feed caches.
+// FanoutPost distributes a new post to the author's own posts and to follower feed caches.
 func (s *Service) FanoutPost(item *model.FeedItem, followerIDs []string) error {
+	if err := s.repo.AppendToFeed(repository.UserPostsKey(item.AuthorID), item); err != nil {
+		return err
+	}
 	for _, followerID := range followerIDs {
-		if err := s.repo.AppendToFeed(followerID, item); err != nil {
+		if err := s.repo.AppendToFeed(repository.HomeFeedKey(followerID), item); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// IncrementLikes increments the like count for a post in the given users' feed caches.
-func (s *Service) IncrementLikes(postID string, userIDs []string) {
+// AdjustCounts applies like and comment deltas to a post in its author's posts and the given users' feed caches.
+func (s *Service) AdjustCounts(postID, authorID string, userIDs []string, likesDelta, commentsDelta int) {
+	s.repo.AdjustCounts(repository.UserPostsKey(authorID), postID, likesDelta, commentsDelta)
 	for _, userID := range userIDs {
-		s.repo.IncrementCount(userID, postID, true)
-	}
-}
-
-// IncrementComments increments the comment count for a post in the given users' feed caches.
-func (s *Service) IncrementComments(postID string, userIDs []string) {
-	for _, userID := range userIDs {
-		s.repo.IncrementCount(userID, postID, false)
+		s.repo.AdjustCounts(repository.HomeFeedKey(userID), postID, likesDelta, commentsDelta)
 	}
 }

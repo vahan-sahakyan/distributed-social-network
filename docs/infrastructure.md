@@ -94,7 +94,7 @@ Use `make down-clean` to wipe all volumes.
 
 ## Database Schemas
 
-Migrations are managed by `scripts/migrate.sh` and are idempotent (uses `CREATE IF NOT EXISTS`).
+Each service embeds its migrations (`services/*/migrations/`) and applies them on startup. They are idempotent (`IF NOT EXISTS`).
 
 ### PostgreSQL — users-db
 

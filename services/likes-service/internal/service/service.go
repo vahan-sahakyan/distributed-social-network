@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"log"
 
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/repository"
@@ -23,7 +24,14 @@ func (s *Service) HasLiked(ctx context.Context, userID, entityID string) (bool, 
 }
 
 func (s *Service) Unlike(ctx context.Context, userID, entityID string) error {
-	return s.repo.Delete(ctx, userID, entityID)
+	deleted, err := s.repo.Delete(ctx, userID, entityID)
+	if err != nil || !deleted {
+		return err
+	}
+
+	s.publish(ctx, "like.deleted", &model.Like{UserID: userID, EntityID: entityID})
+
+	return nil
 }
 
 func (s *Service) CreateLike(ctx context.Context, req *model.CreateLikeRequest) (*model.Like, error) {
@@ -33,11 +41,21 @@ func (s *Service) CreateLike(ctx context.Context, req *model.CreateLikeRequest) 
 		EntityID: req.EntityID,
 	}
 
-	if err := s.repo.Create(ctx, like); err != nil {
+	created, err := s.repo.Create(ctx, like)
+	if err != nil {
 		return nil, err
 	}
 
-	_ = s.producer.Publish(ctx, "like.created", like)
+	// a repeated like is a no-op, so it must not emit another event
+	if created {
+		s.publish(ctx, "like.created", like)
+	}
 
 	return like, nil
+}
+
+func (s *Service) publish(ctx context.Context, topic string, like *model.Like) {
+	if err := s.producer.Publish(ctx, topic, like.EntityID, like); err != nil {
+		log.Printf("failed to publish %s for %s: %v", topic, like.EntityID, err)
+	}
 }

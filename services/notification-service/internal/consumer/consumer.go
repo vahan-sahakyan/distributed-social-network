@@ -8,21 +8,32 @@ import (
 
 	"github.com/segmentio/kafka-go"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/service"
+	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
+	"google.golang.org/grpc"
 )
 
-type Consumer struct {
-	svc     *service.Service
-	brokers string
+// notification types keyed by source topic
+var notifTypes = map[string]string{
+	"like.created":    "like",
+	"comment.created": "comment",
 }
 
-func New(svc *service.Service, brokers string) *Consumer {
-	return &Consumer{svc: svc, brokers: brokers}
+type Consumer struct {
+	svc         *service.Service
+	brokers     string
+	postsClient postspb.PostsServiceClient
+}
+
+func New(svc *service.Service, brokers string, postsConn *grpc.ClientConn) *Consumer {
+	return &Consumer{
+		svc:         svc,
+		brokers:     brokers,
+		postsClient: postspb.NewPostsServiceClient(postsConn),
+	}
 }
 
 func (c *Consumer) Start(ctx context.Context) {
-	topics := []string{"like.created", "comment.created"}
-
-	for _, topic := range topics {
+	for topic := range notifTypes {
 		go c.consume(ctx, topic)
 	}
 
@@ -63,8 +74,17 @@ func (c *Consumer) handle(ctx context.Context, topic string, data []byte) {
 		return
 	}
 
-	notifType := strings.Replace(topic, ".", "_", -1)
+	resp, err := c.postsClient.GetPost(ctx, &postspb.GetPostRequest{Id: event.EntityID})
+	if err != nil || resp.Post == nil || resp.Post.AuthorId == "" {
+		log.Printf("error resolving author of %s: %v", event.EntityID, err)
+		return
+	}
+	authorID := resp.Post.AuthorId
+	if authorID == event.UserID {
+		return
+	}
 
-	// TODO: resolve target user from entity
-	_ = c.svc.CreateNotification(ctx, "", notifType, event.UserID, event.EntityID)
+	if err := c.svc.CreateNotification(ctx, authorID, notifTypes[topic], event.UserID, event.EntityID); err != nil {
+		log.Printf("error creating notification: %v", err)
+	}
 }

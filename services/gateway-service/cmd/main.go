@@ -18,6 +18,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/proxy"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -86,6 +87,13 @@ func main() {
 	}
 
 	registerRoutes(app, cl)
+
+	// media URLs are bucket paths, served from the public-read bucket
+	minioAddr := envOrDefault("MINIO_ENDPOINT", "localhost:9000")
+	bucket := envOrDefault("MINIO_BUCKET", "images")
+	app.Get("/"+bucket+"/*", func(c *fiber.Ctx) error {
+		return proxy.Do(c, "http://"+minioAddr+c.Path())
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {

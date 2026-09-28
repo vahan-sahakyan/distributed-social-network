@@ -7,5 +7,5 @@ CREATE TABLE IF NOT EXISTS comments (
     created_at TIMESTAMP NOT NULL
 );
 
-CREATE INDEX idx_comments_entity_id ON comments (entity_id);
-CREATE INDEX idx_comments_created_at ON comments (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_comments_entity_id ON comments (entity_id);
+CREATE INDEX IF NOT EXISTS idx_comments_created_at ON comments (created_at DESC);

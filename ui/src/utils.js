@@ -37,7 +37,7 @@ export function normalizePost(p) {
     id: p.post_id || p.id,
     authorId: p.author_id,
     text: p.text,
-    imageId: p.image_id || null,
+    imageId: p.image_id || p.image_url || null,
     likesCount: p.likes_count ?? p.likes ?? 0,
     commentsCount: p.comments_count ?? p.comments ?? 0,
     createdAt: parseTimestamp(p.created_at),

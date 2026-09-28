@@ -53,7 +53,7 @@ export function PostCard({ post }) {
     <article className="border-b border-border hover:bg-surface/40 transition-colors cursor-default">
       <div className="px-4 pt-4 pb-3 flex gap-3">
         <button
-          onClick={() => navigate('profile', post.authorId)}
+          onClick={() => navigate('/profile/' + post.authorId)}
           className="shrink-0"
         >
           <Avatar username={username} size="sm" />
@@ -114,7 +114,7 @@ function PostImage({ imageId }) {
 
   useEffect(() => {
     api.getMedia(imageId)
-      .then(m => { if (m?.url) setSrc(`http://localhost:8080${m.url}`) })
+      .then(m => { if (m?.url) setSrc(m.url) })
       .catch(() => {})
   }, [imageId])
 

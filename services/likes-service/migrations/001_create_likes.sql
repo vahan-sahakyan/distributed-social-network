@@ -5,5 +5,5 @@ CREATE TABLE IF NOT EXISTS likes (
     UNIQUE (user_id, entity_id)
 );
 
-CREATE INDEX idx_likes_entity_id ON likes (entity_id);
-CREATE INDEX idx_likes_user_id ON likes (user_id);
+CREATE INDEX IF NOT EXISTS idx_likes_entity_id ON likes (entity_id);
+CREATE INDEX IF NOT EXISTS idx_likes_user_id ON likes (user_id);

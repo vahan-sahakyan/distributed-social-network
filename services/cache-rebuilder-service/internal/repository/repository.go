@@ -43,8 +43,8 @@ func (r *Repository) GetPostStates(ctx context.Context) ([]model.PostState, erro
 	rows, err := r.conn.Query(ctx, `
 		SELECT
 			post_id,
-			countIf(event_type = 'like.created')    AS likes,
-			countIf(event_type = 'comment.created') AS comments,
+			sum(likes_delta)    AS likes,
+			sum(comments_delta) AS comments,
 			max(created_at) AS last_update
 		FROM feed_events
 		WHERE post_id != ''

@@ -4,8 +4,8 @@ import "time"
 
 type PostState struct {
 	PostID     string    `json:"post_id"`
-	Likes      uint64    `json:"likes"`
-	Comments   uint64    `json:"comments"`
+	Likes      int64     `json:"likes"`
+	Comments   int64     `json:"comments"`
 	LastUpdate time.Time `json:"last_update"`
 }
 

@@ -23,7 +23,7 @@ func New(repo *repository.Repository, brokers string) *Consumer {
 }
 
 func (c *Consumer) Start(ctx context.Context) {
-	topics := []string{"post.created", "like.created", "comment.created"}
+	topics := []string{"post.created", "like.created", "like.deleted", "comment.created"}
 
 	for _, topic := range topics {
 		go c.consume(ctx, topic)
@@ -81,13 +81,15 @@ func (c *Consumer) handleEvent(ctx context.Context, eventType string, data []byt
 	case "post.created":
 		event.PostID = payload.ID
 		event.UserID = payload.AuthorID
-	case "like.created", "comment.created":
+	case "like.created", "like.deleted", "comment.created":
 		event.PostID = payload.EntityID
 	}
 
 	switch eventType {
 	case "like.created":
 		event.LikesDelta = 1
+	case "like.deleted":
+		event.LikesDelta = -1
 	case "comment.created":
 		event.CommentsDelta = 1
 	}

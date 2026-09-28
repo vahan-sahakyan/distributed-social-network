@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"io"
+	"log"
 
 	"github.com/vahan-sahakyan/distributed-social-network/media-service/internal/storage"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
@@ -32,7 +33,9 @@ func (s *Service) Upload(ctx context.Context, reader io.Reader, size int64, cont
 	}
 
 	img := &Image{ID: imageID, URL: url}
-	_ = s.producer.Publish(ctx, "image.uploaded", img)
+	if err := s.producer.Publish(ctx, "image.uploaded", img.ID, img); err != nil {
+		log.Printf("failed to publish image.uploaded for %s: %v", img.ID, err)
+	}
 
 	return img, nil
 }

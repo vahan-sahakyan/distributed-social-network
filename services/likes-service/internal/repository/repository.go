@@ -15,13 +15,17 @@ func New(db *pgxpool.Pool) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) Create(ctx context.Context, like *model.Like) error {
-	_, err := r.db.Exec(ctx,
+// Create inserts the like, returning false if the user already liked the entity.
+func (r *Repository) Create(ctx context.Context, like *model.Like) (bool, error) {
+	tag, err := r.db.Exec(ctx,
 		`INSERT INTO likes (id, user_id, entity_id) VALUES ($1, $2, $3)
 		 ON CONFLICT (user_id, entity_id) DO NOTHING`,
 		like.ID, like.UserID, like.EntityID,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }
 
 func (r *Repository) HasLiked(ctx context.Context, userID, entityID string) (bool, error) {
@@ -33,10 +37,14 @@ func (r *Repository) HasLiked(ctx context.Context, userID, entityID string) (boo
 	return exists, err
 }
 
-func (r *Repository) Delete(ctx context.Context, userID, entityID string) error {
-	_, err := r.db.Exec(ctx,
+// Delete removes the like, returning false if there was nothing to remove.
+func (r *Repository) Delete(ctx context.Context, userID, entityID string) (bool, error) {
+	tag, err := r.db.Exec(ctx,
 		`DELETE FROM likes WHERE user_id=$1 AND entity_id=$2`,
 		userID, entityID,
 	)
-	return err
+	if err != nil {
+		return false, err
+	}
+	return tag.RowsAffected() > 0, nil
 }

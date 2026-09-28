@@ -16,8 +16,17 @@ func New(mc *memcache.Client) *Repository {
 	return &Repository{mc: mc}
 }
 
-func (r *Repository) GetFeed(userID string) ([]model.FeedItem, error) {
-	key := fmt.Sprintf("feed:%s", userID)
+// HomeFeedKey is the cache key of the posts by userID and everyone they follow.
+func HomeFeedKey(userID string) string {
+	return fmt.Sprintf("feed:%s", userID)
+}
+
+// UserPostsKey is the cache key of the posts authored by userID.
+func UserPostsKey(userID string) string {
+	return fmt.Sprintf("userposts:%s", userID)
+}
+
+func (r *Repository) GetFeed(key string) ([]model.FeedItem, error) {
 	item, err := r.mc.Get(key)
 	if err == memcache.ErrCacheMiss {
 		return nil, nil
@@ -33,8 +42,7 @@ func (r *Repository) GetFeed(userID string) ([]model.FeedItem, error) {
 	return items, nil
 }
 
-func (r *Repository) SetFeed(userID string, items []model.FeedItem) error {
-	key := fmt.Sprintf("feed:%s", userID)
+func (r *Repository) SetFeed(key string, items []model.FeedItem) error {
 	data, err := json.Marshal(items)
 	if err != nil {
 		return err
@@ -46,8 +54,8 @@ func (r *Repository) SetFeed(userID string, items []model.FeedItem) error {
 	})
 }
 
-func (r *Repository) AppendToFeed(userID string, item *model.FeedItem) error {
-	existing, err := r.GetFeed(userID)
+func (r *Repository) AppendToFeed(key string, item *model.FeedItem) error {
+	existing, err := r.GetFeed(key)
 	if err != nil {
 		return err
 	}
@@ -56,23 +64,20 @@ func (r *Repository) AppendToFeed(userID string, item *model.FeedItem) error {
 	if len(items) > 100 {
 		items = items[:100]
 	}
-	return r.SetFeed(userID, items)
+	return r.SetFeed(key, items)
 }
 
-// IncrementCount increments the like (isLike=true) or comment count for a post in a user's feed.
-func (r *Repository) IncrementCount(userID, postID string, isLike bool) {
-	items, err := r.GetFeed(userID)
+// AdjustCounts applies the like and comment deltas to a post in the feed stored under key.
+func (r *Repository) AdjustCounts(key, postID string, likesDelta, commentsDelta int) {
+	items, err := r.GetFeed(key)
 	if err != nil || len(items) == 0 {
 		return
 	}
 	for i, item := range items {
 		if item.PostID == postID {
-			if isLike {
-				items[i].LikesCount++
-			} else {
-				items[i].CommentsCount++
-			}
-			r.SetFeed(userID, items) //nolint
+			items[i].LikesCount = max(items[i].LikesCount+likesDelta, 0)
+			items[i].CommentsCount = max(items[i].CommentsCount+commentsDelta, 0)
+			r.SetFeed(key, items) //nolint
 			return
 		}
 	}

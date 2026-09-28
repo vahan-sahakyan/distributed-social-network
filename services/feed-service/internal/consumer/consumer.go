@@ -33,8 +33,9 @@ func New(svc *service.Service, brokers string, usersConn, postsConn *grpc.Client
 
 func (c *Consumer) Start(ctx context.Context) {
 	go c.startReader(ctx, "post.created", "feed-service-posts", c.handlePostCreated)
-	go c.startReader(ctx, "like.created", "feed-service-likes", c.handleLikeCreated)
-	c.startReader(ctx, "comment.created", "feed-service-comments", c.handleCommentCreated)
+	go c.startReader(ctx, "like.created", "feed-service-likes", c.countsHandler(1, 0))
+	go c.startReader(ctx, "like.deleted", "feed-service-unlikes", c.countsHandler(-1, 0))
+	c.startReader(ctx, "comment.created", "feed-service-comments", c.countsHandler(0, 1))
 }
 
 func (c *Consumer) startReader(ctx context.Context, topic, groupID string, handler func([]byte)) {
@@ -89,36 +90,23 @@ func (c *Consumer) handlePostCreated(data []byte) {
 	}
 }
 
-func (c *Consumer) handleLikeCreated(data []byte) {
-	var event struct {
-		UserID   string `json:"user_id"`
-		EntityID string `json:"entity_id"`
+// countsHandler returns a handler for like/comment events that applies the given deltas to cached feeds.
+func (c *Consumer) countsHandler(likesDelta, commentsDelta int) func([]byte) {
+	return func(data []byte) {
+		var event struct {
+			UserID   string `json:"user_id"`
+			EntityID string `json:"entity_id"`
+		}
+		if err := json.Unmarshal(data, &event); err != nil {
+			return
+		}
+		authorID, ok := c.fetchPostAuthor(event.EntityID)
+		if !ok {
+			return
+		}
+		users := append(c.fetchFollowers(authorID), authorID)
+		c.svc.AdjustCounts(event.EntityID, authorID, users, likesDelta, commentsDelta)
 	}
-	if err := json.Unmarshal(data, &event); err != nil {
-		return
-	}
-	authorID, ok := c.fetchPostAuthor(event.EntityID)
-	if !ok {
-		return
-	}
-	users := append(c.fetchFollowers(authorID), authorID)
-	c.svc.IncrementLikes(event.EntityID, users)
-}
-
-func (c *Consumer) handleCommentCreated(data []byte) {
-	var event struct {
-		UserID   string `json:"user_id"`
-		EntityID string `json:"entity_id"`
-	}
-	if err := json.Unmarshal(data, &event); err != nil {
-		return
-	}
-	authorID, ok := c.fetchPostAuthor(event.EntityID)
-	if !ok {
-		return
-	}
-	users := append(c.fetchFollowers(authorID), authorID)
-	c.svc.IncrementComments(event.EntityID, users)
 }
 
 func (c *Consumer) fetchFollowers(userID string) []string {

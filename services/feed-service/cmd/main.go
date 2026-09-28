@@ -12,6 +12,7 @@ import (
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/cache"
 	feedpb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/feed"
 
@@ -59,6 +60,10 @@ func main() {
 	defer postsConn.Close()
 
 	// start event consumer for fanout-on-write
+	if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), "post.created", "like.created", "like.deleted", "comment.created"); err != nil {
+		log.Fatalf("failed to ensure kafka topics: %v", err)
+	}
+
 	cons := consumer.New(svc, os.Getenv("KAFKA_BROKERS"), usersConn, postsConn)
 	go cons.Start(ctx)
 
