@@ -41,11 +41,6 @@ func main() {
 	repo := repository.New(db)
 	svc := service.New(repo)
 
-	// start event consumers
-	if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), "like.created", "comment.created"); err != nil {
-		log.Fatalf("failed to ensure kafka topics: %v", err)
-	}
-
 	postsAddr := os.Getenv("POSTS_SERVICE_GRPC_ADDR")
 	if postsAddr == "" {
 		postsAddr = "localhost:9081"
@@ -55,9 +50,6 @@ func main() {
 		log.Fatalf("failed to connect to posts-service: %v", err)
 	}
 	defer postsConn.Close()
-
-	cons := consumer.New(svc, os.Getenv("KAFKA_BROKERS"), postsConn)
-	go cons.Start(ctx)
 
 	// gRPC server
 	grpcPort := os.Getenv("GRPC_PORT")
@@ -100,6 +92,19 @@ func main() {
 		if err := app.Listen(":" + port); err != nil {
 			log.Fatalf("failed to start HTTP server: %v", err)
 		}
+	}()
+
+	// Kafka setup runs after /health is serving so a cold broker does not fail the liveness probe.
+	go func() {
+		brokers := os.Getenv("KAFKA_BROKERS")
+		if err := broker.EnsureTopics(ctx, brokers, consumer.Topics()...); err != nil {
+			log.Fatalf("failed to ensure kafka topics: %v", err)
+		}
+
+		dlq := broker.NewProducer(brokers)
+		defer dlq.Close()
+
+		consumer.New(svc, brokers, dlq, postsConn).Start(ctx)
 	}()
 
 	<-ctx.Done()

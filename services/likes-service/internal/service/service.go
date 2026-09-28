@@ -7,6 +7,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 )
 
@@ -29,7 +30,7 @@ func (s *Service) Unlike(ctx context.Context, userID, entityID string) error {
 		return err
 	}
 
-	s.publish(ctx, "like.deleted", &model.Like{UserID: userID, EntityID: entityID})
+	s.publish(ctx, events.LikeDeleted, &model.Like{UserID: userID, EntityID: entityID})
 
 	return nil
 }
@@ -48,7 +49,7 @@ func (s *Service) CreateLike(ctx context.Context, req *model.CreateLikeRequest) 
 
 	// a repeated like is a no-op, so it must not emit another event
 	if created {
-		s.publish(ctx, "like.created", like)
+		s.publish(ctx, events.LikeCreated, like)
 	}
 
 	return like, nil

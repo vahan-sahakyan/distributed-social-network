@@ -3,59 +3,60 @@ package consumer
 import (
 	"context"
 	"encoding/json"
-	"log"
-	"strings"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/vahan-sahakyan/distributed-social-network/event-writer-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/event-writer-service/internal/repository"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 )
 
 type Consumer struct {
 	repo    *repository.Repository
 	brokers string
+	dlq     *broker.Producer
 }
 
-func New(repo *repository.Repository, brokers string) *Consumer {
-	return &Consumer{repo: repo, brokers: brokers}
+func New(repo *repository.Repository, brokers string, dlq *broker.Producer) *Consumer {
+	return &Consumer{repo: repo, brokers: brokers, dlq: dlq}
 }
 
 func (c *Consumer) Start(ctx context.Context) {
-	topics := []string{"post.created", "like.created", "like.deleted", "comment.created"}
-
-	for _, topic := range topics {
-		go c.consume(ctx, topic)
+	for _, topic := range events.All {
+		go broker.Consume(ctx, broker.ConsumerConfig{
+			Brokers: c.brokers,
+			Topic:   topic,
+			GroupID: "event-writer-service",
+			DLQ:     c.dlq,
+		}, c.handler(topic))
 	}
 
 	<-ctx.Done()
 }
 
-func (c *Consumer) consume(ctx context.Context, topic string) {
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: strings.Split(c.brokers, ","),
-		Topic:   topic,
-		GroupID: "event-writer-service",
-	})
-	defer reader.Close()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			msg, err := reader.ReadMessage(ctx)
-			if err != nil {
-				log.Printf("[%s] error reading message: %v", topic, err)
-				continue
-			}
-			c.handleEvent(ctx, topic, msg.Value)
-		}
+func (c *Consumer) handler(topic string) broker.Handler {
+	return func(ctx context.Context, msg kafka.Message) error {
+		return c.handleEvent(ctx, topic, msg)
 	}
 }
 
-func (c *Consumer) handleEvent(ctx context.Context, eventType string, data []byte) {
+func (c *Consumer) handleEvent(ctx context.Context, eventType string, msg kafka.Message) error {
+	event, err := buildEvent(eventType, msg)
+	if err != nil {
+		return err
+	}
+	if err := c.repo.InsertEvent(ctx, event); err != nil {
+		return fmt.Errorf("inserting event to clickhouse: %w", err)
+	}
+	return nil
+}
+
+// buildEvent maps a Kafka message to the feed_events row it produces.
+func buildEvent(eventType string, msg kafka.Message) (*model.FeedEvent, error) {
 	var payload struct {
 		ID       string `json:"id"`
 		PostID   string `json:"post_id"`
@@ -64,13 +65,15 @@ func (c *Consumer) handleEvent(ctx context.Context, eventType string, data []byt
 		AuthorID string `json:"author_id"`
 	}
 
-	if err := json.Unmarshal(data, &payload); err != nil {
-		log.Printf("error unmarshaling event: %v", err)
-		return
+	if err := json.Unmarshal(msg.Value, &payload); err != nil {
+		return nil, fmt.Errorf("unmarshaling event: %w", err)
 	}
 
 	event := &model.FeedEvent{
-		EventID:   id.New(),
+		// Derived from the message's Kafka coordinates rather than generated, so a
+		// redelivery after a failed commit writes the same event_id and readers can
+		// collapse the duplicate instead of counting the like twice.
+		EventID:   id.Deterministic(msg.Topic, strconv.Itoa(msg.Partition), strconv.FormatInt(msg.Offset, 10)),
 		EventType: eventType,
 		PostID:    payload.PostID,
 		UserID:    payload.UserID,
@@ -78,23 +81,21 @@ func (c *Consumer) handleEvent(ctx context.Context, eventType string, data []byt
 	}
 
 	switch eventType {
-	case "post.created":
+	case events.PostCreated:
 		event.PostID = payload.ID
 		event.UserID = payload.AuthorID
-	case "like.created", "like.deleted", "comment.created":
+	case events.LikeCreated, events.LikeDeleted, events.CommentCreated:
 		event.PostID = payload.EntityID
 	}
 
 	switch eventType {
-	case "like.created":
+	case events.LikeCreated:
 		event.LikesDelta = 1
-	case "like.deleted":
+	case events.LikeDeleted:
 		event.LikesDelta = -1
-	case "comment.created":
+	case events.CommentCreated:
 		event.CommentsDelta = 1
 	}
 
-	if err := c.repo.InsertEvent(ctx, event); err != nil {
-		log.Printf("error inserting event to clickhouse: %v", err)
-	}
+	return event, nil
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/comments-service/migrations"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	commentspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/comments"
 
 	"github.com/ansrivas/fiberprometheus/v2"
@@ -34,10 +35,6 @@ func main() {
 
 	if err := database.MigratePostgres(ctx, db, migrations.SQL); err != nil {
 		log.Fatalf("failed to run migration: %v", err)
-	}
-
-	if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), "comment.created"); err != nil {
-		log.Fatalf("failed to ensure kafka topics: %v", err)
 	}
 
 	producer := broker.NewProducer(os.Getenv("KAFKA_BROKERS"))
@@ -86,6 +83,14 @@ func main() {
 	go func() {
 		if err := app.Listen(":" + port); err != nil {
 			log.Fatalf("failed to start HTTP server: %v", err)
+		}
+	}()
+
+	// Topics are created after /health is serving so a cold broker does not fail
+	// the liveness probe. Publishes fail while Kafka is unreachable either way.
+	go func() {
+		if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), events.CommentCreated); err != nil {
+			log.Fatalf("failed to ensure kafka topics: %v", err)
 		}
 	}()
 

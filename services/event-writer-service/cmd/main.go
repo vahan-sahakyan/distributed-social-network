@@ -12,6 +12,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/event-writer-service/migrations"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
@@ -41,13 +42,6 @@ func main() {
 	}
 
 	repo := repository.New(conn)
-	if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), "post.created", "like.created", "like.deleted", "comment.created"); err != nil {
-		log.Fatalf("failed to ensure kafka topics: %v", err)
-	}
-
-	cons := consumer.New(repo, os.Getenv("KAFKA_BROKERS"))
-
-	go cons.Start(ctx)
 
 	// Health endpoint
 	app := fiber.New(fiber.Config{AppName: "event-writer-service"})
@@ -67,6 +61,19 @@ func main() {
 		if err := app.Listen(":" + port); err != nil {
 			log.Fatalf("failed to start server: %v", err)
 		}
+	}()
+
+	// Kafka setup runs after /health is serving so a cold broker does not fail the liveness probe.
+	go func() {
+		brokers := os.Getenv("KAFKA_BROKERS")
+		if err := broker.EnsureTopics(ctx, brokers, events.All...); err != nil {
+			log.Fatalf("failed to ensure kafka topics: %v", err)
+		}
+
+		dlq := broker.NewProducer(brokers)
+		defer dlq.Close()
+
+		consumer.New(repo, brokers, dlq).Start(ctx)
 	}()
 
 	<-ctx.Done()

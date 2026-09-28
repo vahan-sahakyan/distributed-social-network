@@ -14,6 +14,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/service"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/cache"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	feedpb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/feed"
 
 	"github.com/ansrivas/fiberprometheus/v2"
@@ -59,14 +60,6 @@ func main() {
 	}
 	defer postsConn.Close()
 
-	// start event consumer for fanout-on-write
-	if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), "post.created", "like.created", "like.deleted", "comment.created"); err != nil {
-		log.Fatalf("failed to ensure kafka topics: %v", err)
-	}
-
-	cons := consumer.New(svc, os.Getenv("KAFKA_BROKERS"), usersConn, postsConn)
-	go cons.Start(ctx)
-
 	// gRPC server
 	grpcPort := os.Getenv("GRPC_PORT")
 	if grpcPort == "" {
@@ -105,6 +98,21 @@ func main() {
 		if err := app.Listen(":" + port); err != nil {
 			log.Fatalf("failed to start HTTP server: %v", err)
 		}
+	}()
+
+	// Kafka setup runs after the health endpoint is already serving: waiting on a
+	// cold broker here would otherwise leave the liveness probe unanswered and get
+	// the pod killed before it ever finished starting.
+	go func() {
+		brokers := os.Getenv("KAFKA_BROKERS")
+		if err := broker.EnsureTopics(ctx, brokers, events.All...); err != nil {
+			log.Fatalf("failed to ensure kafka topics: %v", err)
+		}
+
+		dlq := broker.NewProducer(brokers)
+		defer dlq.Close()
+
+		consumer.New(svc, brokers, dlq, usersConn, postsConn).Start(ctx)
 	}()
 
 	<-ctx.Done()

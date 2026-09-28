@@ -70,7 +70,12 @@ func (p *Producer) Close() {
 }
 
 // EnsureTopics creates any missing topics, retrying until the broker is reachable or ctx is done.
+// An empty brokers string is rejected outright rather than retried forever against no address.
 func EnsureTopics(ctx context.Context, brokers string, topics ...string) error {
+	if strings.TrimSpace(brokers) == "" {
+		return errors.New("no kafka brokers configured (KAFKA_BROKERS is empty)")
+	}
+
 	addrs := strings.Split(brokers, ",")
 	configs := make([]kafka.TopicConfig, len(topics))
 	for i, t := range topics {

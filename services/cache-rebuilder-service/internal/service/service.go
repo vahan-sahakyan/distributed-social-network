@@ -10,6 +10,7 @@ import (
 	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/vahan-sahakyan/distributed-social-network/cache-rebuilder-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/cache-rebuilder-service/internal/repository"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/cache"
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
 )
@@ -68,35 +69,24 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 			continue
 		}
 
-		st := postStates[event.PostID]
-		item := feedItem{
-			PostID:        post.ID,
-			AuthorID:      post.AuthorID,
-			Text:          post.Text,
-			ImageURL:      post.ImageID,
-			LikesCount:    int(st.Likes),
-			CommentsCount: int(st.Comments),
-			CreatedAt:     post.CreatedAt,
-		}
+		item := newFeedItem(post, postStates[event.PostID])
 
 		// Write to author's own feed and posts
-		feeds[homeFeedKey(event.UserID)] = append(feeds[homeFeedKey(event.UserID)], item)
-		feeds[userPostsKey(event.UserID)] = append(feeds[userPostsKey(event.UserID)], item)
+		feeds[cache.HomeFeedKey(event.UserID)] = append(feeds[cache.HomeFeedKey(event.UserID)], item)
+		feeds[cache.UserPostsKey(event.UserID)] = append(feeds[cache.UserPostsKey(event.UserID)], item)
 
 		// Write to each follower's feed
 		followers := s.fetchFollowers(event.UserID)
 		for _, followerID := range followers {
-			feeds[homeFeedKey(followerID)] = append(feeds[homeFeedKey(followerID)], item)
+			feeds[cache.HomeFeedKey(followerID)] = append(feeds[cache.HomeFeedKey(followerID)], item)
 		}
 	}
 
 	// Write all feeds to Memcached
 	for key, items := range feeds {
-		data, err := json.Marshal(items)
-		if err != nil {
-			continue
+		if err := s.setFeed(key, items); err != nil {
+			log.Printf("writing %s: %v", key, err)
 		}
-		s.mc.Set(&memcache.Item{Key: key, Value: data, Expiration: 3600})
 	}
 
 	log.Printf("cache rebuild complete: %d feeds populated from %d events", len(feeds), len(events))
@@ -123,7 +113,11 @@ func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
 
 	postStates := s.loadPostStates(ctx)
 
-	var items []feedItem
+	// feed-service serves two caches per user: the home feed and the profile's
+	// own posts. Rebuilding only the first left profiles empty once the second
+	// expired, with nothing able to repopulate it short of a full rebuild.
+	homeItems := []feedItem{}
+	ownItems := []feedItem{}
 	for _, event := range events {
 		if !authorSet[event.UserID] {
 			continue
@@ -132,35 +126,44 @@ func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
 		if err != nil {
 			continue
 		}
-		st := postStates[event.PostID]
-		items = append(items, feedItem{
-			PostID:        post.ID,
-			AuthorID:      post.AuthorID,
-			Text:          post.Text,
-			ImageURL:      post.ImageID,
-			LikesCount:    int(st.Likes),
-			CommentsCount: int(st.Comments),
-			CreatedAt:     post.CreatedAt,
-		})
+		item := newFeedItem(post, postStates[event.PostID])
+		homeItems = append(homeItems, item)
+		if event.UserID == userID {
+			ownItems = append(ownItems, item)
+		}
 	}
 
-	key := homeFeedKey(userID)
+	if err := s.setFeed(cache.HomeFeedKey(userID), homeItems); err != nil {
+		return err
+	}
+	if err := s.setFeed(cache.UserPostsKey(userID), ownItems); err != nil {
+		return err
+	}
+	log.Printf("user feed rebuilt: %d feed posts, %d own posts for %s", len(homeItems), len(ownItems), userID)
+	return nil
+}
+
+func (s *Service) setFeed(key string, items []feedItem) error {
 	data, err := json.Marshal(items)
 	if err != nil {
 		return err
 	}
-	s.mc.Set(&memcache.Item{Key: key, Value: data, Expiration: 3600})
-	log.Printf("user feed rebuilt: %d posts for %s", len(items), userID)
-	return nil
+	return s.mc.Set(&memcache.Item{Key: key, Value: data, Expiration: 3600})
 }
 
-// homeFeedKey and userPostsKey must match the keys feed-service reads.
-func homeFeedKey(userID string) string {
-	return fmt.Sprintf("feed:%s", userID)
-}
-
-func userPostsKey(userID string) string {
-	return fmt.Sprintf("userposts:%s", userID)
+// newFeedItem builds a cached feed entry. Counts are clamped at zero: summed
+// deltas go negative when an unlike outlives its like (e.g. after feed_events
+// was truncated), and the UI would otherwise render "-1 likes".
+func newFeedItem(post *postResponse, st model.PostState) feedItem {
+	return feedItem{
+		PostID:        post.ID,
+		AuthorID:      post.AuthorID,
+		Text:          post.Text,
+		ImageURL:      post.ImageID,
+		LikesCount:    max(int(st.Likes), 0),
+		CommentsCount: max(int(st.Comments), 0),
+		CreatedAt:     post.CreatedAt,
+	}
 }
 
 type postResponse struct {

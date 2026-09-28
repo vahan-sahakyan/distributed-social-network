@@ -3,13 +3,14 @@ package consumer
 import (
 	"context"
 	"encoding/json"
-	"log"
-	"strings"
+	"fmt"
 	"time"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/service"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
 	"google.golang.org/grpc"
@@ -18,50 +19,38 @@ import (
 type Consumer struct {
 	svc         *service.Service
 	brokers     string
+	dlq         *broker.Producer
 	usersClient userspb.UsersServiceClient
 	postsClient postspb.PostsServiceClient
 }
 
-func New(svc *service.Service, brokers string, usersConn, postsConn *grpc.ClientConn) *Consumer {
+func New(svc *service.Service, brokers string, dlq *broker.Producer, usersConn, postsConn *grpc.ClientConn) *Consumer {
 	return &Consumer{
 		svc:         svc,
 		brokers:     brokers,
+		dlq:         dlq,
 		usersClient: userspb.NewUsersServiceClient(usersConn),
 		postsClient: postspb.NewPostsServiceClient(postsConn),
 	}
 }
 
 func (c *Consumer) Start(ctx context.Context) {
-	go c.startReader(ctx, "post.created", "feed-service-posts", c.handlePostCreated)
-	go c.startReader(ctx, "like.created", "feed-service-likes", c.countsHandler(1, 0))
-	go c.startReader(ctx, "like.deleted", "feed-service-unlikes", c.countsHandler(-1, 0))
-	c.startReader(ctx, "comment.created", "feed-service-comments", c.countsHandler(0, 1))
+	go c.consume(ctx, events.PostCreated, "feed-service-posts", c.handlePostCreated)
+	go c.consume(ctx, events.LikeCreated, "feed-service-likes", c.countsHandler(1, 0))
+	go c.consume(ctx, events.LikeDeleted, "feed-service-unlikes", c.countsHandler(-1, 0))
+	c.consume(ctx, events.CommentCreated, "feed-service-comments", c.countsHandler(0, 1))
 }
 
-func (c *Consumer) startReader(ctx context.Context, topic, groupID string, handler func([]byte)) {
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: strings.Split(c.brokers, ","),
+func (c *Consumer) consume(ctx context.Context, topic, groupID string, handler broker.Handler) {
+	broker.Consume(ctx, broker.ConsumerConfig{
+		Brokers: c.brokers,
 		Topic:   topic,
 		GroupID: groupID,
-	})
-	defer reader.Close()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			msg, err := reader.ReadMessage(ctx)
-			if err != nil {
-				log.Printf("[%s] error reading message: %v", topic, err)
-				continue
-			}
-			handler(msg.Value)
-		}
-	}
+		DLQ:     c.dlq,
+	}, handler)
 }
 
-func (c *Consumer) handlePostCreated(data []byte) {
+func (c *Consumer) handlePostCreated(ctx context.Context, msg kafka.Message) error {
 	var post struct {
 		ID        string    `json:"id"`
 		Text      string    `json:"text"`
@@ -69,9 +58,9 @@ func (c *Consumer) handlePostCreated(data []byte) {
 		ImageID   string    `json:"image_id"`
 		CreatedAt time.Time `json:"created_at"`
 	}
-	if err := json.Unmarshal(data, &post); err != nil {
-		log.Printf("error unmarshaling post: %v", err)
-		return
+	if err := json.Unmarshal(msg.Value, &post); err != nil {
+		// Malformed payloads never succeed on retry; park them immediately.
+		return fmt.Errorf("unmarshaling post: %w", err)
 	}
 
 	item := &model.FeedItem{
@@ -82,46 +71,55 @@ func (c *Consumer) handlePostCreated(data []byte) {
 		CreatedAt: post.CreatedAt,
 	}
 
-	followerIDs := c.fetchFollowers(post.AuthorID)
+	followerIDs, err := c.fetchFollowers(ctx, post.AuthorID)
+	if err != nil {
+		return err
+	}
 	followerIDs = append(followerIDs, post.AuthorID)
 
-	if err := c.svc.FanoutPost(item, followerIDs); err != nil {
-		log.Printf("error fanning out post: %v", err)
-	}
+	return c.svc.FanoutPost(item, followerIDs)
 }
 
 // countsHandler returns a handler for like/comment events that applies the given deltas to cached feeds.
-func (c *Consumer) countsHandler(likesDelta, commentsDelta int) func([]byte) {
-	return func(data []byte) {
+func (c *Consumer) countsHandler(likesDelta, commentsDelta int) broker.Handler {
+	return func(ctx context.Context, msg kafka.Message) error {
 		var event struct {
 			UserID   string `json:"user_id"`
 			EntityID string `json:"entity_id"`
 		}
-		if err := json.Unmarshal(data, &event); err != nil {
-			return
+		if err := json.Unmarshal(msg.Value, &event); err != nil {
+			return fmt.Errorf("unmarshaling event: %w", err)
 		}
-		authorID, ok := c.fetchPostAuthor(event.EntityID)
-		if !ok {
-			return
+
+		authorID, err := c.fetchPostAuthor(ctx, event.EntityID)
+		if err != nil {
+			return err
 		}
-		users := append(c.fetchFollowers(authorID), authorID)
-		c.svc.AdjustCounts(event.EntityID, authorID, users, likesDelta, commentsDelta)
+
+		followers, err := c.fetchFollowers(ctx, authorID)
+		if err != nil {
+			return err
+		}
+
+		return c.svc.AdjustCounts(event.EntityID, authorID, append(followers, authorID), likesDelta, commentsDelta)
 	}
 }
 
-func (c *Consumer) fetchFollowers(userID string) []string {
-	resp, err := c.usersClient.GetFollowers(context.Background(), &userspb.GetFollowersRequest{UserId: userID})
+func (c *Consumer) fetchFollowers(ctx context.Context, userID string) ([]string, error) {
+	resp, err := c.usersClient.GetFollowers(ctx, &userspb.GetFollowersRequest{UserId: userID})
 	if err != nil {
-		log.Printf("error fetching followers for %s: %v", userID, err)
-		return nil
+		return nil, fmt.Errorf("fetching followers for %s: %w", userID, err)
 	}
-	return resp.Followers
+	return resp.Followers, nil
 }
 
-func (c *Consumer) fetchPostAuthor(postID string) (string, bool) {
-	resp, err := c.postsClient.GetPost(context.Background(), &postspb.GetPostRequest{Id: postID})
-	if err != nil || resp.Post == nil || resp.Post.AuthorId == "" {
-		return "", false
+func (c *Consumer) fetchPostAuthor(ctx context.Context, postID string) (string, error) {
+	resp, err := c.postsClient.GetPost(ctx, &postspb.GetPostRequest{Id: postID})
+	if err != nil {
+		return "", fmt.Errorf("fetching post %s: %w", postID, err)
 	}
-	return resp.Post.AuthorId, true
+	if resp.Post == nil || resp.Post.AuthorId == "" {
+		return "", fmt.Errorf("post %s has no author", postID)
+	}
+	return resp.Post.AuthorId, nil
 }

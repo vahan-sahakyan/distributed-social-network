@@ -8,6 +8,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 )
 
@@ -33,7 +34,7 @@ func (s *Service) CreateComment(ctx context.Context, req *model.CreateCommentReq
 		return nil, err
 	}
 
-	if err := s.producer.Publish(ctx, "comment.created", comment.EntityID, comment); err != nil {
+	if err := s.producer.Publish(ctx, events.CommentCreated, comment.EntityID, comment); err != nil {
 		log.Printf("failed to publish comment.created for %s: %v", comment.ID, err)
 	}
 
