@@ -48,6 +48,14 @@ func (c *ConsumerConfig) applyDefaults() {
 func Consume(ctx context.Context, cfg ConsumerConfig, handler Handler) {
 	cfg.applyDefaults()
 
+	// the writer doesn't create topics, so parking would fail on a missing DLQ topic
+	if cfg.DLQ != nil {
+		if err := EnsureTopics(ctx, cfg.Brokers, events.DLQ(cfg.Topic)); err != nil {
+			slog.ErrorContext(ctx, "ensuring dead-letter topic", "topic", cfg.Topic, "error", err)
+			return
+		}
+	}
+
 	reader := kafka.NewReader(kafka.ReaderConfig{
 		Brokers: strings.Split(cfg.Brokers, ","),
 		Topic:   cfg.Topic,
