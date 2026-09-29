@@ -1,24 +1,17 @@
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: redpanda-data
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: {{ .Values.redpanda.storage }}
----
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: redpanda
   labels:
     app: redpanda
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
+  serviceName: redpanda-headless
+  # volumes outlive the StatefulSet: deleting or pruning it never deletes data
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   selector:
     matchLabels:
       app: redpanda
@@ -54,10 +47,14 @@ spec:
             initialDelaySeconds: 15
             periodSeconds: 10
             failureThreshold: 6
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: redpanda-data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.redpanda.storage }}
 ---
 apiVersion: v1
 kind: Service
@@ -74,3 +71,19 @@ spec:
       port: 9644
       targetPort: 9644
   type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redpanda-headless
+spec:
+  clusterIP: None
+  selector:
+    app: redpanda
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092
+    - name: admin
+      port: 9644
+      targetPort: 9644

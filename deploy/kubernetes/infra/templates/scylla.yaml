@@ -1,24 +1,17 @@
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: posts-db-data
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: {{ .Values.scylla.storage }}
----
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: posts-db
   labels:
     app: posts-db
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
+  serviceName: posts-db-headless
+  # volumes outlive the StatefulSet: deleting or pruning it never deletes data
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   selector:
     matchLabels:
       app: posts-db
@@ -44,10 +37,14 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
             failureThreshold: 12
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: posts-db-data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.scylla.storage }}
 ---
 apiVersion: v1
 kind: Service
@@ -60,3 +57,15 @@ spec:
     - port: 9042
       targetPort: 9042
   type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: posts-db-headless
+spec:
+  clusterIP: None
+  selector:
+    app: posts-db
+  ports:
+    - port: 9042
+      targetPort: 9042

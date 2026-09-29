@@ -1,25 +1,18 @@
 {{- range $name, $db := .Values.postgres.instances }}
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ $name }}-data
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: {{ $.Values.postgres.storage }}
----
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ $name }}
   labels:
     app: {{ $name }}
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
+  serviceName: {{ $name }}-headless
+  # volumes outlive the StatefulSet: deleting or pruning it never deletes data
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   selector:
     matchLabels:
       app: {{ $name }}
@@ -53,10 +46,14 @@ spec:
               command: [pg_isready, -U, {{ $.Values.postgres.user }}]
             initialDelaySeconds: 5
             periodSeconds: 5
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: {{ $name }}-data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ $.Values.postgres.storage }}
 ---
 apiVersion: v1
 kind: Service
@@ -69,4 +66,16 @@ spec:
     - port: 5432
       targetPort: 5432
   type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-headless
+spec:
+  clusterIP: None
+  selector:
+    app: {{ $name }}
+  ports:
+    - port: 5432
+      targetPort: 5432
 {{- end }}

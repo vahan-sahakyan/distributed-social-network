@@ -1,24 +1,17 @@
 ---
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: minio-data
-spec:
-  accessModes: [ReadWriteOnce]
-  resources:
-    requests:
-      storage: {{ .Values.minio.storage }}
----
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: minio
   labels:
     app: minio
 spec:
   replicas: 1
-  strategy:
-    type: Recreate
+  serviceName: minio-headless
+  # volumes outlive the StatefulSet: deleting or pruning it never deletes data
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
   selector:
     matchLabels:
       app: minio
@@ -50,10 +43,14 @@ spec:
               port: 9000
             initialDelaySeconds: 10
             periodSeconds: 5
-      volumes:
-        - name: data
-          persistentVolumeClaim:
-            claimName: minio-data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.minio.storage }}
 ---
 apiVersion: v1
 kind: Service
@@ -70,3 +67,19 @@ spec:
       port: 9001
       targetPort: 9001
   type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: minio-headless
+spec:
+  clusterIP: None
+  selector:
+    app: minio
+  ports:
+    - name: api
+      port: 9000
+      targetPort: 9000
+    - name: console
+      port: 9001
+      targetPort: 9001
