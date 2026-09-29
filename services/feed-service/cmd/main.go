@@ -16,17 +16,19 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/cache"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	feedpb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/feed"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
+
+	shutdown := observability.Init(ctx, "feed-service")
+	defer shutdown(context.Background())
 
 	memcachedAddr := os.Getenv("MEMCACHED_ADDR")
 	if memcachedAddr == "" {
@@ -48,13 +50,13 @@ func main() {
 		postsAddr = "localhost:9081"
 	}
 
-	usersConn, err := grpc.NewClient(usersAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	usersConn, err := grpc.NewClient(usersAddr, observability.GRPCDialOptions()...)
 	if err != nil {
 		log.Fatalf("failed to connect to users-service: %v", err)
 	}
 	defer usersConn.Close()
 
-	postsConn, err := grpc.NewClient(postsAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	postsConn, err := grpc.NewClient(postsAddr, observability.GRPCDialOptions()...)
 	if err != nil {
 		log.Fatalf("failed to connect to posts-service: %v", err)
 	}
@@ -69,8 +71,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen on grpc port: %v", err)
 	}
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
 	feedpb.RegisterFeedServiceServer(grpcSrv, grpcserver.New(svc, mc))
+	observability.InitGRPCMetrics(grpcSrv)
 	go func() {
 		log.Printf("gRPC server listening on :%s", grpcPort)
 		if err := grpcSrv.Serve(lis); err != nil {
@@ -79,11 +82,10 @@ func main() {
 	}()
 
 	// HTTP server (health + metrics only)
-	app := fiber.New(fiber.Config{AppName: "feed-service"})
+	app := fiber.New(fiber.Config{AppName: "feed-service", DisableStartupMessage: true})
 	prometheus := fiberprometheus.NewWithDefaultRegistry("feed-service")
 	prometheus.RegisterAt(app, "/metrics")
 	app.Use(prometheus.Middleware)
-	app.Use(logger.New())
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})

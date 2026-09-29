@@ -226,12 +226,18 @@ data = json.load(sys.stdin)
 for t in sorted(data['data']['activeTargets'], key=lambda x: x['labels']['job']):
     print(f\"  {t['labels']['job']:30s} {t['health']}\")"
 
-step "HTTP request counts by service:"
-curl -s http://localhost:9090/api/v1/query --data-urlencode 'query=sum by (job)(http_requests_total)' | python3 -c "
+step "Waiting one scrape interval for the demo traffic to land..."
+sleep 16
+
+step "gRPC calls handled by service:"
+curl -s http://localhost:9090/api/v1/query --data-urlencode 'query=sum by (job)(grpc_server_handled_total) > 0' | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 for r in sorted(data.get('data',{}).get('result',[]), key=lambda x: -float(x['value'][1])):
-    print(f\"  {r['metric'].get('job','?'):30s} {r['value'][1]} requests\")" 2>/dev/null || echo "  (no request metrics yet)"
+    print(f\"  {r['metric'].get('job','?'):30s} {r['value'][1]} calls\")" 2>/dev/null || echo "  (no metrics yet)"
+
+step "Traces: the create-post request, through Kafka to every consumer, is one trace in Jaeger"
+info "http://localhost:16686/search?service=gateway-service"
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "12. SYSTEM OVERVIEW"
@@ -244,7 +250,7 @@ echo "
 │                                                                             │
 │  Gateway:           $BASE_URL                                    │
 │  Prometheus:        http://localhost:9090                                    │
-│  Grafana:           http://localhost:3000  (admin/admin)                     │
+│  Grafana:           http://localhost:3000  (admin/admin, DSN Overview)       │
 │  Jaeger:            http://localhost:16686                                   │
 │  Redpanda Console:  http://localhost:8888                                    │
 │  MinIO Console:     http://localhost:9001  (minioadmin/minioadmin)           │
@@ -253,7 +259,7 @@ echo "
 │            notifications, event-writer, cache-rebuilder                      │
 │                                                                             │
 │  Infra: ScyllaDB, PostgreSQL×4, ClickHouse, Redpanda, Memcached, MinIO,     │
-│         Prometheus, Grafana, Loki, Jaeger                                   │
+│         Prometheus, Grafana, Loki, Alloy, Jaeger                            │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
 "

@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
@@ -35,7 +35,7 @@ func (s *Service) CreatePost(ctx context.Context, req *model.CreatePostRequest) 
 	}
 
 	if err := s.producer.Publish(ctx, events.PostCreated, post.ID, post); err != nil {
-		log.Printf("failed to publish post.created for %s: %v", post.ID, err)
+		slog.ErrorContext(ctx, "publishing event", "topic", events.PostCreated, "post_id", post.ID, "error", err)
 	}
 
 	return post, nil

@@ -16,16 +16,19 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	likespb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/likes"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
+
+	shutdown := observability.Init(ctx, "likes-service")
+	defer shutdown(context.Background())
 
 	db, err := database.NewPostgres(ctx, os.Getenv("DATABASE_URL"))
 	if err != nil {
@@ -52,11 +55,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen on grpc port: %v", err)
 	}
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
 	likespb.RegisterLikesServiceServer(grpcSrv, grpcserver.New(svc, func(ctx context.Context) error {
 		_, err := db.Exec(ctx, "TRUNCATE likes")
 		return err
 	}))
+	observability.InitGRPCMetrics(grpcSrv)
 	go func() {
 		log.Printf("gRPC server listening on :%s", grpcPort)
 		if err := grpcSrv.Serve(lis); err != nil {
@@ -65,11 +69,10 @@ func main() {
 	}()
 
 	// HTTP server (health + metrics only)
-	app := fiber.New(fiber.Config{AppName: "likes-service"})
+	app := fiber.New(fiber.Config{AppName: "likes-service", DisableStartupMessage: true})
 	prometheus := fiberprometheus.NewWithDefaultRegistry("likes-service")
 	prometheus.RegisterAt(app, "/metrics")
 	app.Use(prometheus.Middleware)
-	app.Use(logger.New())
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})

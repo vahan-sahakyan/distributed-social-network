@@ -10,6 +10,7 @@ import (
 
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/users-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/service"
@@ -17,13 +18,15 @@ import (
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
+
+	shutdown := observability.Init(ctx, "users-service")
+	defer shutdown(context.Background())
 
 	db, err := database.NewPostgres(ctx, os.Getenv("DATABASE_URL"))
 	if err != nil {
@@ -47,11 +50,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen on grpc port: %v", err)
 	}
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
 	userspb.RegisterUsersServiceServer(grpcSrv, grpcserver.New(svc, func(ctx context.Context) error {
 		_, err := db.Exec(ctx, "TRUNCATE users, follows")
 		return err
 	}))
+	observability.InitGRPCMetrics(grpcSrv)
 	go func() {
 		log.Printf("gRPC server listening on :%s", grpcPort)
 		if err := grpcSrv.Serve(lis); err != nil {
@@ -60,11 +64,10 @@ func main() {
 	}()
 
 	// HTTP server (health + metrics only)
-	app := fiber.New(fiber.Config{AppName: "users-service"})
+	app := fiber.New(fiber.Config{AppName: "users-service", DisableStartupMessage: true})
 	prometheus := fiberprometheus.NewWithDefaultRegistry("users-service")
 	prometheus.RegisterAt(app, "/metrics")
 	app.Use(prometheus.Middleware)
-	app.Use(logger.New())
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})

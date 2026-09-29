@@ -37,7 +37,7 @@ graph LR
     Media --> MinIO
 ```
 
-**10 Go microservices** communicating via gRPC + async events, plus a React UI, backed by **14 infrastructure containers**:
+**10 Go microservices** communicating via gRPC + async events, plus a React UI, backed by **16 infrastructure containers**:
 
 | Layer | Technologies |
 |-------|-------------|
@@ -47,18 +47,21 @@ graph LR
 | Event Store | ClickHouse |
 | Caching | Memcached |
 | Object Storage | MinIO |
-| Observability | Prometheus metrics; Grafana, Loki and Jaeger run in compose but are not wired up yet |
+| Observability | OpenTelemetry -> Jaeger, JSON logs -> Alloy -> Loki, Prometheus, Grafana |
 
 ## Quick Start
 
 ```bash
 # Prerequisites: Docker, Docker Compose, Go 1.24+, Node 22 (UI)
 
-# Build and start all 24 containers (services apply their own migrations on startup)
+# Build and start all 26 containers (services apply their own migrations on startup)
 make up
 
 # Run the end-to-end demo (creates users, posts, likes, comments, etc.)
 make demo
+
+# Generate traffic, then open Grafana's DSN Overview dashboard
+make load
 
 # UI dev server, proxies /api and /images to the gateway on :8080
 cd ui && npm install && npm run dev
@@ -71,6 +74,7 @@ After startup, these are available:
 | Gateway API | http://localhost:8080 | - |
 | Prometheus | http://localhost:9090 | - |
 | Grafana | http://localhost:3000 | admin / admin |
+| Jaeger | http://localhost:16686 | - |
 | Redpanda Console | http://localhost:8888 | - |
 | MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
 
@@ -85,6 +89,7 @@ After startup, these are available:
 | `make fresh` | Clean slate: wipe volumes -> rebuild (services migrate on startup) |
 | `make down-clean` | Stop containers and **delete all data volumes** |
 | `make demo` | Run end-to-end demo script |
+| `make load` | Mixed traffic for the dashboards (`DURATION=120 WORKERS=4`) |
 | `make proto` | Regenerate gRPC stubs under `pkg/grpc/`, then `make dockerfiles` |
 | `make dockerfiles` | Regenerate the `pkg/` COPY lines in every service Dockerfile |
 | `make build` | Compile all service binaries into `bin/` |
@@ -104,13 +109,13 @@ After startup, these are available:
 ├── infrastructure/          Docker Compose files
 │   ├── docker-compose.yml           Infrastructure (DBs, broker, monitoring)
 │   └── docker-compose.services.yml  Application services
-├── monitoring/
-│   └── prometheus/prometheus.yml    Scrape config for all services
+├── monitoring/                Prometheus (scrape, alerts), Grafana provisioning + dashboard, Alloy
 ├── pkg/                     Shared library (broker, cache keys, database, events, generated gRPC, IDs)
 ├── proto/                   gRPC service definitions
 ├── scripts/
 │   ├── gen-dockerfiles.sh   Regenerates Dockerfile pkg/ COPY lines
-│   └── demo.sh              End-to-end demo script
+│   ├── demo.sh              End-to-end demo script
+│   └── load.sh              Traffic generator (make load)
 ├── services/
 │   ├── gateway-service/     HTTP API, translates requests to gRPC
 │   ├── posts-service/       Posts (ScyllaDB)
@@ -136,6 +141,7 @@ After startup, these are available:
 | [API Reference](docs/api.md) | Gateway REST API |
 | [Infrastructure](docs/infrastructure.md) | Docker, databases, and monitoring setup |
 | [Development](docs/development.md) | Local dev workflow, adding services, debugging |
+| [Observability](docs/observability.md) | Metrics, logs, traces, dashboard, alerts, things to try |
 | [DataGrip](docs/datagrip.md) | Connecting a DB client to the local databases |
 
 ## Tech Stack
@@ -148,5 +154,5 @@ After startup, these are available:
 - **Cache:** Memcached
 - **Object Storage:** MinIO (S3 compatible)
 - **UI:** React, Vite, Tailwind
-- **Observability:** Prometheus (Grafana, Loki, Jaeger run in compose, not wired up yet)
+- **Observability:** OpenTelemetry, Jaeger, Prometheus, Loki + Alloy, Grafana
 - **Deployment:** Docker Compose (dev), Helm + Argo CD GitOps (production), arm64 images on GHCR

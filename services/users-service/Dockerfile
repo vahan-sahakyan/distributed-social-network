@@ -4,6 +4,7 @@ COPY pkg/go.mod pkg/go.sum ./pkg/
 COPY pkg/database/ ./pkg/database/
 COPY pkg/grpc/users/ ./pkg/grpc/users/
 COPY pkg/id/ ./pkg/id/
+COPY pkg/observability/ ./pkg/observability/
 COPY services/users-service/ ./services/users-service/
 WORKDIR /app/services/users-service
 RUN go mod download

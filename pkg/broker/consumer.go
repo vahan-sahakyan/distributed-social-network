@@ -4,12 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // Handler processes one message. Returning an error makes Consume retry it, and
@@ -54,6 +55,8 @@ func Consume(ctx context.Context, cfg ConsumerConfig, handler Handler) {
 	})
 	defer reader.Close()
 
+	initMetrics(cfg)
+
 	// readBackoff keeps a broker outage from spinning this loop at full speed.
 	readBackoff := cfg.Backoff
 	for {
@@ -63,7 +66,7 @@ func Consume(ctx context.Context, cfg ConsumerConfig, handler Handler) {
 			if ctx.Err() != nil {
 				return
 			}
-			log.Printf("[%s] error reading message: %v", cfg.Topic, err)
+			slog.WarnContext(ctx, "reading message", "topic", cfg.Topic, "error", err)
 			select {
 			case <-ctx.Done():
 				return
@@ -76,7 +79,14 @@ func Consume(ctx context.Context, cfg ConsumerConfig, handler Handler) {
 		}
 		readBackoff = cfg.Backoff
 
-		if err := handleWithRetry(ctx, cfg, handler, msg); err != nil {
+		msgCtx, span := startConsumerSpan(ctx, cfg, &msg)
+		err = handleWithRetry(msgCtx, cfg, handler, msg)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		}
+		span.End()
+		if err != nil {
 			// Leaving the offset uncommitted is deliberate: the message is
 			// redelivered rather than silently skipped.
 			if ctx.Err() != nil {
@@ -89,7 +99,7 @@ func Consume(ctx context.Context, cfg ConsumerConfig, handler Handler) {
 			if ctx.Err() != nil {
 				return
 			}
-			log.Printf("[%s] error committing offset %d: %v", cfg.Topic, msg.Offset, err)
+			slog.ErrorContext(ctx, "committing offset", "topic", cfg.Topic, "offset", msg.Offset, "error", err)
 		}
 	}
 }
@@ -102,13 +112,19 @@ func handleWithRetry(ctx context.Context, cfg ConsumerConfig, handler Handler, m
 	var err error
 
 	for attempt := 1; attempt <= cfg.MaxAttempts; attempt++ {
-		if err = handler(ctx, msg); err == nil {
+		start := time.Now()
+		err = handler(ctx, msg)
+		handlerDuration.WithLabelValues(cfg.Topic, cfg.GroupID).Observe(time.Since(start).Seconds())
+		if err == nil {
+			consumed.WithLabelValues(cfg.Topic, cfg.GroupID, "ok").Inc()
 			return nil
 		}
+		failedAttempts.WithLabelValues(cfg.Topic, cfg.GroupID).Inc()
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
-		log.Printf("[%s] attempt %d/%d failed for offset %d: %v", cfg.Topic, attempt, cfg.MaxAttempts, msg.Offset, err)
+		slog.WarnContext(ctx, "handler attempt failed", "topic", cfg.Topic, "offset", msg.Offset,
+			"attempt", attempt, "max_attempts", cfg.MaxAttempts, "error", err)
 
 		if attempt < cfg.MaxAttempts {
 			select {
@@ -127,8 +143,9 @@ func handleWithRetry(ctx context.Context, cfg ConsumerConfig, handler Handler, m
 // parked the error is returned so the caller leaves the offset uncommitted.
 func park(ctx context.Context, cfg ConsumerConfig, msg kafka.Message, cause error) error {
 	if cfg.DLQ == nil {
-		log.Printf("[%s] dropping offset %d after %d attempts (no DLQ configured): %v",
-			cfg.Topic, msg.Offset, cfg.MaxAttempts, cause)
+		consumed.WithLabelValues(cfg.Topic, cfg.GroupID, "dropped").Inc()
+		slog.ErrorContext(ctx, "dropping message, no DLQ configured", "topic", cfg.Topic, "offset", msg.Offset,
+			"attempts", cfg.MaxAttempts, "error", cause)
 		return nil
 	}
 
@@ -142,10 +159,14 @@ func park(ctx context.Context, cfg ConsumerConfig, msg kafka.Message, cause erro
 		"failed_at": time.Now().UTC(),
 	}
 	if err := cfg.DLQ.Publish(ctx, events.DLQ(cfg.Topic), string(msg.Key), dead); err != nil {
-		return fmt.Errorf("parking offset %d: %w", msg.Offset, errors.Join(cause, err))
+		consumed.WithLabelValues(cfg.Topic, cfg.GroupID, "error").Inc()
+		err = fmt.Errorf("parking offset %d: %w", msg.Offset, errors.Join(cause, err))
+		slog.ErrorContext(ctx, "parking message", "topic", cfg.Topic, "offset", msg.Offset, "error", err)
+		return err
 	}
 
-	log.Printf("[%s] parked offset %d on %s after %d attempts: %v",
-		cfg.Topic, msg.Offset, events.DLQ(cfg.Topic), cfg.MaxAttempts, cause)
+	consumed.WithLabelValues(cfg.Topic, cfg.GroupID, "dlq").Inc()
+	slog.ErrorContext(ctx, "parked message on DLQ", "topic", cfg.Topic, "offset", msg.Offset,
+		"dlq", events.DLQ(cfg.Topic), "attempts", cfg.MaxAttempts, "error", cause)
 	return nil
 }

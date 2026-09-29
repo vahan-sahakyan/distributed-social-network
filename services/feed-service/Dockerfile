@@ -7,6 +7,7 @@ COPY pkg/events/ ./pkg/events/
 COPY pkg/grpc/feed/ ./pkg/grpc/feed/
 COPY pkg/grpc/posts/ ./pkg/grpc/posts/
 COPY pkg/grpc/users/ ./pkg/grpc/users/
+COPY pkg/observability/ ./pkg/observability/
 COPY services/feed-service/ ./services/feed-service/
 WORKDIR /app/services/feed-service
 RUN go mod download

@@ -1,16 +1,16 @@
 # Infrastructure
 
-[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · **Infrastructure** · [Development](development.md)
+[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · **Infrastructure** · [Development](development.md) · [Observability](observability.md)
 
 ---
 
 ## Container Overview
 
-Locally the system runs **24 containers** via two Docker Compose files:
+Locally the system runs **26 containers** via two Docker Compose files:
 
 ```
 infrastructure/
-├── docker-compose.yml           # 14 infra containers
+├── docker-compose.yml           # 16 infra containers (redpanda-init exits after setup)
 └── docker-compose.services.yml  # 10 app service containers
 ```
 
@@ -41,6 +41,7 @@ ScyllaDB runs with `--smp 1 --memory 512M --overprovisioned 1`.
 |-----------|-------|-------|---------|
 | redpanda | `redpandadata/redpanda:v26.1.10` | 19092 (kafka, external listener), 9644 (admin) | Event streaming (Kafka API) |
 | redpanda-console | `redpandadata/console:latest` | 8888 | Topic browser UI |
+| redpanda-init | `redpandadata/redpanda:v26.1.10` | - | One-shot: enables per-group consumer lag metrics |
 | clickhouse | `clickhouse/clickhouse-server:26.5.1.882` | 8123 (HTTP), 9009 -> 9000 (native) | Event store |
 
 Inside the network, services reach Redpanda at `redpanda:9092` and ClickHouse at `clickhouse:9000`.
@@ -58,10 +59,13 @@ MinIO's upstream images and binaries are no longer published, so the image is bu
 
 | Container | Image | Host Port | Purpose |
 |-----------|-------|------|---------|
-| prometheus | `prom/prometheus:latest` | 9090 | Metrics collection |
-| grafana | `grafana/grafana:latest` | 3000 | Dashboards (no datasources provisioned) |
-| loki | `grafana/loki:latest` | 3100 | Log aggregation (nothing ships logs yet) |
-| jaeger | `jaegertracing/all-in-one:latest` | 16686, 4318 | Distributed tracing (services not instrumented yet) |
+| prometheus | `prom/prometheus:v3.12.0` | 9090 | Metrics, alert rules |
+| grafana | `grafana/grafana:13.0.2` | 3000 | Provisioned datasources + DSN Overview dashboard |
+| loki | `grafana/loki:3.7.2` | 3100 | Log storage |
+| alloy | `grafana/alloy:v1.20.1` | 12345 | Ships container logs to Loki via the Docker socket |
+| jaeger | `jaegertracing/jaeger:2.20.0` | 16686 (UI), 4317/4318 (OTLP) | Traces, in-memory |
+
+See [Observability](observability.md).
 
 ## Application Containers
 
@@ -214,20 +218,14 @@ Created on startup by `pkg/broker.EnsureTopics`, replication factor 1.
 | `comment.created` | 3 | New comment events |
 | `<topic>.dlq` | - | Messages that failed 3 attempts; not created by `EnsureTopics`, nothing consumes them yet |
 
-## Prometheus Configuration
+## Monitoring Configuration
 
-```yaml
-global:
-  scrape_interval: 15s
+| File | Purpose |
+|------|---------|
+| `monitoring/prometheus/prometheus.yml` | Scrapes the 10 services on their HTTP ports, Redpanda `/public_metrics`, Prometheus itself |
+| `monitoring/prometheus/alerts.yml` | Alert rules |
+| `monitoring/grafana/provisioning/` | Datasources (Prometheus, Loki, Jaeger, cross-linked) and dashboard provider |
+| `monitoring/grafana/dashboards/dsn-overview.json` | DSN Overview dashboard, also Grafana's home |
+| `monitoring/alloy/config.alloy` | Docker log discovery -> Loki, labelled `service` and `project` |
 
-scrape_configs:
-  - job_name: "gateway-service"
-    static_configs:
-      - targets: ["gateway-service:8080"]
-  - job_name: "posts-service"
-    static_configs:
-      - targets: ["posts-service:8081"]
-  # ... (all 10 services, on their HTTP ports)
-```
-
-Each service exposes `/metrics` via the `fiberprometheus` middleware.
+Services export traces to `OTEL_EXPORTER_OTLP_ENDPOINT` (`http://jaeger:4318` in compose); unset, tracing is off.

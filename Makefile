@@ -87,6 +87,14 @@ demo:
 	@bash scripts/demo.sh
 
 
+DURATION ?= 120
+WORKERS ?= 4
+
+.PHONY: load
+load:
+	@bash scripts/load.sh $(DURATION) $(WORKERS)
+
+
 .PHONY: ui
 ui:
 	kubectl port-forward service/gateway-service 8080:8080 &
