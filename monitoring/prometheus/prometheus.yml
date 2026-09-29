@@ -1,5 +1,9 @@
 global:
   scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alerts.yml
 
 scrape_configs:
   - job_name: "gateway-service"
@@ -41,3 +45,12 @@ scrape_configs:
   - job_name: "cache-rebuilder-service"
     static_configs:
       - targets: ["cache-rebuilder-service:8089"]
+
+  - job_name: "redpanda"
+    metrics_path: /public_metrics
+    static_configs:
+      - targets: ["redpanda:9644"]
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

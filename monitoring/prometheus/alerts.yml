@@ -1,0 +1,46 @@
+groups:
+  - name: dsn
+    rules:
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.job }} is not answering scrapes"
+
+      - alert: GatewayHighErrorRate
+        expr: |
+          sum(rate(http_requests_total{job="gateway-service", status_code=~"5.."}[5m]))
+            / sum(rate(http_requests_total{job="gateway-service"}[5m])) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway 5xx ratio is {{ $value | humanizePercentage }}"
+
+      - alert: GRPCServerErrors
+        expr: |
+          sum by (job, grpc_method) (
+            rate(grpc_server_handled_total{grpc_code=~"Unknown|Internal|Unavailable|DeadlineExceeded|DataLoss"}[5m])
+          ) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} {{ $labels.grpc_method }} is failing"
+
+      - alert: EventsDeadLettered
+        expr: sum by (group, topic, result) (increase(broker_messages_consumed_total{result=~"dlq|dropped|error"}[10m])) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.group }} gave up on {{ $labels.topic }} messages ({{ $labels.result }})"
+
+      - alert: ConsumerLagHigh
+        expr: sum by (redpanda_group) (redpanda_kafka_consumer_group_lag_sum) > 500
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.redpanda_group }} is {{ $value }} messages behind"
