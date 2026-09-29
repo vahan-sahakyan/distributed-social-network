@@ -66,6 +66,17 @@ down:
 	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml down
 
 
+# stop/start keep containers, so start is instant and nothing is rebuilt
+.PHONY: stop
+stop:
+	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml stop
+
+
+.PHONY: start
+start:
+	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml start
+
+
 .PHONY: down-clean
 down-clean:
 	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml down -v
