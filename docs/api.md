@@ -1,10 +1,10 @@
 # API Reference
 
-[← README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · **API** · [Infrastructure](infrastructure.md) · [Development](development.md)
+[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · **API** · [Infrastructure](infrastructure.md) · [Development](development.md)
 
 ---
 
-All endpoints are accessed through the gateway at `http://localhost:8080`.
+All endpoints are served by the gateway at `http://localhost:8080` (compose) or the cluster ingress, which routes `/api`, `/health` and `/images` to the gateway and everything else to the UI.
 
 ## Base URL
 
@@ -12,10 +12,15 @@ All endpoints are accessed through the gateway at `http://localhost:8080`.
 http://localhost:8080/api/v1
 ```
 
-## Common Response Patterns
+## Conventions
 
-**Success:** Returns resource JSON with appropriate HTTP status (200, 201, 204).  
-**Error:** Returns `{"error": "<message>"}` with 4xx/5xx status.
+- **No authentication.** The acting user is passed in the body or query (`user_id`, `follower_id`, `author_id`).
+- **Success:** resource JSON with 200, 201 or 204.
+- **Error:** `{"error": "<message>"}`. gRPC codes map to `NotFound` -> 404, `InvalidArgument` -> 400, `AlreadyExists` -> 409, anything else -> 500. An unparseable body is 400.
+- **Responses are protobuf messages encoded with `encoding/json`:**
+  - fields with zero values are omitted (`"likes": 0` does not appear, nor does an empty `image_id`)
+  - timestamps are objects: `"created_at": {"seconds": 1781488793, "nanos": 301000000}`
+  - an empty list is `null`
 
 ---
 
@@ -39,7 +44,7 @@ Content-Type: application/json
   "id": "30a46156e6b96a2a9d2c96bc765ab511",
   "username": "alice",
   "bio": "Software engineer",
-  "created_at": "2026-06-15T01:59:53.301Z"
+  "created_at": {"seconds": 1781488793, "nanos": 301000000}
 }
 ```
 
@@ -47,22 +52,16 @@ Content-Type: application/json
 
 ```http
 GET /api/v1/users/:id
+GET /api/v1/users/by-username/:username
 ```
 
-**Response** `200 OK`:
-```json
-{
-  "id": "30a46156e6b96a2a9d2c96bc765ab511",
-  "username": "alice",
-  "bio": "Software engineer",
-  "created_at": "2026-06-15T01:59:53.301Z"
-}
-```
+**Response** `200 OK`: the user, as above. `404` if not found.
 
-### Follow User
+### Follow / Unfollow User
 
 ```http
-POST /api/v1/users/:id/follow
+POST   /api/v1/users/:id/follow
+DELETE /api/v1/users/:id/follow
 Content-Type: application/json
 
 {
@@ -128,12 +127,12 @@ Content-Type: application/json
   "id": "8316cac68f930d1006c9bcac26a6b3c9",
   "text": "Hello distributed world!",
   "author_id": "30a46156e6b96a2a9d2c96bc765ab511",
-  "image_id": "",
-  "created_at": "2026-06-15T01:59:55.290Z"
+  "image_id": "optional-media-id",
+  "created_at": {"seconds": 1781488795, "nanos": 290000000}
 }
 ```
 
-**Side effect:** Publishes `post.created` event to Redpanda.
+**Side effect:** Publishes `post.created`.
 
 ### Get Post
 
@@ -141,15 +140,7 @@ Content-Type: application/json
 GET /api/v1/posts/:id
 ```
 
-**Response** `200 OK`:
-```json
-{
-  "id": "8316cac68f930d1006c9bcac26a6b3c9",
-  "text": "Hello distributed world!",
-  "author_id": "30a46156e6b96a2a9d2c96bc765ab511",
-  "created_at": "2026-06-15T01:59:55.29Z"
-}
-```
+**Response** `200 OK`: the post, as above. `404` if not found.
 
 ---
 
@@ -175,12 +166,11 @@ Content-Type: application/json
   "user_id": "c3abbc40aa9c8de72e21ee92d3f4e5cf",
   "entity_id": "8316cac68f930d1006c9bcac26a6b3c9",
   "text": "Great post!",
-  "likes": 0,
-  "created_at": "2026-06-15T02:00:03.014Z"
+  "created_at": {"seconds": 1781488803, "nanos": 14000000}
 }
 ```
 
-**Side effect:** Publishes `comment.created` event to Redpanda.
+**Side effect:** Publishes `comment.created`.
 
 ### Get Comments by Entity
 
@@ -188,25 +178,13 @@ Content-Type: application/json
 GET /api/v1/comments/entity/:entity_id
 ```
 
-**Response** `200 OK`:
-```json
-[
-  {
-    "id": "43a6738dae6bbd937aae44165416de4c",
-    "user_id": "c3abbc40aa9c8de72e21ee92d3f4e5cf",
-    "entity_id": "8316cac68f930d1006c9bcac26a6b3c9",
-    "text": "Great post!",
-    "likes": 0,
-    "created_at": "2026-06-15T02:00:03.014Z"
-  }
-]
-```
+**Response** `200 OK`: a JSON array of comments, as above.
 
 ---
 
 ## Likes
 
-### Create Like
+### Like
 
 ```http
 POST /api/v1/likes/
@@ -227,9 +205,38 @@ Content-Type: application/json
 }
 ```
 
-**Side effect:** Publishes `like.created` event to Redpanda.
+**Side effect:** Publishes `like.created`.
 
-> Likes are idempotent — duplicate (user_id, entity_id) pairs are ignored via unique constraint.
+> Idempotent: a repeated like returns 201 but stores nothing and publishes no event.
+
+### Unlike
+
+```http
+DELETE /api/v1/likes/
+Content-Type: application/json
+
+{
+  "user_id": "c3abbc40aa9c8de72e21ee92d3f4e5cf",
+  "entity_id": "8316cac68f930d1006c9bcac26a6b3c9"
+}
+```
+
+**Response** `204 No Content`
+
+**Side effect:** Publishes `like.deleted` if a like was removed.
+
+### Check Like
+
+```http
+GET /api/v1/likes/check?user_id=:user_id&entity_id=:entity_id
+```
+
+**Response** `200 OK`:
+```json
+{
+  "liked": true
+}
+```
 
 ---
 
@@ -252,21 +259,23 @@ file: <binary file data>
 }
 ```
 
-> Max file size: 50MB. Files stored in MinIO bucket `images`.
+> Max file size: 60 MB. Files are stored in MinIO bucket `images`.
 
-### Get Media
+### Get Media URL
 
 ```http
 GET /api/v1/media/:id
 ```
 
-**Response** `200 OK`:
-```json
-{
-  "id": "48d2ac6e2c945a7d707136a03d9ae2c9",
-  "url": "/images/48d2ac6e2c945a7d707136a03d9ae2c9"
-}
+**Response** `200 OK`: `{"id": "...", "url": "/images/<id>"}`
+
+### Get File
+
+```http
+GET /images/:id
 ```
+
+Served by the gateway from the public-read MinIO bucket.
 
 ---
 
@@ -278,23 +287,22 @@ GET /api/v1/media/:id
 GET /api/v1/feed/user/:user_id
 ```
 
-**Response** `200 OK`:
+**Response** `200 OK`: a JSON array of the user's own posts, newest first:
 ```json
-{
-  "posts": [
-    {
-      "post_id": "8316cac68f930d1006c9bcac26a6b3c9",
-      "author_id": "30a46156e6b96a2a9d2c96bc765ab511",
-      "text": "Hello distributed world!",
-      "likes_count": 2,
-      "comments_count": 1,
-      "created_at": "2026-06-15T01:59:55.29Z"
-    }
-  ]
-}
+[
+  {
+    "post_id": "8316cac68f930d1006c9bcac26a6b3c9",
+    "author_id": "30a46156e6b96a2a9d2c96bc765ab511",
+    "text": "Hello distributed world!",
+    "likes_count": 2,
+    "comments_count": 1,
+    "image_url": "48d2ac6e2c945a7d707136a03d9ae2c9",
+    "created_at": {"seconds": 1781488795, "nanos": 290000000}
+  }
+]
 ```
 
-> Feed is served from Memcached cache. Empty if cache is cold (run cache-rebuilder to populate).
+> `image_url` currently holds the media id, not a URL. `likes_count`, `comments_count` and `image_url` are omitted when zero or empty.
 
 ### Get Home Feed
 
@@ -302,7 +310,9 @@ GET /api/v1/feed/user/:user_id
 GET /api/v1/feed/home?user_id=:user_id
 ```
 
-Same response format. Returns posts from users the given user follows.
+Same response format. Returns posts from the users the given user follows, plus their own.
+
+> Feeds are served from Memcached. If the cache is cold, `POST /api/v1/rebuild` repopulates it from the event store.
 
 ---
 
@@ -324,14 +334,13 @@ GET /api/v1/notifications/:user_id
       "type": "like",
       "actor_id": "c3abbc40aa9c8de72e21ee92d3f4e5cf",
       "entity_id": "8316cac68f930d1006c9bcac26a6b3c9",
-      "read": false,
-      "created_at": "2026-06-15T02:00:01.5Z"
+      "created_at": {"seconds": 1781488801, "nanos": 500000000}
     }
   ]
 }
 ```
 
-> Notifications are generated asynchronously from `like.created` and `comment.created` events.
+> Generated asynchronously from `like.created` and `comment.created`, for the post author. Returns the 50 most recent. `read` is omitted while false.
 
 ---
 
@@ -341,6 +350,7 @@ GET /api/v1/notifications/:user_id
 
 ```http
 POST /api/v1/rebuild
+POST /api/v1/rebuild?user_id=:user_id
 ```
 
 **Response** `200 OK`:
@@ -350,17 +360,27 @@ POST /api/v1/rebuild
 }
 ```
 
-> Reads all events from ClickHouse and reconstructs Memcached feed caches.
+> Without `user_id`, rebuilds feed caches from recent ClickHouse events. With `user_id`, rebuilds that user's home feed and own posts, and returns `"user feed rebuilt"`.
+
+---
+
+## Reset (dev)
+
+```http
+POST /api/v1/reset
+```
+
+**Response** `200 OK`: `{"status": "reset complete"}`
+
+> Calls `Reset` on every service: truncates all tables and the ClickHouse event store, and flushes Memcached. Uploaded files in MinIO are kept. Not access-controlled, and errors from individual services are ignored.
 
 ---
 
 ## Health & Metrics
 
-Every service exposes:
-
 ```http
-GET /health        → {"status": "ok"}
-GET /metrics       → Prometheus text format
+GET /health        -> {"status": "ok"}
+GET /metrics       -> Prometheus text format
 ```
 
-These are available directly on each service's port (not through the gateway).
+The gateway serves both on 8080. Every other service serves them on its own HTTP port (8081-8089), not through the gateway.

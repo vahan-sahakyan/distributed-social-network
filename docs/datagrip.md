@@ -4,7 +4,7 @@ This guide covers connecting to all project databases from JetBrains DataGrip wh
 
 ## Prerequisites
 
-- Infrastructure running: `make infra` or `docker compose -f infrastructure/docker-compose.yml up -d`
+- Infrastructure running: `make infra-up` (or `make up` for everything)
 - DataGrip installed
 
 ---
@@ -68,9 +68,9 @@ jdbc:postgresql://localhost:5433/comments
 |-----------|---------------|
 | Host      | localhost     |
 | HTTP Port | 8123          |
-| TCP Port  | 9009          |
+| TCP Port  | 9009 (-> container 9000) |
 | User      | default       |
-| Password  | clickhouse    |
+| Password  | (empty)       |
 | Database  | default       |
 
 ### Steps
