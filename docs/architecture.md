@@ -1,29 +1,29 @@
 # Architecture
 
-[← README](../README.md) · **Architecture** · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md)
+[<- README](../README.md) · **Architecture** · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md)
 
 ---
 
 ## Overview
 
-The system follows an **event-driven microservices** architecture with CQRS (Command Query Responsibility Segregation) for the feed system.
+The system follows an **event-driven microservices** architecture. Clients talk HTTP/JSON to the gateway, the gateway and services talk gRPC, and state changes propagate as events on Redpanda. The feed uses CQRS: writes go through events, reads come from Memcached.
 
 ```mermaid
 graph TB
     subgraph "Client Layer"
-        Client[HTTP Client]
+        Client[Browser / HTTP client]
     end
 
     subgraph "API Layer"
-        GW[Gateway Service :8080]
+        GW[gateway-service :8080]
     end
 
     subgraph "Write Path"
-        Posts[posts-service :8081]
-        Comments[comments-service :8083]
-        Likes[likes-service :8084]
-        Users[users-service :8085]
-        Media[media-service :8086]
+        Posts[posts-service :9081]
+        Comments[comments-service :9083]
+        Likes[likes-service :9084]
+        Users[users-service :9085]
+        Media[media-service :9086]
     end
 
     subgraph "Event Bus"
@@ -31,29 +31,30 @@ graph TB
     end
 
     subgraph "Read/Async Path"
-        Feed[feed-service :8082]
-        Notif[notification-service :8087]
-        EW[event-writer-service :8088]
-        CR[cache-rebuilder-service :8089]
+        Feed[feed-service :9082]
+        Notif[notification-service :9087]
+        EW[event-writer-service]
+        CR[cache-rebuilder-service :9089]
     end
 
     subgraph "Data Stores"
         ScyllaDB[(ScyllaDB)]
-        PG[(PostgreSQL ×4)]
+        PG[(PostgreSQL x4)]
         CH[(ClickHouse)]
         MC[Memcached]
         MIO[MinIO]
     end
 
     Client --> GW
-    GW --> Posts & Comments & Likes & Users & Media & Feed & Notif
+    GW -->|gRPC| Posts & Comments & Likes & Users & Media & Feed & Notif & CR
+    GW -->|/images/*| MIO
 
     Posts --> ScyllaDB
     Posts -->|post.created| RP
     Comments --> PG
     Comments -->|comment.created| RP
     Likes --> PG
-    Likes -->|like.created| RP
+    Likes -->|like.created, like.deleted| RP
     Users --> PG
     Media --> MIO
 
@@ -62,17 +63,22 @@ graph TB
     RP --> EW
 
     Feed --> MC
+    Feed -->|gRPC| Users & Posts
     Notif --> PG
+    Notif -->|gRPC| Posts
     EW --> CH
     CH --> CR
     CR --> MC
+    CR -->|gRPC| Users & Posts
 ```
+
+Ports shown are gRPC ports. Every service also serves `/health` and `/metrics` over HTTP on its `PORT` (8081-8089).
 
 ## Design Patterns
 
 ### Event-Driven Communication
 
-Services communicate asynchronously through Redpanda (Kafka-compatible) topics:
+Services communicate asynchronously through Redpanda (Kafka-compatible) topics. Topic names live in `pkg/events`:
 
 | Topic | Producer | Consumers |
 |-------|----------|-----------|
@@ -81,23 +87,29 @@ Services communicate asynchronously through Redpanda (Kafka-compatible) topics:
 | `like.deleted` | likes-service | feed-service, event-writer-service |
 | `comment.created` | comments-service | feed-service, notification-service, event-writer-service |
 
-Topics are created on startup by `pkg/broker.EnsureTopics`. Each consumer uses a dedicated **consumer group**, so every service receives every event:
-- `feed-service` — fans out posts to follower caches
-- `notification-service` — generates notifications for content owners
-- `event-writer-service` — persists all events to ClickHouse for analytics
+Topics are created on startup by `pkg/broker.EnsureTopics` (3 partitions each). Each consumer uses its own **consumer group**, so every service receives every event:
+- `feed-service` - fans out posts to follower feeds, updates like/comment counts
+- `notification-service` - generates notifications for post authors
+- `event-writer-service` - persists all events to ClickHouse
+
+Delivery is **at-least-once** (`pkg/broker.Consume`): the offset is committed only after the handler succeeds. A failing message is retried 3 times with backoff, then published to `<topic>.dlq` and skipped. Nothing consumes the DLQ topics yet. Handlers are written to tolerate redelivery:
+- feed-service fanout is idempotent, and feed cache writes use memcache CAS to avoid lost updates between concurrent consumers
+- event-writer derives `event_id` from topic/partition/offset, so a redelivered message writes a row with the same id and readers deduplicate by it
+- likes-service emits `like.created` / `like.deleted` only when the row actually changed, so a repeated like or unlike emits nothing
 
 ### CQRS for Feed
 
 The feed system separates writes from reads:
 
 1. **Write side:** When a user creates a post, the event flows through Redpanda
-2. **Fanout-on-write:** Feed-service consumes `post.created` and pushes to each follower's Memcached feed cache
-3. **Read side:** Feed queries hit Memcached directly (fast, no DB joins)
-4. **Rebuild:** If cache is cold, cache-rebuilder reconstructs feeds from ClickHouse event store
+2. **Fanout-on-write:** feed-service consumes `post.created` and pushes the post into each follower's home feed (`feed:<id>`) and the author's own feed (`userposts:<id>`) in Memcached
+3. **Read side:** Feed queries hit Memcached directly (no DB joins)
+4. **Rebuild:** cache-rebuilder reconstructs feeds from the ClickHouse event store on request (`POST /api/v1/rebuild`)
 
 ```mermaid
 sequenceDiagram
     participant User
+    participant Gateway
     participant Posts
     participant Redpanda
     participant Feed
@@ -105,51 +117,61 @@ sequenceDiagram
     participant EventWriter
     participant ClickHouse
 
-    User->>Posts: POST /api/v1/posts/
+    User->>Gateway: POST /api/v1/posts/
+    Gateway->>Posts: CreatePost (gRPC)
     Posts->>Posts: Store in ScyllaDB
     Posts->>Redpanda: Publish post.created
     Redpanda->>Feed: Consume post.created
-    Feed->>Memcached: Cache post in follower feeds
+    Feed->>Memcached: Add post to author + follower feeds
     Redpanda->>EventWriter: Consume post.created
     EventWriter->>ClickHouse: INSERT into feed_events
-    User->>Feed: GET /api/v1/feed/user/:id
+    User->>Gateway: GET /api/v1/feed/home?user_id=...
+    Gateway->>Feed: GetHomeFeed (gRPC)
     Feed->>Memcached: Fetch cached feed
-    Memcached->>Feed: Return feed items
-    Feed->>User: Return feed
+    Feed->>Gateway: Feed items
+    Gateway->>User: JSON array
 ```
 
-### Event Sourcing
+### Event Store
 
-All write events are persisted to ClickHouse as an append-only event store:
+All domain events are appended to ClickHouse:
 
 ```sql
 CREATE TABLE feed_events (
-    event_id UUID,
-    event_type String,     -- 'post.created', 'like.created', 'comment.created'
+    event_id UUID,         -- derived from topic/partition/offset
+    event_type String,     -- 'post.created', 'like.created', 'like.deleted', 'comment.created'
     post_id String,
     user_id String,
     likes_delta Int32,     -- +1 for like.created, -1 for like.deleted
-    comments_delta Int32,  -- +1 for comment events
+    comments_delta Int32,  -- +1 for comment.created
     created_at DateTime
 ) ENGINE = MergeTree()
 ORDER BY (post_id, created_at);
 ```
 
-cache-rebuilder-service aggregates current post state at query time:
+cache-rebuilder-service aggregates current post state at query time, collapsing duplicate `event_id` rows first so a redelivered event counts once:
 
 ```sql
-SELECT post_id, sum(likes_delta) AS likes, sum(comments_delta) AS comments, max(created_at) AS last_update
-FROM feed_events
-GROUP BY post_id;
+SELECT pid AS post_id, sum(dlikes) AS likes, sum(dcomments) AS comments, max(first_seen) AS last_update
+FROM (
+    SELECT event_id, any(post_id) AS pid, any(likes_delta) AS dlikes,
+           any(comments_delta) AS dcomments, min(created_at) AS first_seen
+    FROM feed_events
+    WHERE post_id != ''
+    GROUP BY event_id
+)
+GROUP BY pid;
 ```
 
 ### API Gateway Pattern
 
-The gateway-service acts as a reverse proxy, providing:
-- Single entry point for all clients (port 8080)
-- Request routing based on URL prefix
-- Centralized metrics collection
-- Request/response logging
+gateway-service is the only public entry point (port 8080). It:
+- Exposes a REST/JSON API under `/api/v1` and translates each request into a gRPC call
+- Maps gRPC status codes to HTTP (`NotFound` -> 404, `InvalidArgument` -> 400, `AlreadyExists` -> 409, else 500)
+- Proxies `/images/*` to the public-read MinIO bucket
+- Adds CORS, request logging, and Prometheus metrics
+
+There is no authentication: the acting user is passed in the request body or query (`user_id`, `follower_id`, `author_id`).
 
 ### Database-per-Service
 
@@ -160,45 +182,38 @@ Each service owns its data store, chosen for its workload:
 | posts | ScyllaDB | High write throughput, wide-column model for timeline data |
 | users | PostgreSQL | Relational data with ACID guarantees (follows = join table) |
 | comments | PostgreSQL | Structured text with indexes on entity_id |
-| likes | PostgreSQL | Unique constraints (user+entity), simple key-value |
+| likes | PostgreSQL | Unique constraint on (user_id, entity_id) |
 | notifications | PostgreSQL | Ordered reads by user, boolean flags |
-| feed | Memcached | Pure cache, rebuilt from event store on miss |
-| events | ClickHouse | Columnar analytics, fast aggregations |
+| feed | Memcached | Pure cache, rebuilt from the event store |
+| events | ClickHouse | Columnar store, fast aggregations |
 | media | MinIO | S3-compatible object storage for binary files |
 
 ## Service Communication
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    Synchronous (HTTP)                         │
-│                                                              │
-│  Client → Gateway → Service → Database                       │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+Synchronous (gRPC)
+  Client -HTTP-> Gateway -gRPC-> Service -> Database
+  feed-service, cache-rebuilder -gRPC-> users-service (followers), posts-service (post details)
+  notification-service -gRPC-> posts-service (post author)
 
-┌─────────────────────────────────────────────────────────────┐
-│                   Asynchronous (Events)                       │
-│                                                              │
-│  Service → Redpanda Topic → Consumer Service → Side Effect   │
-│                                                              │
-│  Examples:                                                    │
-│    posts-service → post.created → feed-service (cache write) │
-│    likes-service → like.created → notification-service (DB)  │
-│    * → event-writer-service (ClickHouse append)              │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+Asynchronous (events)
+  Service -> Redpanda topic -> consumer service -> side effect
+    posts-service -> post.created -> feed-service (cache write)
+    likes-service -> like.created -> notification-service (DB)
+    * -> event-writer-service (ClickHouse append)
 ```
 
 ## Observability
 
-All services expose a `/metrics` endpoint via `fiberprometheus`:
+Every service exposes `/metrics` on its HTTP port via `fiberprometheus`:
 
-- **Prometheus** scrapes all 10 services every 15s
-- **Grafana** provides dashboards (connected to Prometheus data source)
-- **Loki** aggregates container logs
-- **Jaeger** captures distributed traces (via OpenTelemetry)
+- **Prometheus** scrapes all 10 services every 15s (`monitoring/prometheus/prometheus.yml`)
+- **Grafana**, **Loki** and **Jaeger** run in compose but are not wired up yet: no provisioned datasources or dashboards, no log shipping, no tracing instrumentation
+- The Helm charts do not include the observability stack
 
 Standard metrics exposed per service:
-- `http_requests_total` — counter by method, path, status
-- `http_request_duration_seconds` — histogram of latencies
-- `go_*` — Go runtime metrics (GC, goroutines, memory)
+- `http_requests_total` - counter by method, path, status
+- `http_request_duration_seconds` - histogram of latencies
+- `go_*` - Go runtime metrics (GC, goroutines, memory)
+
+Only the gateway's HTTP traffic is meaningful here; the other services serve their API over gRPC, which is not instrumented.

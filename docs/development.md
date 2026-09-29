@@ -1,6 +1,6 @@
 # Development Guide
 
-[← README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · **Development**
+[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · **Development**
 
 ---
 
@@ -8,9 +8,10 @@
 
 - **Docker** & **Docker Compose** (v2)
 - **Go 1.24+** (for local builds/tests)
+- **Node 22** (UI)
 - **curl** (for testing APIs)
 - **python3** (used by demo script for JSON formatting)
-- **protoc v7.35.1** (`brew install protobuf` / `brew upgrade protobuf` → 35.1)
+- **protoc v7.35.1** (`brew install protobuf` / `brew upgrade protobuf` -> 35.1)
 - **protoc-gen-go v1.36.11** (`go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11`)
 - **protoc-gen-go-grpc v1.5.1** (`go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1`)
 
@@ -20,13 +21,13 @@
 ## First-Time Setup
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/vahan-sahakyan/distributed-social-network.git
 cd distributed-social-network
 
-# Start everything from scratch (builds containers, runs migrations)
-make fresh
+# Build and start everything (services apply their migrations on startup)
+make up
 
-# Verify all services are healthy
+# Exercise the whole flow once services are healthy
 make demo
 ```
 
@@ -36,12 +37,28 @@ make demo
 # Start the system (rebuilds changed services)
 make up
 
-# Stop everything (preserves data)
+# Pause / resume without removing or rebuilding containers
+make stop
+make start
+
+# Remove containers (preserves data)
 make down
 
 # Full reset (wipes all data)
 make fresh
 ```
+
+## UI
+
+```bash
+cd ui
+npm install
+npm run dev     # Vite dev server, proxies /api, /health, /images to localhost:8080
+npm run lint    # oxlint
+npm run build
+```
+
+With compose running, the dev server talks to the compose gateway. `make ui` instead port-forwards a Kubernetes `gateway-service` to 8080 before starting Vite, so use it only against a cluster, with compose stopped.
 
 ## Project Layout
 
@@ -49,28 +66,32 @@ Each service follows the same structure:
 
 ```
 services/<name>/
-├── Dockerfile         Multi-stage build (Go → minimal image)
-├── go.mod             Module with local replace directives
+├── Dockerfile         Multi-stage build (Go -> alpine), pkg/ COPY lines generated
+├── go.mod             Module with a replace directive for ../../pkg
 ├── cmd/
-│   └── main.go        Entry point, wiring, server setup
+│   └── main.go        Entry point, wiring, gRPC + health/metrics servers
 ├── internal/
+│   ├── grpcserver/    gRPC API implementation
 │   ├── service/       Business logic
 │   ├── repository/    Database access layer
 │   ├── model/         Data structures
-│   ├── consumer/      Kafka/Redpanda consumer (if applicable)
+│   ├── consumer/      Redpanda consumer (if applicable)
 │   └── storage/       Object storage (media-service only)
 └── migrations/
-    └── 001_*.sql      Schema definitions
+    ├── 001_*.sql      Schema definitions
+    └── sql.go         Embeds the SQL for startup migration
 ```
 
 Shared code lives in `pkg/`:
 
 ```
 pkg/
-├── broker/producer.go   Kafka producer wrapper
-├── cache/redis.go       Memcached client (named redis.go historically)
-├── database/postgres.go PostgreSQL connection pool
-└── id/id.go             Hex ID generation
+├── broker/     Producer, at-least-once Consume with retries + DLQ, EnsureTopics
+├── cache/      Memcached client, feed cache key builders
+├── database/   Postgres, ScyllaDB, ClickHouse connections + Migrate* helpers
+├── events/     Topic names
+├── grpc/       Generated gRPC stubs (from proto/, via make proto)
+└── id/         Random hex IDs and deterministic IDs
 ```
 
 ## Go Workspace
@@ -101,6 +122,8 @@ Each service's `go.mod` has a `replace` directive pointing to the local `pkg/`:
 replace github.com/vahan-sahakyan/distributed-social-network/pkg => ../../pkg
 ```
 
+Docker builds and CI run with `GOWORK=off`, so each module's own `go.mod`/`go.sum` must be complete.
+
 ## Adding a New Service
 
 1. Create the directory structure:
@@ -108,25 +131,29 @@ replace github.com/vahan-sahakyan/distributed-social-network/pkg => ../../pkg
    mkdir -p services/my-service/{cmd,internal/{grpcserver,service,repository,model},migrations}
    ```
 
-2. Initialize the module:
+2. Initialize the module and add the `replace` directive:
    ```bash
    cd services/my-service
    go mod init github.com/vahan-sahakyan/distributed-social-network/my-service
    ```
-
-3. Add the `replace` directive in `go.mod`:
    ```go
    replace github.com/vahan-sahakyan/distributed-social-network/pkg => ../../pkg
    ```
 
-4. Add to `go.work`:
+3. Add to `go.work`:
    ```
    use ./services/my-service
    ```
 
-5. Create `Dockerfile` (copy from an existing service)
+4. Define the API in `proto/my/my.proto`, add it to the `proto` target in the `Makefile`, and run `make proto`
 
-6. Add to `infrastructure/docker-compose.services.yml`:
+5. Implement the server in `internal/grpcserver/`, serve it on `GRPC_PORT`, and serve `/health` + `/metrics` on `PORT`
+
+6. Add migration SQL under `migrations/`, embed it via `migrations/sql.go`, and apply it on startup with the matching `pkg/database.Migrate*` helper
+
+7. Create a `Dockerfile` from an existing service, then run `make dockerfiles` to generate its `pkg/` COPY lines
+
+8. Add to `infrastructure/docker-compose.services.yml`:
    ```yaml
    my-service:
      build:
@@ -135,33 +162,34 @@ replace github.com/vahan-sahakyan/distributed-social-network/pkg => ../../pkg
      restart: on-failure
      environment:
        PORT: "8090"
+       GRPC_PORT: "9090"
        # ... other env vars
      depends_on:
        - <database>
    ```
 
-7. Add route in `services/gateway-service/cmd/main.go`
+9. Add a gRPC client and routes in `services/gateway-service/cmd/main.go`
 
-8. Add Prometheus scrape target in `monitoring/prometheus/prometheus.yml`
+10. Add a Prometheus scrape target in `monitoring/prometheus/prometheus.yml`
 
-9. Add to `SERVICES` list in `Makefile`
-
-10. Add migration SQL under `services/my-service/migrations/`, embed it via `migrations/sql.go`, and apply it on startup with the matching `pkg/database.Migrate*` helper
+11. Add it to `SERVICES` in the `Makefile`, the module matrix in `.github/workflows/ci.yml`, the image matrix in `.github/workflows/publish.yml`, and `services:` in `deploy/kubernetes/services/values.yaml`
 
 ## Running Tests
 
 ```bash
-# All services
+# pkg + all services
 make test
 
-# Single service
-cd services/users-service && go test ./...
+# Single module, as CI runs it
+cd services/users-service && GOWORK=off go test -race ./...
 ```
+
+CI (`.github/workflows/ci.yml`) runs `gofmt`, `go vet` and `go test -race` per module, checks that the Dockerfiles match `make dockerfiles`, and lints and builds the UI.
 
 ## Building Locally
 
 ```bash
-# All services → bin/ directory
+# All services -> bin/ directory
 make build
 
 # Single service
@@ -202,6 +230,8 @@ docker exec -it infrastructure-posts-db-1 cqlsh
 docker exec -it infrastructure-clickhouse-1 clickhouse-client
 ```
 
+See [DataGrip](datagrip.md) for connecting a DB client.
+
 ### Inspect Redpanda topics
 
 ```bash
@@ -216,11 +246,14 @@ docker exec infrastructure-redpanda-1 rpk topic consume post.created --num 5
 
 ```bash
 # Through gateway
-curl -s http://localhost:8080/api/v1/users/ | python3 -m json.tool
+curl -s http://localhost:8080/api/v1/users/by-username/alice | python3 -m json.tool
 
-# Directly to service (bypass gateway)
-curl -s http://localhost:8085/api/v1/users/ | python3 -m json.tool
+# Directly to a service over gRPC (no server reflection, so pass the proto)
+grpcurl -plaintext -import-path proto -proto users/users.proto \
+  -d '{"username": "alice"}' localhost:9085 users.UsersService/GetUserByUsername
 ```
+
+`docs/postman-collection.json` has gRPC requests for every service.
 
 ### Check Prometheus targets
 
@@ -236,7 +269,7 @@ for t in data['data']['activeTargets']:
 
 ### Services crashing on startup
 
-Services may fail to connect if databases aren't ready yet. The `restart: on-failure` policy handles this — services will retry automatically. Wait 10-15 seconds after `make up`.
+Services connect to their database once at startup and exit if it is not ready. `restart: on-failure` restarts them until it is. Wait 10-15 seconds after `make up`.
 
 ### Tables not found
 
@@ -263,7 +296,9 @@ Two Helm charts, deployed by Argo CD from [distributed-social-network-gitops](ht
 | `deploy/kubernetes/infra` | Postgres x4, Scylla, Redpanda, ClickHouse, MinIO, Memcached |
 | `deploy/kubernetes/services` | the 10 services, UI, ingress |
 
-Images: `ghcr.io/vahan-sahakyan/distributed-social-network/<name>:<sha>`, published on every push by `.github/workflows/publish.yml`. On `main` the workflow also commits the new sha to the gitops repo, which Argo CD syncs.
+The ingress routes `/api`, `/health` and `/images` to the gateway and everything else to the UI.
+
+Images: `ghcr.io/vahan-sahakyan/distributed-social-network/<name>:<sha>` (linux/arm64), published on every push by `.github/workflows/publish.yml`. On `main` the workflow also commits the new sha to the gitops repo, which Argo CD syncs.
 
 Standalone install on a local cluster (plain dev secrets, `createDevSecrets: true` by default):
 
