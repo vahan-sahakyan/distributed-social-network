@@ -55,7 +55,7 @@ func Consume(ctx context.Context, cfg ConsumerConfig, handler Handler) {
 	})
 	defer reader.Close()
 
-	go reportLag(ctx, reader, cfg)
+	initMetrics(cfg)
 
 	// readBackoff keeps a broker outage from spinning this loop at full speed.
 	readBackoff := cfg.Backoff
@@ -100,19 +100,6 @@ func Consume(ctx context.Context, cfg ConsumerConfig, handler Handler) {
 				return
 			}
 			slog.ErrorContext(ctx, "committing offset", "topic", cfg.Topic, "offset", msg.Offset, "error", err)
-		}
-	}
-}
-
-func reportLag(ctx context.Context, reader *kafka.Reader, cfg ConsumerConfig) {
-	t := time.NewTicker(10 * time.Second)
-	defer t.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-t.C:
-			consumerLag.WithLabelValues(cfg.Topic, cfg.GroupID).Set(float64(reader.Stats().Lag))
 		}
 	}
 }

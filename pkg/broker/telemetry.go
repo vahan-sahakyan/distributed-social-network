@@ -34,12 +34,15 @@ var (
 		Help:    "Duration of a single handler attempt.",
 		Buckets: prometheus.DefBuckets,
 	}, []string{"topic", "group"})
-
-	consumerLag = promauto.NewGaugeVec(prometheus.GaugeOpts{
-		Name: "broker_consumer_lag",
-		Help: "Messages behind the partition head, as last reported by the reader.",
-	}, []string{"topic", "group"})
 )
+
+// initMetrics creates every series at zero, so increase() sees the first failure.
+func initMetrics(cfg ConsumerConfig) {
+	for _, r := range []string{"ok", "dlq", "dropped", "error"} {
+		consumed.WithLabelValues(cfg.Topic, cfg.GroupID, r)
+	}
+	failedAttempts.WithLabelValues(cfg.Topic, cfg.GroupID)
+}
 
 func result(err error) string {
 	if err != nil {
