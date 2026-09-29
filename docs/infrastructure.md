@@ -216,7 +216,7 @@ Created on startup by `pkg/broker.EnsureTopics`, replication factor 1.
 | `like.created` | 3 | New like events |
 | `like.deleted` | 3 | Unlike events |
 | `comment.created` | 3 | New comment events |
-| `<topic>.dlq` | - | Messages that failed 3 attempts; not created by `EnsureTopics`, nothing consumes them yet |
+| `<topic>.dlq` | 3 | Messages that failed 3 attempts; created when a consumer with a DLQ starts, nothing consumes them yet |
 
 ## Monitoring Configuration
 
