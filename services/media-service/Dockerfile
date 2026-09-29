@@ -3,6 +3,7 @@ WORKDIR /app
 COPY pkg/go.mod pkg/go.sum ./pkg/
 COPY pkg/grpc/media/ ./pkg/grpc/media/
 COPY pkg/id/ ./pkg/id/
+COPY pkg/observability/ ./pkg/observability/
 COPY services/media-service/ ./services/media-service/
 WORKDIR /app/services/media-service
 RUN go mod download

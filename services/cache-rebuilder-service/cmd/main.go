@@ -16,17 +16,19 @@ import (
 	cacherebpb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/cache_rebuilder"
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
+
+	shutdown := observability.Init(ctx, "cache-rebuilder-service")
+	defer shutdown(context.Background())
 
 	chAddr := os.Getenv("CLICKHOUSE_ADDR")
 	if chAddr == "" {
@@ -59,13 +61,13 @@ func main() {
 		postsAddr = "localhost:9081"
 	}
 
-	usersConn, err := grpc.NewClient(usersAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	usersConn, err := grpc.NewClient(usersAddr, observability.GRPCDialOptions()...)
 	if err != nil {
 		log.Fatalf("failed to connect to users-service: %v", err)
 	}
 	defer usersConn.Close()
 
-	postsConn, err := grpc.NewClient(postsAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	postsConn, err := grpc.NewClient(postsAddr, observability.GRPCDialOptions()...)
 	if err != nil {
 		log.Fatalf("failed to connect to posts-service: %v", err)
 	}
@@ -83,12 +85,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen on grpc port: %v", err)
 	}
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
 	cacherebpb.RegisterCacheRebuilderServiceServer(grpcSrv, grpcserver.New(svc, func(ctx context.Context) error {
 		conn.Exec(ctx, "TRUNCATE TABLE IF EXISTS feed_events")
 		mc.FlushAll()
 		return nil
 	}))
+	observability.InitGRPCMetrics(grpcSrv)
 	go func() {
 		log.Printf("gRPC server listening on :%s", grpcPort)
 		if err := grpcSrv.Serve(lis); err != nil {
@@ -97,11 +100,10 @@ func main() {
 	}()
 
 	// HTTP server (health + metrics only)
-	app := fiber.New(fiber.Config{AppName: "cache-rebuilder-service"})
+	app := fiber.New(fiber.Config{AppName: "cache-rebuilder-service", DisableStartupMessage: true})
 	prometheus := fiberprometheus.NewWithDefaultRegistry("cache-rebuilder-service")
 	prometheus.RegisterAt(app, "/metrics")
 	app.Use(prometheus.Middleware)
-	app.Use(logger.New())
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})

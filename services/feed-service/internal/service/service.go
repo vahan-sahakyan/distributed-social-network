@@ -3,7 +3,7 @@ package service
 import (
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/repository"
@@ -59,7 +59,7 @@ func (s *Service) AdjustCounts(postID, authorID string, userIDs []string, likesD
 	}
 
 	if err := errors.Join(errs...); err != nil {
-		log.Printf("adjusting counts for post %s: %v", postID, err)
+		slog.Warn("adjusting counts", "post_id", postID, "error", err)
 		return err
 	}
 	return nil

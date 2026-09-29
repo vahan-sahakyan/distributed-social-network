@@ -6,6 +6,7 @@ COPY pkg/database/ ./pkg/database/
 COPY pkg/events/ ./pkg/events/
 COPY pkg/grpc/comments/ ./pkg/grpc/comments/
 COPY pkg/id/ ./pkg/id/
+COPY pkg/observability/ ./pkg/observability/
 COPY services/comments-service/ ./services/comments-service/
 WORKDIR /app/services/comments-service
 RUN go mod download

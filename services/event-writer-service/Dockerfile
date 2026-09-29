@@ -5,6 +5,7 @@ COPY pkg/broker/ ./pkg/broker/
 COPY pkg/database/ ./pkg/database/
 COPY pkg/events/ ./pkg/events/
 COPY pkg/id/ ./pkg/id/
+COPY pkg/observability/ ./pkg/observability/
 COPY services/event-writer-service/ ./services/event-writer-service/
 WORKDIR /app/services/event-writer-service
 RUN go mod download

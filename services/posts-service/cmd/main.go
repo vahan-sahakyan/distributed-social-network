@@ -12,6 +12,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/service"
@@ -19,13 +20,15 @@ import (
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
 	"google.golang.org/grpc"
 )
 
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
+
+	shutdown := observability.Init(ctx, "posts-service")
+	defer shutdown(context.Background())
 
 	scyllaHosts := os.Getenv("SCYLLA_HOSTS")
 	if scyllaHosts == "" {
@@ -61,11 +64,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen on grpc port: %v", err)
 	}
-	grpcSrv := grpc.NewServer()
+	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
 	postspb.RegisterPostsServiceServer(grpcSrv, grpcserver.New(svc, func(_ context.Context) error {
 		db.Query("TRUNCATE posts").Exec()
 		return nil
 	}))
+	observability.InitGRPCMetrics(grpcSrv)
 	go func() {
 		log.Printf("gRPC server listening on :%s", grpcPort)
 		if err := grpcSrv.Serve(lis); err != nil {
@@ -74,11 +78,10 @@ func main() {
 	}()
 
 	// HTTP server (health + metrics only)
-	app := fiber.New(fiber.Config{AppName: "posts-service"})
+	app := fiber.New(fiber.Config{AppName: "posts-service", DisableStartupMessage: true})
 	prometheus := fiberprometheus.NewWithDefaultRegistry("posts-service")
 	prometheus.RegisterAt(app, "/metrics")
 	app.Use(prometheus.Middleware)
-	app.Use(logger.New())
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})

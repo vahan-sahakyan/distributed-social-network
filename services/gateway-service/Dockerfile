@@ -9,6 +9,7 @@ COPY pkg/grpc/media/ ./pkg/grpc/media/
 COPY pkg/grpc/notifications/ ./pkg/grpc/notifications/
 COPY pkg/grpc/posts/ ./pkg/grpc/posts/
 COPY pkg/grpc/users/ ./pkg/grpc/users/
+COPY pkg/observability/ ./pkg/observability/
 COPY services/gateway-service/ ./services/gateway-service/
 WORKDIR /app/services/gateway-service
 RUN go mod download

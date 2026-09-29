@@ -13,6 +13,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
@@ -21,6 +22,9 @@ import (
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
+
+	shutdown := observability.Init(ctx, "event-writer-service")
+	defer shutdown(context.Background())
 
 	chAddr := os.Getenv("CLICKHOUSE_ADDR")
 	if chAddr == "" {
@@ -44,7 +48,7 @@ func main() {
 	repo := repository.New(conn)
 
 	// Health endpoint
-	app := fiber.New(fiber.Config{AppName: "event-writer-service"})
+	app := fiber.New(fiber.Config{AppName: "event-writer-service", DisableStartupMessage: true})
 	prometheus := fiberprometheus.NewWithDefaultRegistry("event-writer-service")
 	prometheus.RegisterAt(app, "/metrics")
 	app.Use(prometheus.Middleware)

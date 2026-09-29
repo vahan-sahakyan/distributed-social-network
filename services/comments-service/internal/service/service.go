@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/model"
@@ -35,7 +35,7 @@ func (s *Service) CreateComment(ctx context.Context, req *model.CreateCommentReq
 	}
 
 	if err := s.producer.Publish(ctx, events.CommentCreated, comment.EntityID, comment); err != nil {
-		log.Printf("failed to publish comment.created for %s: %v", comment.ID, err)
+		slog.ErrorContext(ctx, "publishing event", "topic", events.CommentCreated, "comment_id", comment.ID, "error", err)
 	}
 
 	return comment, nil

@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
@@ -39,7 +39,7 @@ type feedItem struct {
 func (s *Service) loadPostStates(ctx context.Context) map[string]model.PostState {
 	states, err := s.repo.GetPostStates(ctx)
 	if err != nil {
-		log.Printf("warning: could not load post states from ClickHouse: %v", err)
+		slog.WarnContext(ctx, "loading post states from clickhouse", "error", err)
 		return map[string]model.PostState{}
 	}
 	m := make(map[string]model.PostState, len(states))
@@ -50,7 +50,7 @@ func (s *Service) loadPostStates(ctx context.Context) map[string]model.PostState
 }
 
 func (s *Service) RebuildCache(ctx context.Context) error {
-	log.Println("starting cache rebuild...")
+	slog.InfoContext(ctx, "starting cache rebuild")
 
 	events, err := s.repo.GetRecentPostEvents(ctx, 1000)
 	if err != nil {
@@ -63,9 +63,9 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 	feeds := map[string][]feedItem{}
 
 	for _, event := range events {
-		post, err := s.fetchPost(event.PostID)
+		post, err := s.fetchPost(ctx, event.PostID)
 		if err != nil {
-			log.Printf("skipping post %s: %v", event.PostID, err)
+			slog.WarnContext(ctx, "skipping post", "post_id", event.PostID, "error", err)
 			continue
 		}
 
@@ -76,7 +76,7 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 		feeds[cache.UserPostsKey(event.UserID)] = append(feeds[cache.UserPostsKey(event.UserID)], item)
 
 		// Write to each follower's feed
-		followers := s.fetchFollowers(event.UserID)
+		followers := s.fetchFollowers(ctx, event.UserID)
 		for _, followerID := range followers {
 			feeds[cache.HomeFeedKey(followerID)] = append(feeds[cache.HomeFeedKey(followerID)], item)
 		}
@@ -85,19 +85,19 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 	// Write all feeds to Memcached
 	for key, items := range feeds {
 		if err := s.setFeed(key, items); err != nil {
-			log.Printf("writing %s: %v", key, err)
+			slog.ErrorContext(ctx, "writing feed", "key", key, "error", err)
 		}
 	}
 
-	log.Printf("cache rebuild complete: %d feeds populated from %d events", len(feeds), len(events))
+	slog.InfoContext(ctx, "cache rebuild complete", "feeds", len(feeds), "events", len(events))
 	return nil
 }
 
 // RebuildUserFeed rebuilds the feed for a single user based on who they currently follow.
 func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
-	log.Printf("rebuilding feed for user %s...", userID)
+	slog.InfoContext(ctx, "rebuilding user feed", "user_id", userID)
 
-	following := s.fetchFollowing(userID)
+	following := s.fetchFollowing(ctx, userID)
 	// include the user's own posts too
 	authors := append(following, userID)
 
@@ -122,7 +122,7 @@ func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
 		if !authorSet[event.UserID] {
 			continue
 		}
-		post, err := s.fetchPost(event.PostID)
+		post, err := s.fetchPost(ctx, event.PostID)
 		if err != nil {
 			continue
 		}
@@ -139,7 +139,7 @@ func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
 	if err := s.setFeed(cache.UserPostsKey(userID), ownItems); err != nil {
 		return err
 	}
-	log.Printf("user feed rebuilt: %d feed posts, %d own posts for %s", len(homeItems), len(ownItems), userID)
+	slog.InfoContext(ctx, "user feed rebuilt", "user_id", userID, "feed_posts", len(homeItems), "own_posts", len(ownItems))
 	return nil
 }
 
@@ -174,8 +174,8 @@ type postResponse struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func (s *Service) fetchPost(postID string) (*postResponse, error) {
-	resp, err := s.postsClient.GetPost(context.Background(), &postspb.GetPostRequest{Id: postID})
+func (s *Service) fetchPost(ctx context.Context, postID string) (*postResponse, error) {
+	resp, err := s.postsClient.GetPost(ctx, &postspb.GetPostRequest{Id: postID})
 	if err != nil {
 		return nil, err
 	}
@@ -195,17 +195,19 @@ func (s *Service) fetchPost(postID string) (*postResponse, error) {
 	return post, nil
 }
 
-func (s *Service) fetchFollowers(userID string) []string {
-	resp, err := s.usersClient.GetFollowers(context.Background(), &userspb.GetFollowersRequest{UserId: userID})
+func (s *Service) fetchFollowers(ctx context.Context, userID string) []string {
+	resp, err := s.usersClient.GetFollowers(ctx, &userspb.GetFollowersRequest{UserId: userID})
 	if err != nil {
+		slog.WarnContext(ctx, "fetching followers", "user_id", userID, "error", err)
 		return nil
 	}
 	return resp.Followers
 }
 
-func (s *Service) fetchFollowing(userID string) []string {
-	resp, err := s.usersClient.GetFollowing(context.Background(), &userspb.GetFollowingRequest{UserId: userID})
+func (s *Service) fetchFollowing(ctx context.Context, userID string) []string {
+	resp, err := s.usersClient.GetFollowing(ctx, &userspb.GetFollowingRequest{UserId: userID})
 	if err != nil {
+		slog.WarnContext(ctx, "fetching following", "user_id", userID, "error", err)
 		return nil
 	}
 	return resp.Following

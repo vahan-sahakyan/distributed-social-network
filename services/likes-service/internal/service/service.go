@@ -2,7 +2,7 @@ package service
 
 import (
 	"context"
-	"log"
+	"log/slog"
 
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/repository"
@@ -57,6 +57,6 @@ func (s *Service) CreateLike(ctx context.Context, req *model.CreateLikeRequest) 
 
 func (s *Service) publish(ctx context.Context, topic string, like *model.Like) {
 	if err := s.producer.Publish(ctx, topic, like.EntityID, like); err != nil {
-		log.Printf("failed to publish %s for %s: %v", topic, like.EntityID, err)
+		slog.ErrorContext(ctx, "publishing event", "topic", topic, "entity_id", like.EntityID, "error", err)
 	}
 }
