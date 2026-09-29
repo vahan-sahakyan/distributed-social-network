@@ -1,7 +1,7 @@
 services:
   # --- Databases ---
   posts-db:
-    image: scylladb/scylla:latest
+    image: scylladb/scylla:2026.1.5
     command: --smp 1 --memory 512M --overprovisioned 1
     ports:
       - "9042:9042"
@@ -9,7 +9,7 @@ services:
       - posts-db-data:/var/lib/scylla
 
   comments-db:
-    image: postgres:16-alpine
+    image: postgres:16.14-alpine
     environment:
       POSTGRES_DB: comments
       POSTGRES_USER: postgres
@@ -20,7 +20,7 @@ services:
       - comments-db-data:/var/lib/postgresql/data
 
   likes-db:
-    image: postgres:16-alpine
+    image: postgres:16.14-alpine
     environment:
       POSTGRES_DB: likes
       POSTGRES_USER: postgres
@@ -31,7 +31,7 @@ services:
       - likes-db-data:/var/lib/postgresql/data
 
   users-db:
-    image: postgres:16-alpine
+    image: postgres:16.14-alpine
     environment:
       POSTGRES_DB: users
       POSTGRES_USER: postgres
@@ -42,7 +42,7 @@ services:
       - users-db-data:/var/lib/postgresql/data
 
   notifications-db:
-    image: postgres:16-alpine
+    image: postgres:16.14-alpine
     environment:
       POSTGRES_DB: notifications
       POSTGRES_USER: postgres
@@ -54,7 +54,7 @@ services:
 
   # --- Event Store ---
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
+    image: clickhouse/clickhouse-server:26.5.1.882
     environment:
       CLICKHOUSE_USER: default
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
@@ -66,7 +66,7 @@ services:
 
   # --- Message Broker ---
   redpanda:
-    image: redpandadata/redpanda:latest
+    image: redpandadata/redpanda:v26.1.10
     command:
       - redpanda start
       - --smp 1
@@ -91,13 +91,13 @@ services:
 
   # --- Cache ---
   memcached:
-    image: memcached:1.6-alpine
+    image: memcached:1.6.45-alpine
     ports:
       - "11211:11211"
 
   # --- Object Storage ---
   minio:
-    image: minio/minio:latest
+    image: ghcr.io/vahan-sahakyan/distributed-social-network/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin

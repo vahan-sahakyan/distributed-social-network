@@ -1,8 +1,42 @@
 replicaCount: 1
 
 image:
-  tag: latest
+  repository: ghcr.io/vahan-sahakyan/distributed-social-network
+  # git sha of the app repo; environments pin it, CI bumps it
+  tag: main
   pullPolicy: IfNotPresent
+
+# default container resources, overridable per service
+resources:
+  requests:
+    cpu: 10m
+    memory: 32Mi
+  limits:
+    memory: 128Mi
+
+ingress:
+  enabled: true
+  className: traefik
+  # empty host matches any, handy locally
+  host: ""
+  tls: false
+  clusterIssuer: letsencrypt
+
+# plain secrets for local clusters; set false where secrets come from elsewhere
+# (helm merges maps, so emptying devSecrets would not remove them)
+createDevSecrets: true
+devSecrets:
+  comments-service:
+    DATABASE_URL: postgres://postgres:postgres@comments-db:5432/comments?sslmode=disable
+  likes-service:
+    DATABASE_URL: postgres://postgres:postgres@likes-db:5432/likes?sslmode=disable
+  users-service:
+    DATABASE_URL: postgres://postgres:postgres@users-db:5432/users?sslmode=disable
+  notification-service:
+    DATABASE_URL: postgres://postgres:postgres@notifications-db:5432/notifications?sslmode=disable
+  media-service:
+    MINIO_ACCESS_KEY: minioadmin
+    MINIO_SECRET_KEY: minioadmin
 
 services:
   gateway:
@@ -39,37 +73,36 @@ services:
   comments:
     port: 8083
     grpcPort: 9083
+    secret: true
     env:
-      DATABASE_URL: postgres://postgres:postgres@comments-db:5432/comments?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
 
   likes:
     port: 8084
     grpcPort: 9084
+    secret: true
     env:
-      DATABASE_URL: postgres://postgres:postgres@likes-db:5432/likes?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
 
   users:
     port: 8085
     grpcPort: 9085
+    secret: true
     env:
-      DATABASE_URL: postgres://postgres:postgres@users-db:5432/users?sslmode=disable
 
   media:
+    secret: true
     port: 8086
     grpcPort: 9086
     env:
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: images
 
   notification:
     port: 8087
     grpcPort: 9087
+    secret: true
     env:
-      DATABASE_URL: postgres://postgres:postgres@notifications-db:5432/notifications?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081
 
@@ -89,3 +122,7 @@ services:
       MEMCACHED_ADDR: memcached:11211
       USERS_SERVICE_GRPC_ADDR: users-service:9085
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081
+
+  ui:
+    image: ui
+    port: 8080

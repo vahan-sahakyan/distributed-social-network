@@ -1,8 +1,11 @@
 postgres:
-  image: postgres:16-alpine
+  image: postgres:16.14-alpine
   user: postgres
-  password: postgres
+  # password comes from the postgres-credentials secret (POSTGRES_PASSWORD)
   storage: 1Gi
+  resources:
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {memory: 256Mi}
   instances:
     comments-db:
       database: comments
@@ -14,22 +17,47 @@ postgres:
       database: notifications
 
 scylla:
-  image: scylladb/scylla:latest
+  image: scylladb/scylla:2026.1.5
   storage: 2Gi
+  resources:
+    requests: {cpu: 100m, memory: 768Mi}
+    limits: {memory: 1Gi}
 
 redpanda:
-  image: redpandadata/redpanda:latest
+  image: redpandadata/redpanda:v26.1.10
   storage: 1Gi
+  resources:
+    requests: {cpu: 100m, memory: 640Mi}
+    limits: {memory: 1Gi}
 
 memcached:
-  image: memcached:1.6-alpine
+  image: memcached:1.6.45-alpine
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 128Mi}
 
 clickhouse:
-  image: clickhouse/clickhouse-server:latest
+  image: clickhouse/clickhouse-server:26.5.1.882
   storage: 2Gi
+  resources:
+    requests: {cpu: 100m, memory: 1Gi}
+    limits: {memory: 3Gi}
 
 minio:
-  image: minio/minio:latest
-  rootUser: minioadmin
-  rootPassword: minioadmin
+  # built from source by CI, see deploy/images/minio
+  image: ghcr.io/vahan-sahakyan/distributed-social-network/minio:RELEASE.2025-09-07T16-13-09Z
+  # root user/password come from the minio-credentials secret
   storage: 5Gi
+  resources:
+    requests: {cpu: 20m, memory: 128Mi}
+    limits: {memory: 512Mi}
+
+# plain secrets for local clusters; set false where secrets come from elsewhere
+# (helm merges maps, so emptying devSecrets would not remove them)
+createDevSecrets: true
+devSecrets:
+  postgres-credentials:
+    POSTGRES_PASSWORD: postgres
+  minio-credentials:
+    MINIO_ROOT_USER: minioadmin
+    MINIO_ROOT_PASSWORD: minioadmin

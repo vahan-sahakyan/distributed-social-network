@@ -1,0 +1,39 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dsn
+  {{- if .Values.ingress.tls }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.clusterIssuer }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts: [{{ .Values.ingress.host | quote }}]
+      secretName: dsn-tls
+  {{- end }}
+  rules:
+    - http:
+        paths:
+          {{- range list "/api" "/health" "/images" }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway-service
+                port:
+                  number: {{ $.Values.services.gateway.port }}
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ui-service
+                port:
+                  number: {{ $.Values.services.ui.port }}
+      {{- with .Values.ingress.host }}
+      host: {{ . | quote }}
+      {{- end }}
+{{- end }}

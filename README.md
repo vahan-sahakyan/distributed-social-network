@@ -108,7 +108,7 @@ After startup, these dashboards are available:
 │   ├── notification-service/ Notifications (PostgreSQL + Kafka consumer)
 │   ├── event-writer-service/ Event sourcing (ClickHouse)
 │   └── cache-rebuilder-service/ Cache rebuild from event store
-├── deploy/kubernetes/       Helm chart for K8s deployment
+├── deploy/kubernetes/       Helm charts (infra, services), deployed via GitOps
 ├── Makefile
 └── go.work                  Go workspace file
 ```
@@ -133,4 +133,4 @@ After startup, these dashboards are available:
 - **Cache:** Memcached
 - **Object Storage:** MinIO (S3 compatible)
 - **Observability:** Prometheus + Grafana, Loki (logs), Jaeger (traces)
-- **Containerization:** Docker Compose (dev), Helm/Kubernetes (production)
+- **Containerization:** Docker Compose (dev), Helm + Argo CD GitOps (production), images on GHCR

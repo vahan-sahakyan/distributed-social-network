@@ -256,12 +256,20 @@ This happens when running `go build ./...` inside a service that has a `cmd/` di
 
 ## Kubernetes Deployment
 
-A Helm chart is available at `deploy/kubernetes/`:
+Two Helm charts, deployed by Argo CD from [distributed-social-network-gitops](https://github.com/vahan-sahakyan/distributed-social-network-gitops):
+
+| Chart | Contents |
+|---|---|
+| `deploy/kubernetes/infra` | Postgres x4, Scylla, Redpanda, ClickHouse, MinIO, Memcached |
+| `deploy/kubernetes/services` | the 10 services, UI, ingress |
+
+Images: `ghcr.io/vahan-sahakyan/distributed-social-network/<name>:<sha>`, published on every push by `.github/workflows/publish.yml`. On `main` the workflow also commits the new sha to the gitops repo, which Argo CD syncs.
+
+Standalone install on a local cluster (plain dev secrets, `createDevSecrets: true` by default):
 
 ```bash
-helm install dsn ./deploy/kubernetes \
-  --set image.tag=latest \
-  --values deploy/kubernetes/values.yaml
+k3d cluster create dsn -p "8081:80@loadbalancer"
+helm install infra deploy/kubernetes/infra -n dsn --create-namespace
+helm install services deploy/kubernetes/services -n dsn --set image.tag=main
+# app on http://localhost:8081
 ```
-
-See `deploy/kubernetes/values.yaml` for configuration options.

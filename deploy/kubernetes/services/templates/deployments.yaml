@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: {{ $name }}-service
-          image: "distributed-social-network/{{ $name }}-service:{{ $.Values.image.tag }}"
+          image: "{{ $.Values.image.repository }}/{{ $svc.image | default (printf "%s-service" $name) }}:{{ $.Values.image.tag }}"
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
           ports:
             - name: http
@@ -38,6 +38,13 @@ spec:
             - name: {{ $key }}
               value: {{ $val | quote }}
             {{- end }}
+          {{- if $svc.secret }}
+          envFrom:
+            - secretRef:
+                name: {{ $name }}-service
+          {{- end }}
+          resources:
+            {{- toYaml ($svc.resources | default $.Values.resources) | nindent 12 }}
           livenessProbe:
             httpGet:
               path: /health
