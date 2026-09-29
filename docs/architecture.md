@@ -1,6 +1,6 @@
 # Architecture
 
-[<- README](../README.md) · **Architecture** · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md)
+[<- README](../README.md) · **Architecture** · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md) · [Observability](observability.md)
 
 ---
 
@@ -205,15 +205,10 @@ Asynchronous (events)
 
 ## Observability
 
-Every service exposes `/metrics` on its HTTP port via `fiberprometheus`:
+Wired through `pkg/observability` and `pkg/broker`; details, dashboards and exercises in [Observability](observability.md).
 
-- **Prometheus** scrapes all 10 services every 15s (`monitoring/prometheus/prometheus.yml`)
-- **Grafana**, **Loki** and **Jaeger** run in compose but are not wired up yet: no provisioned datasources or dashboards, no log shipping, no tracing instrumentation
-- The Helm charts do not include the observability stack
-
-Standard metrics exposed per service:
-- `http_requests_total` - counter by method, path, status
-- `http_request_duration_seconds` - histogram of latencies
-- `go_*` - Go runtime metrics (GC, goroutines, memory)
-
-Only the gateway's HTTP traffic is meaningful here; the other services serve their API over gRPC, which is not instrumented.
+- **Traces**: OpenTelemetry over HTTP -> gRPC -> Kafka headers -> consumers, so a request and the events it causes are one trace (Jaeger)
+- **Logs**: JSON `slog` with `trace_id`, shipped by Alloy to Loki
+- **Metrics**: gateway HTTP, gRPC server/client, and publish/consume/retry/DLQ metrics per service; consumer lag from Redpanda (Prometheus)
+- Grafana has the three datasources linked and a provisioned **DSN Overview** dashboard
+- The Helm charts do not include the observability stack; without `OTEL_EXPORTER_OTLP_ENDPOINT` services only log and expose `/metrics`

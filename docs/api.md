@@ -1,6 +1,6 @@
 # API Reference
 
-[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · **API** · [Infrastructure](infrastructure.md) · [Development](development.md)
+[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · **API** · [Infrastructure](infrastructure.md) · [Development](development.md) · [Observability](observability.md)
 
 ---
 

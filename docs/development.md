@@ -1,6 +1,6 @@
 # Development Guide
 
-[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · **Development**
+[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · **Development** · [Observability](observability.md)
 
 ---
 

@@ -1,6 +1,6 @@
 # Services
 
-[<- README](../README.md) · [Architecture](architecture.md) · **Services** · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md)
+[<- README](../README.md) · [Architecture](architecture.md) · **Services** · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md) · [Observability](observability.md)
 
 ---
 
