@@ -15,6 +15,7 @@ import (
 	mediapb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/media"
 	notificationspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/notifications"
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
+	searchpb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/search"
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
 
@@ -38,6 +39,7 @@ type clients struct {
 	media          mediapb.MediaServiceClient
 	notifications  notificationspb.NotificationServiceClient
 	cacheRebuilder cacherebpb.CacheRebuilderServiceClient
+	search         searchpb.SearchServiceClient
 }
 
 func grpcErrStatus(c *fiber.Ctx, err error) error {
@@ -143,6 +145,7 @@ func main() {
 		media:          mediapb.NewMediaServiceClient(mustDial(envOrDefault("MEDIA_SERVICE_GRPC_ADDR", "localhost:9086"))),
 		notifications:  notificationspb.NewNotificationServiceClient(mustDial(envOrDefault("NOTIFICATIONS_SERVICE_GRPC_ADDR", "localhost:9087"))),
 		cacheRebuilder: cacherebpb.NewCacheRebuilderServiceClient(mustDial(envOrDefault("CACHE_REBUILDER_SERVICE_GRPC_ADDR", "localhost:9089"))),
+		search:         searchpb.NewSearchServiceClient(mustDial(envOrDefault("SEARCH_SERVICE_GRPC_ADDR", "localhost:9091"))),
 	}
 
 	registerRoutes(app, cl)
@@ -382,6 +385,38 @@ func registerRoutes(app *fiber.App, cl *clients) {
 		return c.JSON(fiber.Map{"notifications": resp.Notifications})
 	})
 
+	// --- search ---
+	app.Get("/api/v1/search/posts", func(c *fiber.Ctx) error {
+		resp, err := cl.search.SearchPosts(c.UserContext(), &searchpb.SearchPostsRequest{
+			Query: c.Query("q"),
+			Limit: int32(c.QueryInt("limit")),
+		})
+		if err != nil {
+			return grpcErrStatus(c, err)
+		}
+		return c.JSON(fiber.Map{"total": resp.Total, "posts": resp.Posts})
+	})
+	app.Get("/api/v1/search/users", func(c *fiber.Ctx) error {
+		resp, err := cl.search.SearchUsers(c.UserContext(), &searchpb.SearchUsersRequest{
+			Query: c.Query("q"),
+			Limit: int32(c.QueryInt("limit")),
+		})
+		if err != nil {
+			return grpcErrStatus(c, err)
+		}
+		return c.JSON(fiber.Map{"total": resp.Total, "users": resp.Users})
+	})
+	app.Get("/api/v1/search/hashtags/trending", func(c *fiber.Ctx) error {
+		resp, err := cl.search.TrendingHashtags(c.UserContext(), &searchpb.TrendingHashtagsRequest{
+			Hours: int32(c.QueryInt("hours")),
+			Limit: int32(c.QueryInt("limit")),
+		})
+		if err != nil {
+			return grpcErrStatus(c, err)
+		}
+		return c.JSON(fiber.Map{"hashtags": resp.Hashtags})
+	})
+
 	// --- cache rebuild ---
 	app.Post("/api/v1/rebuild", func(c *fiber.Ctx) error {
 		// a full rebuild replays up to 1000 events, well past the default call timeout
@@ -406,6 +441,7 @@ func registerRoutes(app *fiber.App, cl *clients) {
 		cl.notifications.Reset(ctx, &notificationspb.ResetRequest{})
 		cl.feed.Reset(ctx, &feedpb.ResetRequest{})
 		cl.cacheRebuilder.Reset(ctx, &cacherebpb.ResetRequest{})
+		cl.search.Reset(ctx, &searchpb.ResetRequest{})
 		return c.JSON(fiber.Map{"status": "reset complete"})
 	})
 

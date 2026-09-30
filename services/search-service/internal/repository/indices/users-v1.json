@@ -1,0 +1,36 @@
+{
+  "aliases": {
+    "users": { "is_write_index": true }
+  },
+  "settings": {
+    "number_of_shards": 1,
+    "number_of_replicas": 0,
+    "analysis": {
+      "filter": {
+        "prefixes": { "type": "edge_ngram", "min_gram": 1, "max_gram": 32 }
+      },
+      "analyzer": {
+        "username_prefix": { "type": "custom", "tokenizer": "keyword", "filter": ["lowercase", "prefixes"] },
+        "username_search": { "type": "custom", "tokenizer": "keyword", "filter": ["lowercase"] }
+      },
+      "normalizer": {
+        "lowercase": { "type": "custom", "filter": ["lowercase"] }
+      }
+    }
+  },
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "username": {
+        "type": "text",
+        "analyzer": "username_prefix",
+        "search_analyzer": "username_search",
+        "fields": {
+          "exact": { "type": "keyword", "normalizer": "lowercase" }
+        }
+      },
+      "bio": { "type": "text", "analyzer": "english" },
+      "created_at": { "type": "date" }
+    }
+  }
+}

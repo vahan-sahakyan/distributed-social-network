@@ -24,6 +24,7 @@ jobs:
           - services/notification-service
           - services/event-writer-service
           - services/cache-rebuilder-service
+          - services/search-service
     defaults:
       run:
         working-directory: ${{ matrix.module }}

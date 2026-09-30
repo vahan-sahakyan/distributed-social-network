@@ -242,8 +242,8 @@
     },
     {
       "type": "stat",
-      "title": "Services up",
-      "description": "Of 10 app services",
+      "title": "Services down",
+      "description": "App services failing their scrape",
       "id": 4,
       "datasource": {
         "type": "prometheus",
@@ -262,7 +262,7 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "sum(up{job=~\".+-service\"})",
+          "expr": "count(up{job=~\".+-service\"} == 0) or vector(0)",
           "instant": true
         }
       ],
@@ -276,12 +276,12 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "red",
+                "color": "green",
                 "value": null
               },
               {
-                "color": "green",
-                "value": 10
+                "color": "red",
+                "value": 1
               }
             ]
           }
