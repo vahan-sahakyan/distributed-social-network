@@ -7,8 +7,10 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/retry"
 )
 
+// NewClickHouse opens a connection and retries the ping until the server answers or ctx is done.
 func NewClickHouse(ctx context.Context, addr string, database string) (driver.Conn, error) {
 	conn, err := clickhouse.Open(&clickhouse.Options{
 		Addr: []string{addr},
@@ -21,8 +23,9 @@ func NewClickHouse(ctx context.Context, addr string, database string) (driver.Co
 		return nil, fmt.Errorf("failed to open clickhouse connection: %w", err)
 	}
 
-	if err := conn.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("failed to ping clickhouse: %w", err)
+	if err := retry.Do(ctx, "connecting to clickhouse", conn.Ping); err != nil {
+		_ = conn.Close()
+		return nil, fmt.Errorf("connecting to clickhouse: %w", err)
 	}
 
 	return conn, nil

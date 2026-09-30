@@ -39,11 +39,11 @@ func main() {
 		scyllaKeyspace = "posts"
 	}
 
-	if err := database.MigrateScylla(scyllaHosts, migrations.SQL); err != nil {
+	if err := database.MigrateScylla(ctx, scyllaHosts, migrations.SQL); err != nil {
 		log.Fatalf("failed to run scylla migration: %v", err)
 	}
 
-	db, err := database.NewScyllaDB(scyllaHosts, scyllaKeyspace)
+	db, err := database.NewScyllaDB(ctx, scyllaHosts, scyllaKeyspace)
 	if err != nil {
 		log.Fatalf("failed to connect to scylladb: %v", err)
 	}

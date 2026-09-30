@@ -8,6 +8,7 @@ COPY pkg/grpc/notifications/ ./pkg/grpc/notifications/
 COPY pkg/grpc/posts/ ./pkg/grpc/posts/
 COPY pkg/id/ ./pkg/id/
 COPY pkg/observability/ ./pkg/observability/
+COPY pkg/retry/ ./pkg/retry/
 COPY services/notification-service/ ./services/notification-service/
 WORKDIR /app/services/notification-service
 RUN go mod download
