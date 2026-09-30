@@ -120,11 +120,17 @@ services:
   # --- Observability ---
   prometheus:
     image: prom/prometheus:v3.12.0
+    # picks up edits to the mounted config and rules without a restart
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --config.auto-reload
+      - --config.auto-reload-interval=10s
     ports:
       - "9090:9090"
     volumes:
-      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ../monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      # a directory mount, so edits that replace the file are seen
+      - ../monitoring/prometheus:/etc/prometheus:ro
       - prometheus-data:/prometheus
 
   grafana:
