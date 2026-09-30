@@ -2,7 +2,9 @@ package repository
 
 import (
 	"context"
+	"errors"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/model"
 )
@@ -20,6 +22,17 @@ func (r *Repository) Create(ctx context.Context, user *model.User) error {
 		`INSERT INTO users (id, username, bio, created_at) VALUES ($1, $2, $3, $4)`,
 		user.ID, user.Username, user.Bio, user.CreatedAt,
 	)
+	return translate(err)
+}
+
+const uniqueViolation = "23505"
+
+// translate turns the username unique violation into model.ErrUsernameTaken.
+func translate(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+		return model.ErrUsernameTaken
+	}
 	return err
 }
 

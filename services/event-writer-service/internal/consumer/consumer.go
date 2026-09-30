@@ -27,7 +27,7 @@ func New(repo *repository.Repository, brokers string, dlq *broker.Producer) *Con
 
 func (c *Consumer) Start(ctx context.Context) {
 	for _, topic := range events.All {
-		go broker.Consume(ctx, broker.ConsumerConfig{
+		go broker.ConsumeBatch(ctx, broker.ConsumerConfig{
 			Brokers: c.brokers,
 			Topic:   topic,
 			GroupID: "event-writer-service",
@@ -38,19 +38,23 @@ func (c *Consumer) Start(ctx context.Context) {
 	<-ctx.Done()
 }
 
-func (c *Consumer) handler(topic string) broker.Handler {
-	return func(ctx context.Context, msg kafka.Message) error {
-		return c.handleEvent(ctx, topic, msg)
+func (c *Consumer) handler(topic string) broker.BatchHandler {
+	return func(ctx context.Context, msgs []kafka.Message) error {
+		return c.handleEvents(ctx, topic, msgs)
 	}
 }
 
-func (c *Consumer) handleEvent(ctx context.Context, eventType string, msg kafka.Message) error {
-	event, err := buildEvent(eventType, msg)
-	if err != nil {
-		return err
+func (c *Consumer) handleEvents(ctx context.Context, eventType string, msgs []kafka.Message) error {
+	events := make([]*model.FeedEvent, len(msgs))
+	for i, msg := range msgs {
+		event, err := buildEvent(eventType, msg)
+		if err != nil {
+			return fmt.Errorf("offset %d: %w", msg.Offset, err)
+		}
+		events[i] = event
 	}
-	if err := c.repo.InsertEvent(ctx, event); err != nil {
-		return fmt.Errorf("inserting event to clickhouse: %w", err)
+	if err := c.repo.InsertEvents(ctx, events); err != nil {
+		return fmt.Errorf("inserting %d events to clickhouse: %w", len(events), err)
 	}
 	return nil
 }
