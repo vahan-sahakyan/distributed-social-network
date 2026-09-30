@@ -97,12 +97,14 @@ Then in the log panel pick a feed-service or notification-service ERROR line, ju
 
 **4. Stop a consumer.** `docker stop infrastructure-notification-service-1` for a minute: lag keeps rising (broker-side), events are not lost, and they drain on `docker start`.
 
-**5. Find a bug from an alert.** Create the same username twice:
+**5. Trace an error to its cause.** Take a database away from one service:
 ```bash
-curl -s -XPOST localhost:8080/api/v1/users/ -H 'Content-Type: application/json' -d '{"username":"dup"}'
-curl -s -XPOST localhost:8080/api/v1/users/ -H 'Content-Type: application/json' -d '{"username":"dup"}'
+docker stop infrastructure-comments-db-1
+curl -s -XPOST localhost:8080/api/v1/comments/ -H 'Content-Type: application/json' \
+  -d '{"entity_id":"<post id>","user_id":"<user id>","text":"hi"}'
+docker start infrastructure-comments-db-1
 ```
-The second call is a 500, `GRPCServerErrors` fires for `users-service CreateUser`, and the span status carries the Postgres unique violation.
+The call is a 500, `GRPCServerErrors` fires for `comments-service CreateComment` under load, and the failed span's status carries the Postgres connection error.
 
 ### Query cheat sheet
 
