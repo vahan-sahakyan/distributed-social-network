@@ -263,7 +263,7 @@ type Notification struct {
 **Consumer group:** `event-writer-service`
 **Topics consumed:** `post.created`, `like.created`, `like.deleted`, `comment.created`
 
-**Writes to ClickHouse:**
+**Writes to ClickHouse:** one insert per batch (`broker.ConsumeBatch`: up to 500 messages or 200ms), with `async_insert` and `wait_for_async_insert` so the rows are durable before the offsets commit
 ```sql
 INSERT INTO feed_events (event_id, event_type, post_id, user_id, likes_delta, comments_delta, created_at)
 ```
