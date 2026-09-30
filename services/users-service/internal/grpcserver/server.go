@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/validate"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/service"
 	"google.golang.org/grpc/codes"
@@ -23,6 +24,12 @@ func New(svc *service.Service, resetFn func(ctx context.Context) error) *Server 
 }
 
 func (s *Server) CreateUser(ctx context.Context, req *userspb.CreateUserRequest) (*userspb.CreateUserResponse, error) {
+	if err := validate.Username(req.Username); err != nil {
+		return nil, err
+	}
+	if err := validate.MaxLen("bio", req.Bio, 500); err != nil {
+		return nil, err
+	}
 	user, err := s.svc.CreateUser(ctx, &model.CreateUserRequest{
 		Username: req.Username,
 		Bio:      req.Bio,
@@ -53,6 +60,12 @@ func (s *Server) GetUserByUsername(ctx context.Context, req *userspb.GetUserByUs
 }
 
 func (s *Server) FollowUser(ctx context.Context, req *userspb.FollowUserRequest) (*userspb.FollowUserResponse, error) {
+	if err := validate.Required("follower_id", req.FollowerId, "target_id", req.TargetId); err != nil {
+		return nil, err
+	}
+	if req.FollowerId == req.TargetId {
+		return nil, status.Error(codes.InvalidArgument, "users cannot follow themselves")
+	}
 	if err := s.svc.Follow(ctx, req.FollowerId, req.TargetId); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to follow: %v", err)
 	}
@@ -60,6 +73,9 @@ func (s *Server) FollowUser(ctx context.Context, req *userspb.FollowUserRequest)
 }
 
 func (s *Server) UnfollowUser(ctx context.Context, req *userspb.UnfollowUserRequest) (*userspb.UnfollowUserResponse, error) {
+	if err := validate.Required("follower_id", req.FollowerId, "target_id", req.TargetId); err != nil {
+		return nil, err
+	}
 	if err := s.svc.Unfollow(ctx, req.FollowerId, req.TargetId); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to unfollow: %v", err)
 	}

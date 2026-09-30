@@ -7,6 +7,7 @@ COPY pkg/events/ ./pkg/events/
 COPY pkg/grpc/posts/ ./pkg/grpc/posts/
 COPY pkg/id/ ./pkg/id/
 COPY pkg/observability/ ./pkg/observability/
+COPY pkg/validate/ ./pkg/validate/
 COPY services/posts-service/ ./services/posts-service/
 WORKDIR /app/services/posts-service
 RUN go mod download

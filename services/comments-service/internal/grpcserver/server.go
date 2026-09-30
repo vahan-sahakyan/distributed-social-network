@@ -6,6 +6,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/service"
 	commentspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/comments"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/validate"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,6 +23,12 @@ func New(svc *service.Service, resetFn func(ctx context.Context) error) *Server 
 }
 
 func (s *Server) CreateComment(ctx context.Context, req *commentspb.CreateCommentRequest) (*commentspb.CreateCommentResponse, error) {
+	if err := validate.Required("user_id", req.UserId, "entity_id", req.EntityId, "text", req.Text); err != nil {
+		return nil, err
+	}
+	if err := validate.MaxLen("text", req.Text, 2000); err != nil {
+		return nil, err
+	}
 	comment, err := s.svc.CreateComment(ctx, &model.CreateCommentRequest{
 		UserID:   req.UserId,
 		EntityID: req.EntityId,

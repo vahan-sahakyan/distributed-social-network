@@ -2,8 +2,10 @@ package grpcserver
 
 import (
 	"context"
+	"strings"
 
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/validate"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/service"
 	"google.golang.org/grpc/codes"
@@ -22,6 +24,15 @@ func New(svc *service.Service, resetFn func(ctx context.Context) error) *Server 
 }
 
 func (s *Server) CreatePost(ctx context.Context, req *postspb.CreatePostRequest) (*postspb.CreatePostResponse, error) {
+	if err := validate.Required("author_id", req.AuthorId); err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(req.Text) == "" && req.ImageId == "" {
+		return nil, status.Error(codes.InvalidArgument, "text or image_id is required")
+	}
+	if err := validate.MaxLen("text", req.Text, 5000); err != nil {
+		return nil, err
+	}
 	post, err := s.svc.CreatePost(ctx, &model.CreatePostRequest{
 		Text:     req.Text,
 		AuthorID: req.AuthorId,

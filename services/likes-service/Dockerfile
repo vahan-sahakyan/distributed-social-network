@@ -7,6 +7,7 @@ COPY pkg/events/ ./pkg/events/
 COPY pkg/grpc/likes/ ./pkg/grpc/likes/
 COPY pkg/id/ ./pkg/id/
 COPY pkg/observability/ ./pkg/observability/
+COPY pkg/validate/ ./pkg/validate/
 COPY services/likes-service/ ./services/likes-service/
 WORKDIR /app/services/likes-service
 RUN go mod download

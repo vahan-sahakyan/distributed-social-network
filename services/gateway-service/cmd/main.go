@@ -23,6 +23,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/proxy"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -49,12 +50,24 @@ func grpcErrStatus(c *fiber.Ctx, err error) error {
 		case codes.AlreadyExists:
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": st.Message()})
 		case codes.Unavailable:
-			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": st.Message()})
+			return serverError(c, fiber.StatusServiceUnavailable, "service unavailable", err)
 		case codes.DeadlineExceeded:
-			return c.Status(fiber.StatusGatewayTimeout).JSON(fiber.Map{"error": st.Message()})
+			return serverError(c, fiber.StatusGatewayTimeout, "upstream timed out", err)
 		}
 	}
-	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
+	return serverError(c, fiber.StatusInternalServerError, "internal error", err)
+}
+
+// serverError logs the cause and answers with a generic message plus the trace id,
+// so internals like hostnames and SQL errors don't reach the client.
+func serverError(c *fiber.Ctx, code int, msg string, err error) error {
+	ctx := c.UserContext()
+	slog.ErrorContext(ctx, "upstream call failed", "route", c.Route().Path, "status", code, "error", err)
+	body := fiber.Map{"error": msg}
+	if sc := trace.SpanContextFromContext(ctx); sc.IsValid() {
+		body["trace_id"] = sc.TraceID().String()
+	}
+	return c.Status(code).JSON(body)
 }
 
 func mustDial(addr string) *grpc.ClientConn {
