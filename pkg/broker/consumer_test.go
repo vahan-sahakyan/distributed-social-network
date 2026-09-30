@@ -71,8 +71,8 @@ func TestHandleWithRetryStopsOnCancel(t *testing.T) {
 func TestApplyDefaults(t *testing.T) {
 	var cfg ConsumerConfig
 	cfg.applyDefaults()
-	if cfg.MaxAttempts != 3 || cfg.Backoff != 200*time.Millisecond {
-		t.Errorf("got MaxAttempts=%d Backoff=%v", cfg.MaxAttempts, cfg.Backoff)
+	if cfg.MaxAttempts != 3 || cfg.Backoff != 200*time.Millisecond || cfg.BatchSize != 500 || cfg.BatchWait != 200*time.Millisecond {
+		t.Errorf("got MaxAttempts=%d Backoff=%v BatchSize=%d BatchWait=%v", cfg.MaxAttempts, cfg.Backoff, cfg.BatchSize, cfg.BatchWait)
 	}
 }
 

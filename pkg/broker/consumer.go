@@ -10,7 +10,6 @@ import (
 
 	"github.com/segmentio/kafka-go"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
-	"go.opentelemetry.io/otel/codes"
 )
 
 // Handler processes one message. Returning an error makes Consume retry it, and
@@ -32,6 +31,12 @@ type ConsumerConfig struct {
 	// DLQ parks messages that exhausted MaxAttempts. When nil they are dropped
 	// with a log line, which is the old at-most-once behaviour.
 	DLQ *Producer
+
+	// BatchSize caps a ConsumeBatch batch. Defaults to 500.
+	BatchSize int
+	// BatchWait is how long ConsumeBatch collects after the first message of a
+	// batch. Defaults to 200ms.
+	BatchWait time.Duration
 }
 
 func (c *ConsumerConfig) applyDefaults() {
@@ -41,59 +46,34 @@ func (c *ConsumerConfig) applyDefaults() {
 	if c.Backoff <= 0 {
 		c.Backoff = 200 * time.Millisecond
 	}
+	if c.BatchSize <= 0 {
+		c.BatchSize = 500
+	}
+	if c.BatchWait <= 0 {
+		c.BatchWait = 200 * time.Millisecond
+	}
 }
 
 // Consume reads cfg.Topic until ctx is done, committing each message only after
 // the handler has accepted it. It blocks.
 func Consume(ctx context.Context, cfg ConsumerConfig, handler Handler) {
 	cfg.applyDefaults()
-
-	// the writer doesn't create topics, so parking would fail on a missing DLQ topic
-	if cfg.DLQ != nil {
-		if err := EnsureTopics(ctx, cfg.Brokers, events.DLQ(cfg.Topic)); err != nil {
-			slog.ErrorContext(ctx, "ensuring dead-letter topic", "topic", cfg.Topic, "error", err)
-			return
-		}
+	reader, ok := openReader(ctx, cfg)
+	if !ok {
+		return
 	}
-
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: strings.Split(cfg.Brokers, ","),
-		Topic:   cfg.Topic,
-		GroupID: cfg.GroupID,
-	})
 	defer reader.Close()
 
-	initMetrics(cfg)
-
-	// readBackoff keeps a broker outage from spinning this loop at full speed.
-	readBackoff := cfg.Backoff
+	backoff := cfg.Backoff
 	for {
-		// FetchMessage, unlike ReadMessage, leaves the offset uncommitted.
-		msg, err := reader.FetchMessage(ctx)
-		if err != nil {
-			if ctx.Err() != nil {
-				return
-			}
-			slog.WarnContext(ctx, "reading message", "topic", cfg.Topic, "error", err)
-			select {
-			case <-ctx.Done():
-				return
-			case <-time.After(readBackoff):
-			}
-			if readBackoff < 30*time.Second {
-				readBackoff *= 2
-			}
-			continue
+		msg, ok := fetch(ctx, cfg, reader, &backoff)
+		if !ok {
+			return
 		}
-		readBackoff = cfg.Backoff
 
 		msgCtx, span := startConsumerSpan(ctx, cfg, &msg)
-		err = handleWithRetry(msgCtx, cfg, handler, msg)
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, err.Error())
-		}
-		span.End()
+		err := handleWithRetry(msgCtx, cfg, handler, msg)
+		endSpan(span, err)
 		if err != nil {
 			// Leaving the offset uncommitted is deliberate: the message is
 			// redelivered rather than silently skipped.
@@ -103,12 +83,70 @@ func Consume(ctx context.Context, cfg ConsumerConfig, handler Handler) {
 			continue
 		}
 
-		if err := reader.CommitMessages(ctx, msg); err != nil {
-			if ctx.Err() != nil {
-				return
-			}
-			slog.ErrorContext(ctx, "committing offset", "topic", cfg.Topic, "offset", msg.Offset, "error", err)
+		commit(ctx, cfg, reader, msg)
+	}
+}
+
+// openReader creates the dead-letter topic and the group reader. It returns false
+// once ctx is done.
+func openReader(ctx context.Context, cfg ConsumerConfig) (*kafka.Reader, bool) {
+	// the writer doesn't create topics, so parking would fail on a missing DLQ topic
+	if cfg.DLQ != nil {
+		if err := EnsureTopics(ctx, cfg.Brokers, events.DLQ(cfg.Topic)); err != nil {
+			slog.ErrorContext(ctx, "ensuring dead-letter topic", "topic", cfg.Topic, "error", err)
+			return nil, false
 		}
+	}
+
+	initMetrics(cfg)
+	return kafka.NewReader(kafka.ReaderConfig{
+		Brokers: strings.Split(cfg.Brokers, ","),
+		Topic:   cfg.Topic,
+		GroupID: cfg.GroupID,
+	}), true
+}
+
+type fetcher interface {
+	FetchMessage(ctx context.Context) (kafka.Message, error)
+}
+
+// fetch blocks for the next message, backing off while the broker is unreachable so
+// an outage does not spin the loop. It returns false once ctx is done.
+func fetch(ctx context.Context, cfg ConsumerConfig, r fetcher, backoff *time.Duration) (kafka.Message, bool) {
+	for {
+		// FetchMessage, unlike ReadMessage, leaves the offset uncommitted.
+		msg, err := r.FetchMessage(ctx)
+		if err == nil {
+			*backoff = cfg.Backoff
+			return msg, true
+		}
+		if ctx.Err() != nil {
+			return kafka.Message{}, false
+		}
+		slog.WarnContext(ctx, "reading message", "topic", cfg.Topic, "error", err)
+		if !sleep(ctx, *backoff) {
+			return kafka.Message{}, false
+		}
+		if *backoff < 30*time.Second {
+			*backoff *= 2
+		}
+	}
+}
+
+func commit(ctx context.Context, cfg ConsumerConfig, reader *kafka.Reader, msgs ...kafka.Message) {
+	if err := reader.CommitMessages(ctx, msgs...); err != nil && ctx.Err() == nil {
+		slog.ErrorContext(ctx, "committing offsets", "topic", cfg.Topic,
+			"last_offset", msgs[len(msgs)-1].Offset, "error", err)
+	}
+}
+
+// sleep waits d, returning false if ctx is done first.
+func sleep(ctx context.Context, d time.Duration) bool {
+	select {
+	case <-ctx.Done():
+		return false
+	case <-time.After(d):
+		return true
 	}
 }
 
@@ -135,10 +173,8 @@ func handleWithRetry(ctx context.Context, cfg ConsumerConfig, handler Handler, m
 			"attempt", attempt, "max_attempts", cfg.MaxAttempts, "error", err)
 
 		if attempt < cfg.MaxAttempts {
-			select {
-			case <-ctx.Done():
+			if !sleep(ctx, backoff) {
 				return ctx.Err()
-			case <-time.After(backoff):
 			}
 			backoff *= 2
 		}
