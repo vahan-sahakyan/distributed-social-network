@@ -6,6 +6,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/service"
 	likespb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/likes"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/validate"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -21,6 +22,9 @@ func New(svc *service.Service, resetFn func(ctx context.Context) error) *Server 
 }
 
 func (s *Server) CreateLike(ctx context.Context, req *likespb.CreateLikeRequest) (*likespb.CreateLikeResponse, error) {
+	if err := validate.Required("user_id", req.UserId, "entity_id", req.EntityId); err != nil {
+		return nil, err
+	}
 	like, err := s.svc.CreateLike(ctx, &model.CreateLikeRequest{
 		UserID:   req.UserId,
 		EntityID: req.EntityId,
@@ -44,6 +48,9 @@ func (s *Server) HasLiked(ctx context.Context, req *likespb.HasLikedRequest) (*l
 }
 
 func (s *Server) Unlike(ctx context.Context, req *likespb.UnlikeRequest) (*likespb.UnlikeResponse, error) {
+	if err := validate.Required("user_id", req.UserId, "entity_id", req.EntityId); err != nil {
+		return nil, err
+	}
 	if err := s.svc.Unlike(ctx, req.UserId, req.EntityId); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to unlike: %v", err)
 	}
