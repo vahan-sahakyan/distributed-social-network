@@ -69,7 +69,7 @@ See [Observability](observability.md).
 
 ## Application Containers
 
-All app services are built from multi-stage Dockerfiles (`golang:1.24-alpine` -> `alpine:3.20`). Each Dockerfile copies only the `pkg/` directories its service imports; `make dockerfiles` regenerates those lines and CI fails if they drift.
+All app services are built from multi-stage Dockerfiles (`golang:1.27-alpine3.24` -> `alpine:3.24`). Each Dockerfile copies only the `pkg/` directories its service imports; `make dockerfiles` regenerates those lines and CI fails if they drift.
 
 - `restart: on-failure`, so a service that starts before its database is ready exits and retries
 - All containers share the default compose network

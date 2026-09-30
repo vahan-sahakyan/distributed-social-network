@@ -1,6 +1,6 @@
 module github.com/vahan-sahakyan/distributed-social-network/likes-service
 
-go 1.24.0
+go 1.27.0
 
 require (
 	github.com/ansrivas/fiberprometheus/v2 v2.17.0
