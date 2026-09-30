@@ -8,6 +8,7 @@ import (
 	"github.com/segmentio/kafka-go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -97,4 +98,34 @@ func startConsumerSpan(ctx context.Context, cfg ConsumerConfig, msg *kafka.Messa
 			attribute.Int64("messaging.kafka.offset", msg.Offset),
 		),
 	)
+}
+
+// startBatchSpan links the batch to each producer's trace, since one span can't
+// have many parents.
+func startBatchSpan(ctx context.Context, cfg ConsumerConfig, msgs []kafka.Message) (context.Context, trace.Span) {
+	links := make([]trace.Link, 0, len(msgs))
+	for i := range msgs {
+		sc := trace.SpanContextFromContext(otel.GetTextMapPropagator().Extract(ctx, headerCarrier{&msgs[i].Headers}))
+		if sc.IsValid() {
+			links = append(links, trace.Link{SpanContext: sc})
+		}
+	}
+	return tracer.Start(ctx, "process "+cfg.Topic,
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithLinks(links...),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "kafka"),
+			attribute.String("messaging.destination.name", cfg.Topic),
+			attribute.String("messaging.consumer.group.name", cfg.GroupID),
+			attribute.Int("messaging.batch.message_count", len(msgs)),
+		),
+	)
+}
+
+func endSpan(span trace.Span, err error) {
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, err.Error())
+	}
+	span.End()
 }

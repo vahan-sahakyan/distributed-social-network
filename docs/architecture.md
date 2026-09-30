@@ -92,7 +92,7 @@ Topics are created on startup by `pkg/broker.EnsureTopics` (3 partitions each). 
 - `notification-service` - generates notifications for post authors
 - `event-writer-service` - persists all events to ClickHouse
 
-Delivery is **at-least-once** (`pkg/broker.Consume`): the offset is committed only after the handler succeeds. A failing message is retried 3 times with backoff, then published to `<topic>.dlq` and skipped. Nothing consumes the DLQ topics yet. Handlers are written to tolerate redelivery:
+Delivery is **at-least-once** (`pkg/broker.Consume`): the offset is committed only after the handler succeeds. A failing message is retried 3 times with backoff, then published to `<topic>.dlq` and skipped. Nothing consumes the DLQ topics yet. `pkg/broker.ConsumeBatch` (event-writer) does the same per batch of up to 500 messages or 200ms, and retries a failing batch message by message so only the bad ones are parked. Handlers are written to tolerate redelivery:
 - feed-service fanout is idempotent, and feed cache writes use memcache CAS to avoid lost updates between concurrent consumers
 - event-writer derives `event_id` from topic/partition/offset, so a redelivered message writes a row with the same id and readers deduplicate by it
 - likes-service emits `like.created` / `like.deleted` only when the row actually changed, so a repeated like or unlike emits nothing

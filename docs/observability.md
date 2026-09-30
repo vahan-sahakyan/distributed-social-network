@@ -82,7 +82,7 @@ Lag comes from the broker rather than the consumer: a dead consumer can't report
 
 Run `make load DURATION=600` in one terminal and watch **DSN Overview** while doing these.
 
-**1. Follow one request end to end.** Jaeger -> service `gateway-service`, operation `/api/v1/posts/` -> open a trace. Expected: gateway -> posts-service `CreatePost` -> `publish post.created` -> `process post.created` in feed-service and event-writer-service, plus feed's `GetFollowers` call to users-service.
+**1. Follow one request end to end.** Jaeger -> service `gateway-service`, operation `/api/v1/posts/` -> open a trace. Expected: gateway -> posts-service `CreatePost` -> `publish post.created` -> `process post.created` in feed-service and event-writer-service, plus feed's `GetFollowers` call to users-service. Under load event-writer processes batches: its span then starts its own trace and links to each producer span (`messaging.batch.message_count` tag).
 
 **2. Kill a dependency.**
 ```bash
@@ -93,7 +93,7 @@ docker start infrastructure-posts-service-1
 ```
 Then in the log panel pick a feed-service or notification-service ERROR line, jump to its trace, and see each retry as a failed `GetPost` span.
 
-**3. Watch a consumer fall behind.** Under load, **Consumer lag** for `event-writer-service` grows: it inserts one ClickHouse row per event (~170ms each). Compare `broker_handler_duration_seconds` across groups. Batching those inserts is the fix.
+**3. Slow a consumer down.** Pause ClickHouse under load: `docker pause infrastructure-clickhouse-1`, wait a minute, `docker unpause infrastructure-clickhouse-1`. Inserts block rather than fail, so consumer lag for `event-writer-service` climbs by thousands, then drains within seconds of the unpause in batches of up to 500; nothing is parked.
 
 **4. Stop a consumer.** `docker stop infrastructure-notification-service-1` for a minute: lag keeps rising (broker-side), events are not lost, and they drain on `docker start`.
 
