@@ -48,6 +48,10 @@ func grpcErrStatus(c *fiber.Ctx, err error) error {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": st.Message()})
 		case codes.AlreadyExists:
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": st.Message()})
+		case codes.Unavailable:
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": st.Message()})
+		case codes.DeadlineExceeded:
+			return c.Status(fiber.StatusGatewayTimeout).JSON(fiber.Map{"error": st.Message()})
 		}
 	}
 	return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{"error": err.Error()})
@@ -367,7 +371,10 @@ func registerRoutes(app *fiber.App, cl *clients) {
 
 	// --- cache rebuild ---
 	app.Post("/api/v1/rebuild", func(c *fiber.Ctx) error {
-		resp, err := cl.cacheRebuilder.TriggerRebuild(c.UserContext(), &cacherebpb.TriggerRebuildRequest{
+		// a full rebuild replays up to 1000 events, well past the default call timeout
+		ctx, cancel := context.WithTimeout(c.UserContext(), 2*time.Minute)
+		defer cancel()
+		resp, err := cl.cacheRebuilder.TriggerRebuild(ctx, &cacherebpb.TriggerRebuildRequest{
 			UserId: c.Query("user_id"),
 		})
 		if err != nil {

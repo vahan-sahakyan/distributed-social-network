@@ -16,7 +16,7 @@ http://localhost:8080/api/v1
 
 - **No authentication.** The acting user is passed in the body or query (`user_id`, `follower_id`, `author_id`).
 - **Success:** resource JSON with 200, 201 or 204.
-- **Error:** `{"error": "<message>"}`. gRPC codes map to `NotFound` -> 404, `InvalidArgument` -> 400, `AlreadyExists` -> 409, anything else -> 500. An unparseable body is 400.
+- **Error:** `{"error": "<message>"}`. gRPC codes map to `NotFound` -> 404, `InvalidArgument` -> 400, `AlreadyExists` -> 409, `Unavailable` -> 503, `DeadlineExceeded` -> 504, anything else -> 500. Backend calls time out after 5s (cache rebuild: 2m). An unparseable body is 400.
 - **Responses are protobuf messages encoded with `encoding/json`:**
   - fields with zero values are omitted (`"likes": 0` does not appear, nor does an empty `image_id`)
   - timestamps are objects: `"created_at": {"seconds": 1781488793, "nanos": 301000000}`
