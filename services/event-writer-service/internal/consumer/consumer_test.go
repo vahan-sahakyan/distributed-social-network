@@ -31,7 +31,7 @@ func TestBuildEvent(t *testing.T) {
 			if ev.PostID != tt.wantPost || ev.UserID != tt.wantUser {
 				t.Errorf("post/user = %q/%q, want %q/%q", ev.PostID, ev.UserID, tt.wantPost, tt.wantUser)
 			}
-			if int32(ev.LikesDelta) != tt.wantLikes || int32(ev.CommentsDelta) != tt.wantComments {
+			if ev.LikesDelta != tt.wantLikes || ev.CommentsDelta != tt.wantComments {
 				t.Errorf("deltas = %d/%d, want %d/%d", ev.LikesDelta, ev.CommentsDelta, tt.wantLikes, tt.wantComments)
 			}
 		})

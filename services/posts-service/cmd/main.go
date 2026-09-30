@@ -28,7 +28,7 @@ func main() {
 	defer cancel()
 
 	shutdown := observability.Init(ctx, "posts-service")
-	defer shutdown(context.Background())
+	defer shutdown()
 
 	scyllaHosts := os.Getenv("SCYLLA_HOSTS")
 	if scyllaHosts == "" {
@@ -65,9 +65,8 @@ func main() {
 		log.Fatalf("failed to listen on grpc port: %v", err)
 	}
 	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
-	postspb.RegisterPostsServiceServer(grpcSrv, grpcserver.New(svc, func(_ context.Context) error {
-		db.Query("TRUNCATE posts").Exec()
-		return nil
+	postspb.RegisterPostsServiceServer(grpcSrv, grpcserver.New(svc, func(ctx context.Context) error {
+		return db.Query("TRUNCATE posts").WithContext(ctx).Exec()
 	}))
 	observability.InitGRPCMetrics(grpcSrv)
 	go func() {

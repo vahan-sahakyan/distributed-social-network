@@ -2,10 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
 	"os"
+	"sort"
+	"strings"
 	"time"
 
 	cacherebpb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/cache_rebuilder"
@@ -94,7 +98,8 @@ func accessLog(c *fiber.Ctx) error {
 	err := c.Next()
 	status := c.Response().StatusCode()
 	if err != nil {
-		if fe, ok := err.(*fiber.Error); ok {
+		var fe *fiber.Error
+		if errors.As(err, &fe) {
 			status = fe.Code
 		} else {
 			status = fiber.StatusInternalServerError
@@ -116,7 +121,7 @@ func accessLog(c *fiber.Ctx) error {
 
 func main() {
 	shutdown := observability.Init(context.Background(), "gateway-service")
-	defer shutdown(context.Background())
+	defer shutdown()
 
 	app := fiber.New(fiber.Config{
 		AppName:               "gateway-service",
@@ -355,7 +360,7 @@ func registerRoutes(app *fiber.App, cl *clients) {
 					return grpcErrStatus(c, err)
 				}
 			}
-			if readErr == io.EOF {
+			if errors.Is(readErr, io.EOF) {
 				break
 			}
 			if readErr != nil {
@@ -434,20 +439,38 @@ func registerRoutes(app *fiber.App, cl *clients) {
 	// --- reset (dev only) ---
 	app.Post("/api/v1/reset", func(c *fiber.Ctx) error {
 		ctx := c.UserContext()
-		cl.users.Reset(ctx, &userspb.ResetRequest{})
-		cl.posts.Reset(ctx, &postspb.ResetRequest{})
-		cl.comments.Reset(ctx, &commentspb.ResetRequest{})
-		cl.likes.Reset(ctx, &likespb.ResetRequest{})
-		cl.notifications.Reset(ctx, &notificationspb.ResetRequest{})
-		cl.feed.Reset(ctx, &feedpb.ResetRequest{})
-		cl.cacheRebuilder.Reset(ctx, &cacherebpb.ResetRequest{})
-		cl.search.Reset(ctx, &searchpb.ResetRequest{})
+		results := map[string]error{
+			"users":           errOnly(cl.users.Reset(ctx, &userspb.ResetRequest{})),
+			"posts":           errOnly(cl.posts.Reset(ctx, &postspb.ResetRequest{})),
+			"comments":        errOnly(cl.comments.Reset(ctx, &commentspb.ResetRequest{})),
+			"likes":           errOnly(cl.likes.Reset(ctx, &likespb.ResetRequest{})),
+			"notifications":   errOnly(cl.notifications.Reset(ctx, &notificationspb.ResetRequest{})),
+			"feed":            errOnly(cl.feed.Reset(ctx, &feedpb.ResetRequest{})),
+			"cache-rebuilder": errOnly(cl.cacheRebuilder.Reset(ctx, &cacherebpb.ResetRequest{})),
+			"search":          errOnly(cl.search.Reset(ctx, &searchpb.ResetRequest{})),
+		}
+		var failed []string
+		var errs []error
+		for name, err := range results {
+			if err != nil {
+				failed = append(failed, name)
+				errs = append(errs, fmt.Errorf("%s: %w", name, err))
+			}
+		}
+		if len(failed) > 0 {
+			sort.Strings(failed)
+			return serverError(c, fiber.StatusInternalServerError, "reset failed for "+strings.Join(failed, ", "), errors.Join(errs...))
+		}
 		return c.JSON(fiber.Map{"status": "reset complete"})
 	})
 
 	app.Get("/health", func(c *fiber.Ctx) error {
 		return c.JSON(fiber.Map{"status": "ok"})
 	})
+}
+
+func errOnly[T any](_ T, err error) error {
+	return err
 }
 
 func envOrDefault(key, fallback string) string {

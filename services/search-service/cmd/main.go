@@ -27,16 +27,16 @@ func main() {
 	defer cancel()
 
 	shutdown := observability.Init(ctx, "search-service")
-	defer shutdown(context.Background())
+	defer shutdown()
 
 	esURL := os.Getenv("ELASTICSEARCH_URL")
 	if esURL == "" {
 		esURL = "http://localhost:9200"
 	}
-	es, err := elasticsearch.NewClient(elasticsearch.Config{
-		Addresses:       []string{esURL},
-		Instrumentation: elasticsearch.NewOpenTelemetryInstrumentation(otel.GetTracerProvider(), false),
-	})
+	es, err := elasticsearch.New(
+		elasticsearch.WithAddresses(esURL),
+		elasticsearch.WithInstrumentation(elasticsearch.NewOpenTelemetryInstrumentation(otel.GetTracerProvider(), false)),
+	)
 	if err != nil {
 		log.Fatalf("failed to create elasticsearch client: %v", err)
 	}

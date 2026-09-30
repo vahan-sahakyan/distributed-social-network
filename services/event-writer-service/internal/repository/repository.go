@@ -29,7 +29,8 @@ func (r *Repository) InsertEvents(ctx context.Context, events []*model.FeedEvent
 	if err != nil {
 		return fmt.Errorf("preparing batch: %w", err)
 	}
-	defer batch.Abort()
+	// releases the batch on an early return; after Send it only reports ErrBatchAlreadySent
+	defer func() { _ = batch.Abort() }()
 
 	for _, e := range events {
 		if err := batch.Append(e.EventID, e.EventType, e.PostID, e.UserID, e.LikesDelta, e.CommentsDelta, e.CreatedAt); err != nil {

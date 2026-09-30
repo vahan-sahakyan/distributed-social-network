@@ -28,7 +28,7 @@ func main() {
 	defer cancel()
 
 	shutdown := observability.Init(ctx, "comments-service")
-	defer shutdown(context.Background())
+	defer shutdown()
 
 	db, err := database.NewPostgres(ctx, os.Getenv("DATABASE_URL"))
 	if err != nil {

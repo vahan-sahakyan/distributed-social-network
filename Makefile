@@ -41,6 +41,7 @@ test:
 
 .PHONY: lint
 lint:
+	@echo "Linting pkg..." && (cd pkg && golangci-lint run ./...) || exit 1
 	@for svc in $(SERVICES); do \
 		echo "Linting $$svc..."; \
 		(cd services/$$svc && golangci-lint run ./...) || exit 1; \
