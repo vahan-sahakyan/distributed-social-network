@@ -233,7 +233,34 @@ echo "  Events by type:"
 docker exec infrastructure-clickhouse-1 clickhouse-client --query "SELECT event_type, count(*) as cnt FROM feed_events GROUP BY event_type ORDER BY cnt DESC"
 
 # ─────────────────────────────────────────────────────────────────────────────
-section "11. OBSERVABILITY"
+section "11. SEARCH (Redpanda -> Elasticsearch)"
+# ─────────────────────────────────────────────────────────────────────────────
+
+search() {
+  curl -s "$API/search/$1" | python3 -c "
+import json, sys
+d = json.load(sys.stdin)
+for h in d.get('posts') or []:
+    print('  ', h.get('highlight') or h['text'])
+for h in d.get('users') or []:
+    print('   @' + h['username'], '-', h.get('bio', ''))
+for h in d.get('hashtags') or []:
+    print('   #' + h['hashtag'], h['posts'])"
+}
+
+info "Indexing is asynchronous; giving it a moment..."
+sleep 3
+step "Posts matching \"deploying\" (stemmed to deployed):"
+search "posts?q=deploying"
+step "Posts tagged #golang:"
+search "posts?q=%23golang"
+step "Users starting with \"ch\":"
+search "users?q=ch"
+step "Trending hashtags, last 24h:"
+search "hashtags/trending"
+
+# ─────────────────────────────────────────────────────────────────────────────
+section "12. OBSERVABILITY"
 # ─────────────────────────────────────────────────────────────────────────────
 
 step "Prometheus targets:"
@@ -257,7 +284,7 @@ step "Traces: the create-post request, through Kafka to every consumer, is one t
 info "http://localhost:16686/search?service=gateway-service"
 
 # ─────────────────────────────────────────────────────────────────────────────
-section "12. SYSTEM OVERVIEW"
+section "13. SYSTEM OVERVIEW"
 # ─────────────────────────────────────────────────────────────────────────────
 
 echo "
@@ -270,12 +297,14 @@ echo "
 │  Grafana:           http://localhost:3000  (admin/admin, DSN Overview)       │
 │  Jaeger:            http://localhost:16686                                   │
 │  Redpanda Console:  http://localhost:8888                                    │
+│  Elasticsearch:     http://localhost:9200  (make kibana for Kibana :5601)    │
 │  MinIO Console:     http://localhost:9001  (minioadmin/minioadmin)           │
 │                                                                             │
 │  Services: gateway, posts, feed, comments, likes, users, media,             │
-│            notifications, event-writer, cache-rebuilder                      │
+│            notifications, event-writer, cache-rebuilder, search              │
 │                                                                             │
 │  Infra: ScyllaDB, PostgreSQL×4, ClickHouse, Redpanda, Memcached, MinIO,     │
+│         Elasticsearch,                                                      │
 │         Prometheus, Grafana, Loki, Alloy, Jaeger                            │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘

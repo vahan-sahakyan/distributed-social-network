@@ -20,6 +20,7 @@ services:
       MEDIA_SERVICE_GRPC_ADDR: media-service:9086
       NOTIFICATIONS_SERVICE_GRPC_ADDR: notification-service:9087
       CACHE_REBUILDER_SERVICE_GRPC_ADDR: cache-rebuilder-service:9089
+      SEARCH_SERVICE_GRPC_ADDR: search-service:9091
       MINIO_ENDPOINT: minio:9000
       MINIO_BUCKET: images
     depends_on:
@@ -31,6 +32,7 @@ services:
       - media-service
       - notification-service
       - cache-rebuilder-service
+      - search-service
 
   posts-service:
     build:
@@ -117,8 +119,10 @@ services:
       PORT: "8085"
       GRPC_PORT: "9085"
       DATABASE_URL: postgres://postgres:postgres@users-db:5432/users?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
     depends_on:
       - users-db
+      - redpanda
 
   media-service:
     build:
@@ -194,3 +198,19 @@ services:
       - users-service
       - posts-service
 
+  search-service:
+    build:
+      context: ../
+      dockerfile: services/search-service/Dockerfile
+    restart: on-failure
+    ports:
+      - "9091:9091"
+    environment:
+      <<: *otel
+      PORT: "8091"
+      GRPC_PORT: "9091"
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      KAFKA_BROKERS: redpanda:9092
+    depends_on:
+      - elasticsearch
+      - redpanda

@@ -8,6 +8,7 @@ COPY pkg/grpc/likes/ ./pkg/grpc/likes/
 COPY pkg/grpc/media/ ./pkg/grpc/media/
 COPY pkg/grpc/notifications/ ./pkg/grpc/notifications/
 COPY pkg/grpc/posts/ ./pkg/grpc/posts/
+COPY pkg/grpc/search/ ./pkg/grpc/search/
 COPY pkg/grpc/users/ ./pkg/grpc/users/
 COPY pkg/observability/ ./pkg/observability/
 COPY services/gateway-service/ ./services/gateway-service/

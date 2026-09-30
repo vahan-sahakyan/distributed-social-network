@@ -46,6 +46,10 @@ scrape_configs:
     static_configs:
       - targets: ["cache-rebuilder-service:8089"]
 
+  - job_name: "search-service"
+    static_configs:
+      - targets: ["search-service:8091"]
+
   - job_name: "redpanda"
     metrics_path: /public_metrics
     static_configs:

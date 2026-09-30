@@ -1,4 +1,4 @@
-SERVICES = gateway-service posts-service comments-service likes-service feed-service users-service media-service notification-service event-writer-service cache-rebuilder-service
+SERVICES = gateway-service posts-service comments-service likes-service feed-service users-service media-service notification-service event-writer-service cache-rebuilder-service search-service
 
 .PHONY: proto
 proto:
@@ -16,7 +16,8 @@ proto:
 		proto/feed/feed.proto \
 		proto/media/media.proto \
 		proto/notifications/notifications.proto \
-		proto/cache_rebuilder/cache_rebuilder.proto
+		proto/cache_rebuilder/cache_rebuilder.proto \
+		proto/search/search.proto
 	@echo "gRPC code generation complete."
 	@$(MAKE) dockerfiles
 
@@ -93,6 +94,13 @@ WORKERS ?= 4
 .PHONY: load
 load:
 	@bash scripts/load.sh $(DURATION) $(WORKERS)
+
+
+# Kibana for poking at the search indices (Dev Tools), not started by make up
+.PHONY: kibana
+kibana:
+	docker compose -f infrastructure/docker-compose.yml --profile kibana up -d kibana
+	@echo "Kibana: http://localhost:5601/app/dev_tools#/console"
 
 
 .PHONY: ui

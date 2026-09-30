@@ -1,6 +1,6 @@
 # API Reference
 
-[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · **API** · [Infrastructure](infrastructure.md) · [Development](development.md) · [Observability](observability.md)
+[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · **API** · [Infrastructure](infrastructure.md) · [Development](development.md) · [Observability](observability.md) · [Search](search.md)
 
 ---
 
@@ -345,6 +345,72 @@ GET /api/v1/notifications/:user_id
 
 ---
 
+## Search
+
+Served by search-service from Elasticsearch; see [Search](search.md) for how results are ranked. Results are eventually consistent: a new post or user is searchable about a second after it is created.
+
+### Search Posts
+
+```http
+GET /api/v1/search/posts?q=deploying&limit=20
+GET /api/v1/search/posts?q=%23golang
+```
+
+`q` is required: words (stemmed, typo tolerant) or `#tag` (exact hashtag). `limit` defaults to 20, max 50.
+
+**Response** `200 OK`:
+```json
+{
+  "total": 1,
+  "posts": [
+    {
+      "id": "8316cac68f930d1006c9bcac26a6b3c9",
+      "author_id": "30a46156e6b96a2a9d2c96bc765ab511",
+      "text": "Just deployed our new microservices architecture! #distributed #golang",
+      "hashtags": ["distributed", "golang"],
+      "created_at": {"seconds": 1781488801, "nanos": 500000000},
+      "highlight": "Just <em>deployed</em> our new microservices architecture! #distributed #golang",
+      "score": 2.69
+    }
+  ]
+}
+```
+
+> `highlight` is omitted when only a hashtag matched. Hits carry `author_id`, not the username.
+
+### Search Users
+
+```http
+GET /api/v1/search/users?q=ali&limit=20
+```
+
+`q` is required: a username prefix (a leading `@` is ignored) or words from the bio.
+
+**Response** `200 OK`:
+```json
+{
+  "total": 1,
+  "users": [
+    {"id": "30a46156e6b96a2a9d2c96bc765ab511", "username": "alice", "bio": "Software engineer", "created_at": {"seconds": 1781488793}, "score": 4.37}
+  ]
+}
+```
+
+### Trending Hashtags
+
+```http
+GET /api/v1/search/hashtags/trending?hours=24&limit=10
+```
+
+Hashtags by number of posts created in the last `hours` (default 24, max 720). `limit` defaults to 10, max 50.
+
+**Response** `200 OK`:
+```json
+{"hashtags": [{"hashtag": "golang", "posts": 12}, {"hashtag": "distributed", "posts": 7}]}
+```
+
+---
+
 ## Cache Rebuilder
 
 ### Trigger Rebuild
@@ -384,4 +450,4 @@ GET /health        -> {"status": "ok"}
 GET /metrics       -> Prometheus text format
 ```
 
-The gateway serves both on 8080. Every other service serves them on its own HTTP port (8081-8089), not through the gateway.
+The gateway serves both on 8080. Every other service serves them on its own HTTP port (8081-8089, search 8091), not through the gateway.

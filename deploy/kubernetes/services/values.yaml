@@ -89,6 +89,7 @@ services:
     grpcPort: 9085
     secret: true
     env:
+      KAFKA_BROKERS: redpanda:9092
 
   media:
     secret: true

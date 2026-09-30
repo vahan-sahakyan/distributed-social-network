@@ -98,6 +98,30 @@ services:
     depends_on:
       - redpanda
 
+  # --- Search ---
+  elasticsearch:
+    image: elasticsearch:9.5.3
+    environment:
+      discovery.type: single-node
+      # local only: no TLS or auth
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+
+  # optional, ~1GB: make kibana, then Dev Tools at http://localhost:5601
+  kibana:
+    image: kibana:9.5.3
+    profiles: ["kibana"]
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
   # --- Cache ---
   memcached:
     image: memcached:1.6.45-alpine
@@ -120,11 +144,17 @@ services:
   # --- Observability ---
   prometheus:
     image: prom/prometheus:v3.12.0
+    # picks up edits to the mounted config and rules without a restart
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --config.auto-reload
+      - --config.auto-reload-interval=10s
     ports:
       - "9090:9090"
     volumes:
-      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ../monitoring/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      # a directory mount, so edits that replace the file are seen
+      - ../monitoring/prometheus:/etc/prometheus:ro
       - prometheus-data:/prometheus
 
   grafana:
@@ -183,3 +213,4 @@ volumes:
   prometheus-data:
   grafana-data:
   loki-data:
+  elasticsearch-data:

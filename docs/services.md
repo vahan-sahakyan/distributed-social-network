@@ -1,6 +1,6 @@
 # Services
 
-[<- README](../README.md) · [Architecture](architecture.md) · **Services** · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md) · [Observability](observability.md)
+[<- README](../README.md) · [Architecture](architecture.md) · **Services** · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md) · [Observability](observability.md) · [Search](search.md)
 
 ---
 
@@ -18,6 +18,7 @@
 | notification-service | 8087 | 9087 | PostgreSQL | Notifications (event consumer) |
 | event-writer-service | 8088 | - | ClickHouse | Event store writer (event consumer) |
 | cache-rebuilder-service | 8089 | 9089 | ClickHouse -> Memcached | Feed cache reconstruction |
+| search-service | 8091 | 9091 | Elasticsearch | Post and user search, trending hashtags (event consumer) |
 
 Backend services serve their API over gRPC (`GRPC_PORT`, definitions in `proto/`). The HTTP port (`PORT`) serves only `/health` and `/metrics`, except on the gateway.
 
@@ -296,6 +297,27 @@ INSERT INTO feed_events (event_id, event_type, post_id, user_id, likes_delta, co
 | `MEMCACHED_ADDR` | localhost:11211 | Memcached address |
 | `USERS_SERVICE_GRPC_ADDR` | localhost:9085 | users-service (followers, following) |
 | `POSTS_SERVICE_GRPC_ADDR` | localhost:9081 | posts-service (post details) |
+
+---
+
+## search-service
+
+**Role:** Indexes posts and users into Elasticsearch and serves search. See [Search](search.md).
+
+**Stack:** gRPC + Elasticsearch (`go-elasticsearch/v9`, traced) + Redpanda consumer (`broker.ConsumeBatch`, one `_bulk` per batch)
+
+**Consumer group:** `search-service`
+**Topics consumed:** `post.created`, `user.created`
+
+**gRPC:** `SearchPosts`, `SearchUsers`, `TrendingHashtags`, `Reset` (`proto/search/search.proto`)
+
+**Environment:**
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | 8091 | Health/metrics port |
+| `GRPC_PORT` | 9091 | gRPC port |
+| `ELASTICSEARCH_URL` | http://localhost:9200 | Elasticsearch |
+| `KAFKA_BROKERS` | - | Redpanda brokers |
 
 ---
 

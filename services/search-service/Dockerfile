@@ -2,14 +2,12 @@ FROM golang:1.27-alpine3.24 AS builder
 WORKDIR /app
 COPY pkg/go.mod pkg/go.sum ./pkg/
 COPY pkg/broker/ ./pkg/broker/
-COPY pkg/database/ ./pkg/database/
 COPY pkg/events/ ./pkg/events/
-COPY pkg/grpc/users/ ./pkg/grpc/users/
-COPY pkg/id/ ./pkg/id/
+COPY pkg/grpc/search/ ./pkg/grpc/search/
 COPY pkg/observability/ ./pkg/observability/
 COPY pkg/validate/ ./pkg/validate/
-COPY services/users-service/ ./services/users-service/
-WORKDIR /app/services/users-service
+COPY services/search-service/ ./services/search-service/
+WORKDIR /app/services/search-service
 RUN go mod download
 RUN CGO_ENABLED=0 go build -o /bin/service ./cmd
 

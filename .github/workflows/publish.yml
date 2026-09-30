@@ -36,6 +36,7 @@ jobs:
           - notification-service
           - event-writer-service
           - cache-rebuilder-service
+          - search-service
         include:
           - name: ui
             context: ui

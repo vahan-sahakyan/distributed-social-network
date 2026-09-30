@@ -8,9 +8,10 @@ const (
 	LikeCreated    = "like.created"
 	LikeDeleted    = "like.deleted"
 	CommentCreated = "comment.created"
+	UserCreated    = "user.created"
 )
 
-// All is every topic the platform uses, for services that consume the full stream.
+// All is every post activity topic, for services that consume the full feed stream.
 var All = []string{PostCreated, LikeCreated, LikeDeleted, CommentCreated}
 
 // DLQ is the dead-letter topic for messages a consumer could not process.

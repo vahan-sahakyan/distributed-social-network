@@ -11,5 +11,6 @@ use (
 	./services/media-service
 	./services/notification-service
 	./services/posts-service
+	./services/search-service
 	./services/users-service
 )

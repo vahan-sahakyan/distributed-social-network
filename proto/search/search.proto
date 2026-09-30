@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package search;
+
+option go_package = "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/search;searchpb";
+
+import "google/protobuf/timestamp.proto";
+
+message PostHit {
+  string id = 1;
+  string author_id = 2;
+  string text = 3;
+  string image_id = 4;
+  repeated string hashtags = 5;
+  google.protobuf.Timestamp created_at = 6;
+  // text with matches wrapped in <em></em>; empty when only a hashtag matched
+  string highlight = 7;
+  float score = 8;
+}
+
+message UserHit {
+  string id = 1;
+  string username = 2;
+  string bio = 3;
+  google.protobuf.Timestamp created_at = 4;
+  float score = 5;
+}
+
+message SearchPostsRequest {
+  // full text; "#tag" matches the hashtag exactly
+  string query = 1;
+  int32 limit = 2;
+}
+
+message SearchPostsResponse {
+  repeated PostHit posts = 1;
+  int64 total = 2;
+}
+
+message SearchUsersRequest {
+  // username prefix or words in the bio
+  string query = 1;
+  int32 limit = 2;
+}
+
+message SearchUsersResponse {
+  repeated UserHit users = 1;
+  int64 total = 2;
+}
+
+message TrendingHashtagsRequest {
+  int32 hours = 1;
+  int32 limit = 2;
+}
+
+message HashtagCount {
+  string hashtag = 1;
+  int64 posts = 2;
+}
+
+message TrendingHashtagsResponse {
+  repeated HashtagCount hashtags = 1;
+}
+
+message ResetRequest {}
+
+message ResetResponse {
+  string status = 1;
+}
+
+service SearchService {
+  rpc SearchPosts(SearchPostsRequest) returns (SearchPostsResponse);
+  rpc SearchUsers(SearchUsersRequest) returns (SearchUsersResponse);
+  rpc TrendingHashtags(TrendingHashtagsRequest) returns (TrendingHashtagsResponse);
+  rpc Reset(ResetRequest) returns (ResetResponse);
+}
