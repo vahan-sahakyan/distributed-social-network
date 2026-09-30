@@ -52,7 +52,7 @@ graph LR
 ## Quick Start
 
 ```bash
-# Prerequisites: Docker, Docker Compose, Go 1.24+, Node 22 (UI)
+# Prerequisites: Docker, Docker Compose, Go 1.27+, Node 22 (UI)
 
 # Build and start all 26 containers (services apply their own migrations on startup)
 make up
@@ -146,7 +146,7 @@ After startup, these are available:
 
 ## Tech Stack
 
-- **Language:** Go 1.24
+- **Language:** Go 1.27
 - **RPC:** gRPC + Protocol Buffers between services; Fiber v2 for the gateway's HTTP API and each service's health/metrics port
 - **Databases:** ScyllaDB (posts), PostgreSQL 16 (users, comments, likes, notifications)
 - **Message Broker:** Redpanda (Kafka API compatible)

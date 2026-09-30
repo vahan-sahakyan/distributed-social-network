@@ -7,7 +7,7 @@
 ## Prerequisites
 
 - **Docker** & **Docker Compose** (v2)
-- **Go 1.24+** (for local builds/tests)
+- **Go 1.27+** (for local builds/tests; an older Go downloads 1.27 automatically via `GOTOOLCHAIN=auto`)
 - **Node 22** (UI)
 - **curl** (for testing APIs)
 - **python3** (used by demo script for JSON formatting)
@@ -99,7 +99,7 @@ pkg/
 The project uses Go workspaces (`go.work`) to link all modules:
 
 ```
-go 1.24
+go 1.27.0
 
 use (
     ./pkg

@@ -1,6 +1,6 @@
 module github.com/vahan-sahakyan/distributed-social-network/pkg
 
-go 1.24.0
+go 1.27.0
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.23.0
