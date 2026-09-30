@@ -62,6 +62,23 @@ post_json() {
   echo "$response"
 }
 
+# create_user returns the existing user when the username is taken, so the demo can rerun
+create_user() {
+  local response code
+  response=$(curl -s -w '\n%{http_code}' -X POST "$API/users/" -H "Content-Type: application/json" -d "$2")
+  code="${response##*$'\n'}"
+  response="${response%$'\n'*}"
+  if [[ "$code" == 409 ]]; then
+    curl -s "$API/users/by-username/$1"
+    return
+  fi
+  if [[ "$code" != 201 ]]; then
+    echo "ERROR: $response" >&2
+    exit 1
+  fi
+  echo "$response"
+}
+
 get_json() {
   curl -s "$1"
 }
@@ -79,19 +96,19 @@ section "1. CREATE USERS"
 # ─────────────────────────────────────────────────────────────────────────────
 
 step "Creating Alice (software engineer)..."
-ALICE_RAW=$(post_json "$API/users/" '{"username":"alice","display_name":"Alice Johnson","bio":"Software engineer & open source enthusiast"}')
+ALICE_RAW=$(create_user alice '{"username":"alice","display_name":"Alice Johnson","bio":"Software engineer & open source enthusiast"}')
 ALICE_ID=$(echo "$ALICE_RAW" | extract id)
 echo "$ALICE_RAW" | pretty
 info "Alice ID: $ALICE_ID"
 
 step "Creating Bob (DevOps wizard)..."
-BOB_RAW=$(post_json "$API/users/" '{"username":"bob","display_name":"Bob Smith","bio":"DevOps wizard, coffee addict"}')
+BOB_RAW=$(create_user bob '{"username":"bob","display_name":"Bob Smith","bio":"DevOps wizard, coffee addict"}')
 BOB_ID=$(echo "$BOB_RAW" | extract id)
 echo "$BOB_RAW" | pretty
 info "Bob ID: $BOB_ID"
 
 step "Creating Charlie (full-stack dev)..."
-CHARLIE_RAW=$(post_json "$API/users/" '{"username":"charlie","display_name":"Charlie Davis","bio":"Full-stack developer & writer"}')
+CHARLIE_RAW=$(create_user charlie '{"username":"charlie","display_name":"Charlie Davis","bio":"Full-stack developer & writer"}')
 CHARLIE_ID=$(echo "$CHARLIE_RAW" | extract id)
 echo "$CHARLIE_RAW" | pretty
 info "Charlie ID: $CHARLIE_ID"

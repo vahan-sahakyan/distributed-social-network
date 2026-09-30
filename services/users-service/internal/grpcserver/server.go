@@ -2,6 +2,7 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
 
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/model"
@@ -26,6 +27,9 @@ func (s *Server) CreateUser(ctx context.Context, req *userspb.CreateUserRequest)
 		Username: req.Username,
 		Bio:      req.Bio,
 	})
+	if errors.Is(err, model.ErrUsernameTaken) {
+		return nil, status.Errorf(codes.AlreadyExists, "username %q is already taken", req.Username)
+	}
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to create user: %v", err)
 	}
