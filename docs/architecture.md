@@ -1,6 +1,6 @@
 # Architecture
 
-[<- README](../README.md) · **Architecture** · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md) · [Observability](observability.md)
+[<- README](../README.md) · **Architecture** · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md) · [Observability](observability.md) · [Search](search.md)
 
 ---
 
@@ -35,6 +35,7 @@ graph TB
         Notif[notification-service :9087]
         EW[event-writer-service]
         CR[cache-rebuilder-service :9089]
+        Search[search-service :9091]
     end
 
     subgraph "Data Stores"
@@ -43,10 +44,11 @@ graph TB
         CH[(ClickHouse)]
         MC[Memcached]
         MIO[MinIO]
+        ES[(Elasticsearch)]
     end
 
     Client --> GW
-    GW -->|gRPC| Posts & Comments & Likes & Users & Media & Feed & Notif & CR
+    GW -->|gRPC| Posts & Comments & Likes & Users & Media & Feed & Notif & CR & Search
     GW -->|/images/*| MIO
 
     Posts --> ScyllaDB
@@ -56,11 +58,13 @@ graph TB
     Likes --> PG
     Likes -->|like.created, like.deleted| RP
     Users --> PG
+    Users -->|user.created| RP
     Media --> MIO
 
     RP --> Feed
     RP --> Notif
     RP --> EW
+    RP --> Search
 
     Feed --> MC
     Feed -->|gRPC| Users & Posts
@@ -70,9 +74,10 @@ graph TB
     CH --> CR
     CR --> MC
     CR -->|gRPC| Users & Posts
+    Search --> ES
 ```
 
-Ports shown are gRPC ports. Every service also serves `/health` and `/metrics` over HTTP on its `PORT` (8081-8089).
+Ports shown are gRPC ports. Every service also serves `/health` and `/metrics` over HTTP on its `PORT` (8081-8089, search 8091).
 
 ## Design Patterns
 
@@ -82,20 +87,26 @@ Services communicate asynchronously through Redpanda (Kafka-compatible) topics. 
 
 | Topic | Producer | Consumers |
 |-------|----------|-----------|
-| `post.created` | posts-service | feed-service, event-writer-service |
+| `post.created` | posts-service | feed-service, event-writer-service, search-service |
 | `like.created` | likes-service | feed-service, notification-service, event-writer-service |
 | `like.deleted` | likes-service | feed-service, event-writer-service |
 | `comment.created` | comments-service | feed-service, notification-service, event-writer-service |
+| `user.created` | users-service | search-service |
 
 Topics are created on startup by `pkg/broker.EnsureTopics` (3 partitions each). Each consumer uses its own **consumer group**, so every service receives every event:
 - `feed-service` - fans out posts to follower feeds, updates like/comment counts
 - `notification-service` - generates notifications for post authors
-- `event-writer-service` - persists all events to ClickHouse
+- `event-writer-service` - persists all post activity events to ClickHouse
+- `search-service` - indexes posts and users into Elasticsearch
 
-Delivery is **at-least-once** (`pkg/broker.Consume`): the offset is committed only after the handler succeeds. A failing message is retried 3 times with backoff, then published to `<topic>.dlq` and skipped. Nothing consumes the DLQ topics yet. `pkg/broker.ConsumeBatch` (event-writer) does the same per batch of up to 500 messages or 200ms, and retries a failing batch message by message so only the bad ones are parked. Handlers are written to tolerate redelivery:
+Delivery is **at-least-once** (`pkg/broker.Consume`): the offset is committed only after the handler succeeds. A failing message is retried 3 times with backoff, then published to `<topic>.dlq` and skipped. Nothing consumes the DLQ topics yet. `pkg/broker.ConsumeBatch` (event-writer, search-service) does the same per batch of up to 500 messages or 200ms, and retries a failing batch message by message so only the bad ones are parked. Handlers are written to tolerate redelivery:
 - feed-service fanout is idempotent, and feed cache writes use memcache CAS to avoid lost updates between concurrent consumers
 - event-writer derives `event_id` from topic/partition/offset, so a redelivered message writes a row with the same id and readers deduplicate by it
 - likes-service emits `like.created` / `like.deleted` only when the row actually changed, so a repeated like or unlike emits nothing
+
+### CQRS for Search
+
+Search is a second read model on the same stream: search-service indexes `post.created` and `user.created` into Elasticsearch and answers queries from it. Details in [Search](search.md), the decision in [ADR 0001](adr/0001-search-engine.md).
 
 ### CQRS for Feed
 

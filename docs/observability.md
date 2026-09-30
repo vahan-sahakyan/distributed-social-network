@@ -1,10 +1,10 @@
 # Observability
 
-[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md) · **Observability**
+[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · [Development](development.md) · **Observability** · [Search](search.md)
 
 ---
 
-Metrics, logs and traces for all 10 services, correlated by trace id. Local compose only; the Helm charts don't ship this stack.
+Metrics, logs and traces for all 11 services, correlated by trace id. Local compose only; the Helm charts don't ship this stack.
 
 ## Quick start
 
@@ -27,7 +27,7 @@ open http://localhost:3000 # admin / admin, lands on "DSN Overview"
 
 ```mermaid
 graph LR
-    Svc[10 services] -->|/metrics, scraped every 15s| Prom[Prometheus]
+    Svc[11 services] -->|/metrics, scraped every 15s| Prom[Prometheus]
     Redpanda -->|/public_metrics| Prom
     Svc -->|OTLP/HTTP :4318| Jaeger
     Svc -->|JSON to stdout| Docker
@@ -87,7 +87,7 @@ Run `make load DURATION=600` in one terminal and watch **DSN Overview** while do
 **2. Kill a dependency.**
 ```bash
 docker stop infrastructure-posts-service-1
-# watch: Services up drops, ServiceDown fires after 1m, gateway 5xx rises,
+# watch: Services down goes to 1, ServiceDown fires after 1m, gateway 5xx rises,
 # "Failures, DLQ, drops" climbs as feed/notification retries fail on like/comment events
 docker start infrastructure-posts-service-1
 ```

@@ -15,14 +15,18 @@ graph LR
     Gateway -->|gRPC| Media[media-service]
     Gateway -->|gRPC| Notif[notification-service]
     Gateway -->|gRPC| CacheRebuilder[cache-rebuilder]
+    Gateway -->|gRPC| Search[search-service]
 
     Posts -->|post.created| Redpanda
     Comments -->|comment.created| Redpanda
     Likes -->|like.created, like.deleted| Redpanda
+    Users -->|user.created| Redpanda
 
     Redpanda -->|all events| Feed
     Redpanda -->|like.created, comment.created| Notif
     Redpanda -->|all events| EventWriter[event-writer]
+    Redpanda -->|post.created, user.created| Search
+    Search --> ES[(Elasticsearch)]
 
     EventWriter --> ClickHouse
     ClickHouse --> CacheRebuilder
@@ -37,7 +41,7 @@ graph LR
     Media --> MinIO
 ```
 
-**10 Go microservices** communicating via gRPC + async events, plus a React UI, backed by **16 infrastructure containers**:
+**11 Go microservices** communicating via gRPC + async events, plus a React UI, backed by **17 infrastructure containers**:
 
 | Layer | Technologies |
 |-------|-------------|
@@ -45,6 +49,7 @@ graph LR
 | Databases | ScyllaDB, PostgreSQL x4 |
 | Event Streaming | Redpanda (Kafka-compatible) |
 | Event Store | ClickHouse |
+| Search | Elasticsearch |
 | Caching | Memcached |
 | Object Storage | MinIO |
 | Observability | OpenTelemetry -> Jaeger, JSON logs -> Alloy -> Loki, Prometheus, Grafana |
@@ -54,7 +59,7 @@ graph LR
 ```bash
 # Prerequisites: Docker, Docker Compose, Go 1.27+, Node 22 (UI)
 
-# Build and start all 26 containers (services apply their own migrations on startup)
+# Build and start all 28 containers (services apply their own migrations on startup)
 make up
 
 # Run the end-to-end demo (creates users, posts, likes, comments, etc.)
@@ -76,6 +81,8 @@ After startup, these are available:
 | Grafana | http://localhost:3000 | admin / admin |
 | Jaeger | http://localhost:16686 | - |
 | Redpanda Console | http://localhost:8888 | - |
+| Elasticsearch | http://localhost:9200 | - |
+| Kibana (`make kibana`) | http://localhost:5601 | - |
 | MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
 
 ## Make Commands
@@ -90,6 +97,7 @@ After startup, these are available:
 | `make down-clean` | Stop containers and **delete all data volumes** |
 | `make demo` | Run end-to-end demo script |
 | `make load` | Mixed traffic for the dashboards (`DURATION=120 WORKERS=4`) |
+| `make kibana` | Start Kibana for the search indices (not part of `make up`) |
 | `make proto` | Regenerate gRPC stubs under `pkg/grpc/`, then `make dockerfiles` |
 | `make dockerfiles` | Regenerate the `pkg/` COPY lines in every service Dockerfile |
 | `make build` | Compile all service binaries into `bin/` |
@@ -126,7 +134,8 @@ After startup, these are available:
 │   ├── media-service/       File uploads (MinIO)
 │   ├── notification-service/ Notifications (PostgreSQL + event consumer)
 │   ├── event-writer-service/ Event store writer (ClickHouse)
-│   └── cache-rebuilder-service/ Cache rebuild from event store
+│   ├── cache-rebuilder-service/ Cache rebuild from event store
+│   └── search-service/      Post/user search, trending hashtags (Elasticsearch)
 ├── ui/                      React + Vite frontend
 ├── Makefile
 └── go.work                  Go workspace file
@@ -141,6 +150,8 @@ After startup, these are available:
 | [API Reference](docs/api.md) | Gateway REST API |
 | [Infrastructure](docs/infrastructure.md) | Docker, databases, and monitoring setup |
 | [Development](docs/development.md) | Local dev workflow, adding services, debugging |
+| [Search](docs/search.md) | Elasticsearch read model, indices, queries, reindexing |
+| [ADR 0001](docs/adr/0001-search-engine.md) | Why Elasticsearch for search |
 | [Observability](docs/observability.md) | Metrics, logs, traces, dashboard, alerts, things to try |
 | [DataGrip](docs/datagrip.md) | Connecting a DB client to the local databases |
 
@@ -151,6 +162,7 @@ After startup, these are available:
 - **Databases:** ScyllaDB (posts), PostgreSQL 16 (users, comments, likes, notifications)
 - **Message Broker:** Redpanda (Kafka API compatible)
 - **Event Store:** ClickHouse
+- **Search:** Elasticsearch
 - **Cache:** Memcached
 - **Object Storage:** MinIO (S3 compatible)
 - **UI:** React, Vite, Tailwind

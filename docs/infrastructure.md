@@ -1,17 +1,17 @@
 # Infrastructure
 
-[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · **Infrastructure** · [Development](development.md) · [Observability](observability.md)
+[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · **Infrastructure** · [Development](development.md) · [Observability](observability.md) · [Search](search.md)
 
 ---
 
 ## Container Overview
 
-Locally the system runs **26 containers** via two Docker Compose files:
+Locally the system runs **28 containers** (plus optional Kibana) via two Docker Compose files:
 
 ```
 infrastructure/
-├── docker-compose.yml           # 16 infra containers (redpanda-init exits after setup)
-└── docker-compose.services.yml  # 10 app service containers
+├── docker-compose.yml           # 17 infra containers (redpanda-init exits after setup), Kibana behind a profile
+└── docker-compose.services.yml  # 11 app service containers
 ```
 
 The UI is not in compose; run it with `npm run dev` (see [Development](development.md)). In Kubernetes, the Helm charts under `deploy/kubernetes/` run the same data stores and services plus the UI, without the observability containers.
@@ -45,6 +45,15 @@ ScyllaDB runs with `--smp 1 --memory 512M --overprovisioned 1`.
 | clickhouse | `clickhouse/clickhouse-server:26.5.1.882` | 8123 (HTTP), 9009 -> 9000 (native) | Event store |
 
 Inside the network, services reach Redpanda at `redpanda:9092` and ClickHouse at `clickhouse:9000`.
+
+### Search
+
+| Container | Image | Host Ports | Purpose |
+|-----------|-------|-------|---------|
+| elasticsearch | `elasticsearch:9.5.3` | 9200 | Search indices (single node, 1 GB heap, security off) |
+| kibana | `kibana:9.5.3` | 5601 | Optional (`make kibana`, compose profile `kibana`): Dev Tools console for the indices |
+
+See [Search](search.md).
 
 ### Cache & Storage
 
@@ -86,12 +95,13 @@ All app services are built from multi-stage Dockerfiles (`golang:1.27-alpine3.24
 | notification-service | 8087 | 9087 | notifications-db, redpanda, posts-service |
 | event-writer-service | 8088 | - | redpanda, clickhouse |
 | cache-rebuilder-service | 8089 | 9089 | clickhouse, memcached, users-service, posts-service |
+| search-service | 8091 | 9091 | elasticsearch, redpanda |
 
 ## Networking
 
 Services reference each other by compose service name (e.g., `posts-db:9042`, `redpanda:9092`, `users-service:9085`).
 
-Exposed to the host: the gateway (8080), the gRPC ports 9081-9089 (for tools like grpcurl or Postman), every data store's port, and the observability tools. The services' HTTP ports (8081-8089) stay internal; Prometheus scrapes them on the compose network.
+Exposed to the host: the gateway (8080), the gRPC ports 9081-9089 and 9091 (for tools like grpcurl or Postman), every data store's port, and the observability tools. The services' HTTP ports (8081-8089, 8091) stay internal; Prometheus scrapes them on the compose network.
 
 ## Volumes
 
@@ -100,7 +110,7 @@ Persistent named volumes for all stateful services:
 ```
 posts-db-data, comments-db-data, likes-db-data, users-db-data,
 notifications-db-data, clickhouse-data, redpanda-data,
-minio-data, prometheus-data, grafana-data, loki-data
+minio-data, prometheus-data, grafana-data, loki-data, elasticsearch-data
 ```
 
 `make down-clean` (and `make fresh`) wipe all volumes.
@@ -222,7 +232,7 @@ Created on startup by `pkg/broker.EnsureTopics`, replication factor 1.
 
 | File | Purpose |
 |------|---------|
-| `monitoring/prometheus/prometheus.yml` | Scrapes the 10 services on their HTTP ports, Redpanda `/public_metrics`, Prometheus itself |
+| `monitoring/prometheus/prometheus.yml` | Scrapes the 11 services on their HTTP ports; reloads on edit (`--config.auto-reload`), Redpanda `/public_metrics`, Prometheus itself |
 | `monitoring/prometheus/alerts.yml` | Alert rules |
 | `monitoring/grafana/provisioning/` | Datasources (Prometheus, Loki, Jaeger, cross-linked) and dashboard provider |
 | `monitoring/grafana/dashboards/dsn-overview.json` | DSN Overview dashboard, also Grafana's home |

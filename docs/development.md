@@ -1,6 +1,6 @@
 # Development Guide
 
-[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · **Development** · [Observability](observability.md)
+[<- README](../README.md) · [Architecture](architecture.md) · [Services](services.md) · [API](api.md) · [Infrastructure](infrastructure.md) · **Development** · [Observability](observability.md) · [Search](search.md)
 
 ---
 
@@ -294,7 +294,7 @@ Two Helm charts, deployed by Argo CD from [distributed-social-network-gitops](ht
 | Chart | Contents |
 |---|---|
 | `deploy/kubernetes/infra` | Postgres x4, Scylla, Redpanda, ClickHouse, MinIO, Memcached |
-| `deploy/kubernetes/services` | the 10 services, UI, ingress |
+| `deploy/kubernetes/services` | the 10 services except search, UI, ingress |
 
 The ingress routes `/api`, `/health` and `/images` to the gateway and everything else to the UI.
 
