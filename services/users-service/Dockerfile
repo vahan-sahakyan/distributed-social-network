@@ -1,7 +1,9 @@
 FROM golang:1.27-alpine3.24 AS builder
 WORKDIR /app
 COPY pkg/go.mod pkg/go.sum ./pkg/
+COPY pkg/broker/ ./pkg/broker/
 COPY pkg/database/ ./pkg/database/
+COPY pkg/events/ ./pkg/events/
 COPY pkg/grpc/users/ ./pkg/grpc/users/
 COPY pkg/id/ ./pkg/id/
 COPY pkg/observability/ ./pkg/observability/

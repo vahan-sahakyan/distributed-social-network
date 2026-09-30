@@ -117,8 +117,10 @@ services:
       PORT: "8085"
       GRPC_PORT: "9085"
       DATABASE_URL: postgres://postgres:postgres@users-db:5432/users?sslmode=disable
+      KAFKA_BROKERS: redpanda:9092
     depends_on:
       - users-db
+      - redpanda
 
   media-service:
     build:

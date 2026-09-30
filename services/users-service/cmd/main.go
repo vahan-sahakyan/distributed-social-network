@@ -8,7 +8,9 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/users-service/internal/grpcserver"
@@ -38,8 +40,11 @@ func main() {
 		log.Fatalf("failed to run migration: %v", err)
 	}
 
+	producer := broker.NewProducer(os.Getenv("KAFKA_BROKERS"))
+	defer producer.Close()
+
 	repo := repository.New(db)
-	svc := service.New(repo)
+	svc := service.New(repo, producer)
 
 	// gRPC server
 	grpcPort := os.Getenv("GRPC_PORT")
@@ -81,6 +86,13 @@ func main() {
 	go func() {
 		if err := app.Listen(":" + port); err != nil {
 			log.Fatalf("failed to start HTTP server: %v", err)
+		}
+	}()
+
+	// topics are created after /health is serving so a cold broker does not fail the liveness probe
+	go func() {
+		if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), events.UserCreated); err != nil {
+			log.Fatalf("failed to ensure kafka topics: %v", err)
 		}
 	}()
 
