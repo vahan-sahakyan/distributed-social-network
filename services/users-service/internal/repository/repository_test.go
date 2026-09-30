@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/model"
 )
@@ -29,6 +30,9 @@ func TestTranslate(t *testing.T) {
 				t.Errorf("translate(%v) = %v, want it unchanged", tt.err, got)
 			}
 		})
+	}
+	if !errors.Is(translate(fmt.Errorf("scan: %w", pgx.ErrNoRows)), model.ErrUserNotFound) {
+		t.Error("no rows should be ErrUserNotFound")
 	}
 	if translate(nil) != nil {
 		t.Error("translate(nil) != nil")

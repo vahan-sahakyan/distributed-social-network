@@ -1,6 +1,11 @@
 package model
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+var ErrPostNotFound = errors.New("post not found")
 
 type Post struct {
 	ID        string    `json:"id"`

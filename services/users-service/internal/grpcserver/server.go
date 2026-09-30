@@ -46,7 +46,7 @@ func (s *Server) CreateUser(ctx context.Context, req *userspb.CreateUserRequest)
 func (s *Server) GetUser(ctx context.Context, req *userspb.GetUserRequest) (*userspb.GetUserResponse, error) {
 	user, err := s.svc.GetUser(ctx, req.Id)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "user not found")
+		return nil, userError(err)
 	}
 	return &userspb.GetUserResponse{User: toProto(user)}, nil
 }
@@ -54,7 +54,7 @@ func (s *Server) GetUser(ctx context.Context, req *userspb.GetUserRequest) (*use
 func (s *Server) GetUserByUsername(ctx context.Context, req *userspb.GetUserByUsernameRequest) (*userspb.GetUserByUsernameResponse, error) {
 	user, err := s.svc.GetUserByUsername(ctx, req.Username)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "user not found")
+		return nil, userError(err)
 	}
 	return &userspb.GetUserByUsernameResponse{User: toProto(user)}, nil
 }
@@ -112,4 +112,11 @@ func toProto(u *model.User) *userspb.User {
 		Bio:       u.Bio,
 		CreatedAt: timestamppb.New(u.CreatedAt),
 	}
+}
+
+func userError(err error) error {
+	if errors.Is(err, model.ErrUserNotFound) {
+		return status.Error(codes.NotFound, "user not found")
+	}
+	return status.Errorf(codes.Internal, "getting user: %v", err)
 }

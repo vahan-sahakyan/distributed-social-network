@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/model"
@@ -27,8 +28,11 @@ func (r *Repository) Create(ctx context.Context, user *model.User) error {
 
 const uniqueViolation = "23505"
 
-// translate turns the username unique violation into model.ErrUsernameTaken.
+// translate maps Postgres errors to the model's domain errors.
 func translate(err error) error {
+	if errors.Is(err, pgx.ErrNoRows) {
+		return model.ErrUserNotFound
+	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
 		return model.ErrUsernameTaken
@@ -42,7 +46,7 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*model.User, error
 		`SELECT id, username, bio, created_at FROM users WHERE id = $1`, id,
 	).Scan(&user.ID, &user.Username, &user.Bio, &user.CreatedAt)
 	if err != nil {
-		return nil, err
+		return nil, translate(err)
 	}
 	return &user, nil
 }
@@ -53,7 +57,7 @@ func (r *Repository) GetByUsername(ctx context.Context, username string) (*model
 		`SELECT id, username, bio, created_at FROM users WHERE username = $1`, username,
 	).Scan(&user.ID, &user.Username, &user.Bio, &user.CreatedAt)
 	if err != nil {
-		return nil, err
+		return nil, translate(err)
 	}
 	return &user, nil
 }
