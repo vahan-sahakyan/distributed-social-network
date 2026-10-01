@@ -49,11 +49,12 @@ func toProtoItems(items []model.FeedItem) []*feedpb.FeedItem {
 	out := make([]*feedpb.FeedItem, len(items))
 	for i, item := range items {
 		out[i] = &feedpb.FeedItem{
-			PostId:        item.PostID,
-			AuthorId:      item.AuthorID,
-			Text:          item.Text,
-			LikesCount:    int32(item.LikesCount),
-			CommentsCount: int32(item.CommentsCount),
+			PostId:   item.PostID,
+			AuthorId: item.AuthorID,
+			Text:     item.Text,
+			// a transient negative while an unlike overtook its like
+			LikesCount:    int32(max(item.LikesCount, 0)),
+			CommentsCount: int32(max(item.CommentsCount, 0)),
 			ImageUrl:      item.ImageURL,
 			CreatedAt:     timestamppb.New(item.CreatedAt),
 		}
