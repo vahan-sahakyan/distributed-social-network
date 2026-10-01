@@ -41,11 +41,12 @@ graph LR
     Media --> MinIO
 ```
 
-**11 Go microservices** communicating via gRPC + async events, plus a React UI, backed by **17 infrastructure containers**:
+**11 Go microservices** communicating via gRPC + async events, plus a React UI, backed by **19 infrastructure containers**:
 
 | Layer | Technologies |
 |-------|-------------|
 | API Gateway | Go Fiber, HTTP/JSON -> gRPC |
+| Identity | Keycloak (OIDC, PKCE), JWTs verified at the gateway |
 | Databases | ScyllaDB, PostgreSQL x4 |
 | Event Streaming | Redpanda (Kafka-compatible) |
 | Event Store | ClickHouse |
@@ -59,10 +60,10 @@ graph LR
 ```bash
 # Prerequisites: Docker, Docker Compose, Go 1.27+, Node 22 (UI)
 
-# Build and start all 28 containers (services apply their own migrations on startup)
+# Build and start all 30 containers (services apply their own migrations on startup)
 make up
 
-# Run the end-to-end demo (creates users, posts, likes, comments, etc.)
+# Run the end-to-end demo (creates alice, bob, charlie - password "password" - posts, likes, comments)
 make demo
 
 # Generate traffic, then open Grafana's DSN Overview dashboard
@@ -77,6 +78,7 @@ After startup, these are available:
 | Service | URL | Credentials |
 |---------|-----|-------------|
 | Gateway API | http://localhost:8080 | - |
+| Keycloak | http://localhost:8180/auth | admin / admin (console); demo users: password |
 | Prometheus | http://localhost:9090 | - |
 | Grafana | http://localhost:3000 | admin / admin |
 | Jaeger | http://localhost:16686 | - |
@@ -152,6 +154,8 @@ After startup, these are available:
 | [Development](docs/development.md) | Local dev workflow, adding services, debugging |
 | [Search](docs/search.md) | Elasticsearch read model, indices, queries, reindexing |
 | [ADR 0001](docs/adr/0001-search-engine.md) | Why Elasticsearch for search |
+| [ADR 0002](docs/adr/0002-transactional-outbox.md) | Why a transactional outbox for events |
+| [ADR 0003](docs/adr/0003-authentication-oidc-keycloak.md) | Why OIDC with Keycloak for authentication |
 | [Observability](docs/observability.md) | Metrics, logs, traces, dashboard, alerts, things to try |
 | [DataGrip](docs/datagrip.md) | Connecting a DB client to the local databases |
 

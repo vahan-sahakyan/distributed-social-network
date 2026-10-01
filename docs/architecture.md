@@ -12,6 +12,7 @@ The system follows an **event-driven microservices** architecture. Clients talk 
 graph TB
     subgraph "Client Layer"
         Client[Browser / HTTP client]
+        KC[Keycloak /auth]
     end
 
     subgraph "API Layer"
@@ -47,7 +48,9 @@ graph TB
         ES[(Elasticsearch)]
     end
 
-    Client --> GW
+    Client -->|login, PKCE| KC
+    Client -->|Bearer token| GW
+    GW -.->|JWKS| KC
     GW -->|gRPC| Posts & Comments & Likes & Users & Media & Feed & Notif & CR & Search
     GW -->|/images/*| MIO
 
@@ -138,7 +141,7 @@ sequenceDiagram
     Feed->>Memcached: Add post to author + follower feeds
     Redpanda->>EventWriter: Consume post.created
     EventWriter->>ClickHouse: INSERT into feed_events
-    User->>Gateway: GET /api/v1/feed/home?user_id=...
+    User->>Gateway: GET /api/v1/feed/home (Bearer token)
     Gateway->>Feed: GetHomeFeed (gRPC)
     Feed->>Memcached: Fetch cached feed
     Feed->>Gateway: Feed items
@@ -180,11 +183,12 @@ GROUP BY pid;
 
 gateway-service is the only public entry point (port 8080). It:
 - Exposes a REST/JSON API under `/api/v1` and translates each request into a gRPC call
-- Maps gRPC status codes to HTTP (`NotFound` -> 404, `InvalidArgument` -> 400, `AlreadyExists` -> 409, else 500)
+- Verifies Keycloak access tokens (signature via JWKS, `aud: dsn-api`, expiry, issuer) on writes and private reads, and sets the acting user from the token's `sub`
+- Maps gRPC status codes to HTTP (`NotFound` -> 404, `InvalidArgument` -> 400, `AlreadyExists` -> 409, `Unavailable` -> 503, `DeadlineExceeded` -> 504, else 500)
 - Proxies `/images/*` to the public-read MinIO bucket
 - Adds CORS, request logging, and Prometheus metrics
 
-There is no authentication: the acting user is passed in the request body or query (`user_id`, `follower_id`, `author_id`).
+Services trust the gateway: they take the acting user from the gRPC request and don't see tokens. Login, sign-up and sessions are Keycloak's ([ADR 0003](adr/0003-authentication-oidc-keycloak.md)). A profile's id is the Keycloak subject.
 
 ### Database-per-Service
 
