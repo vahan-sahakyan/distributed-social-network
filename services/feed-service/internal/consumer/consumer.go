@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -14,6 +15,8 @@ import (
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type Consumer struct {
@@ -92,6 +95,11 @@ func (c *Consumer) countsHandler(likesDelta, commentsDelta int) broker.Handler {
 		}
 
 		authorID, err := c.fetchPostAuthor(ctx, event.EntityID)
+		if status.Code(err) == codes.NotFound {
+			// gone for good (deleted, or wiped by a reset): retrying can't help
+			slog.InfoContext(ctx, "skipping event for a post that doesn't exist", "topic", msg.Topic, "post_id", event.EntityID)
+			return nil
+		}
 		if err != nil {
 			return err
 		}
