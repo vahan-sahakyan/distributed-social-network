@@ -99,6 +99,8 @@ Topics are created on startup by `pkg/broker.EnsureTopics` (3 partitions each). 
 - `event-writer-service` - persists all post activity events to ClickHouse
 - `search-service` - indexes posts and users into Elasticsearch
 
+Publishing goes through a **transactional outbox** in comments, likes and users (`pkg/outbox`, [ADR 0002](adr/0002-transactional-outbox.md)): the event row is committed with the data, and a relay publishes it once Redpanda acks, so a broker outage delays events instead of losing them. posts-service (ScyllaDB) still publishes directly after the write. Producers wait for the broker's ack (`RequireAll`).
+
 Delivery is **at-least-once** (`pkg/broker.Consume`): the offset is committed only after the handler succeeds. A failing message is retried 3 times with backoff, then published to `<topic>.dlq` and skipped. Nothing consumes the DLQ topics yet. `pkg/broker.ConsumeBatch` (event-writer, search-service) does the same per batch of up to 500 messages or 200ms, and retries a failing batch message by message so only the bad ones are parked. Handlers are written to tolerate redelivery:
 - feed-service fanout is idempotent, and feed cache writes use memcache CAS to avoid lost updates between concurrent consumers
 - event-writer derives `event_id` from topic/partition/offset, so a redelivered message writes a row with the same id and readers deduplicate by it
