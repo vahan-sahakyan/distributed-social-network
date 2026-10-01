@@ -1,6 +1,12 @@
 package model
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+// ErrPostNotFound is returned for writes that refer to a post that doesn't exist.
+var ErrPostNotFound = errors.New("post not found")
 
 type Comment struct {
 	ID        string    `json:"id"`

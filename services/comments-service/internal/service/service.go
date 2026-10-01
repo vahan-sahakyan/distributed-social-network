@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/model"
@@ -11,14 +12,26 @@ import (
 )
 
 type Service struct {
-	repo *repository.Repository
+	repo  *repository.Repository
+	posts PostChecker
 }
 
-func New(repo *repository.Repository) *Service {
-	return &Service{repo: repo}
+// PostChecker reports whether a post exists; *posts.Checker in production.
+type PostChecker interface {
+	Exists(ctx context.Context, id string) (bool, error)
+}
+
+func New(repo *repository.Repository, posts PostChecker) *Service {
+	return &Service{repo: repo, posts: posts}
 }
 
 func (s *Service) CreateComment(ctx context.Context, req *model.CreateCommentRequest) (*model.Comment, error) {
+	if exists, err := s.posts.Exists(ctx, req.EntityID); err != nil {
+		return nil, fmt.Errorf("checking post %s: %w", req.EntityID, err)
+	} else if !exists {
+		return nil, model.ErrPostNotFound
+	}
+
 	comment := &model.Comment{
 		ID:        id.New(),
 		UserID:    req.UserID,

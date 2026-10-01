@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/repository"
@@ -10,11 +11,17 @@ import (
 )
 
 type Service struct {
-	repo *repository.Repository
+	repo  *repository.Repository
+	posts PostChecker
 }
 
-func New(repo *repository.Repository) *Service {
-	return &Service{repo: repo}
+// PostChecker reports whether a post exists; *posts.Checker in production.
+type PostChecker interface {
+	Exists(ctx context.Context, id string) (bool, error)
+}
+
+func New(repo *repository.Repository, posts PostChecker) *Service {
+	return &Service{repo: repo, posts: posts}
 }
 
 func (s *Service) HasLiked(ctx context.Context, userID, entityID string) (bool, error) {
@@ -32,6 +39,12 @@ func (s *Service) Unlike(ctx context.Context, userID, entityID string) error {
 }
 
 func (s *Service) CreateLike(ctx context.Context, req *model.CreateLikeRequest) (*model.Like, error) {
+	if exists, err := s.posts.Exists(ctx, req.EntityID); err != nil {
+		return nil, fmt.Errorf("checking post %s: %w", req.EntityID, err)
+	} else if !exists {
+		return nil, model.ErrPostNotFound
+	}
+
 	like := &model.Like{
 		ID:       id.New(),
 		UserID:   req.UserID,

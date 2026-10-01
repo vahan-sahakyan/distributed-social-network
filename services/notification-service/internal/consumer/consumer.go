@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/service"
@@ -12,6 +13,8 @@ import (
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // notification types keyed by source topic
@@ -73,6 +76,11 @@ func (c *Consumer) handle(ctx context.Context, topic string, msg kafka.Message) 
 	}
 
 	resp, err := c.postsClient.GetPost(ctx, &postspb.GetPostRequest{Id: event.EntityID})
+	if status.Code(err) == codes.NotFound {
+		// gone for good (deleted, or wiped by a reset): retrying can't help
+		slog.InfoContext(ctx, "skipping event for a post that doesn't exist", "topic", topic, "post_id", event.EntityID)
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("resolving author of %s: %w", event.EntityID, err)
 	}

@@ -16,8 +16,10 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	commentspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/comments"
+	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/outbox"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/posts"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
@@ -45,7 +47,13 @@ func main() {
 	defer producer.Close()
 
 	repo := repository.New(db)
-	svc := service.New(repo)
+	postsConn, err := grpc.NewClient(envOr("POSTS_SERVICE_GRPC_ADDR", "localhost:9081"), observability.GRPCDialOptions()...)
+	if err != nil {
+		log.Fatalf("failed to dial posts-service: %v", err)
+	}
+	defer func() { _ = postsConn.Close() }()
+
+	svc := service.New(repo, posts.NewChecker(postspb.NewPostsServiceClient(postsConn)))
 	go outbox.NewRelay(db, producer, "comments-service").Run(ctx)
 
 	// gRPC server
@@ -102,4 +110,11 @@ func main() {
 	<-ctx.Done()
 	grpcSrv.GracefulStop()
 	_ = app.Shutdown()
+}
+
+func envOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }

@@ -78,6 +78,7 @@ services:
     secret: true
     env:
       KAFKA_BROKERS: redpanda:9092
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
 
   likes:
     port: 8084
@@ -85,6 +86,7 @@ services:
     secret: true
     env:
       KAFKA_BROKERS: redpanda:9092
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
 
   users:
     port: 8085
