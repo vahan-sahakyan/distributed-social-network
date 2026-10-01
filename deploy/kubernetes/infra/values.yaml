@@ -15,6 +15,8 @@ postgres:
       database: users
     notifications-db:
       database: notifications
+    keycloak-db:
+      database: keycloak
 
 scylla:
   image: scylladb/scylla:2026.1.5
@@ -52,6 +54,18 @@ minio:
     requests: {cpu: 20m, memory: 128Mi}
     limits: {memory: 512Mi}
 
+keycloak:
+  image: quay.io/keycloak/keycloak:26.7.5
+  # public origin of the UI, for login redirects, e.g. https://dsn.example.com
+  uiUrl: ""
+  # public URL of Keycloak, e.g. https://dsn.example.com/auth; empty takes it from
+  # each request's forwarded host
+  hostname: ""
+  # admin user/password come from the keycloak-admin secret
+  resources:
+    requests: {cpu: 100m, memory: 512Mi}
+    limits: {memory: 1Gi}
+
 # plain secrets for local clusters; set false where secrets come from elsewhere
 # (helm merges maps, so emptying devSecrets would not remove them)
 createDevSecrets: true
@@ -61,3 +75,6 @@ devSecrets:
   minio-credentials:
     MINIO_ROOT_USER: minioadmin
     MINIO_ROOT_PASSWORD: minioadmin
+  keycloak-admin:
+    KEYCLOAK_ADMIN: admin
+    KEYCLOAK_ADMIN_PASSWORD: admin

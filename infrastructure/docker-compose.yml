@@ -98,6 +98,41 @@ services:
     depends_on:
       - redpanda
 
+  # --- Identity ---
+  keycloak-db:
+    image: postgres:16.14-alpine
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - keycloak-data:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.5
+    command: [start-dev, --import-realm]
+    environment:
+      # local only: the admin console is admin/admin
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HTTP_RELATIVE_PATH: /auth
+      # tokens carry this issuer however Keycloak was reached (browser, scripts, gateway)
+      KC_HOSTNAME: http://localhost:8180/auth
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+      # plain-http localhost; the realm defaults to requiring https off-host
+      DSN_SSL_REQUIRED: none
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/keycloak
+      KC_DB_USERNAME: postgres
+      KC_DB_PASSWORD: postgres
+    ports:
+      - "8180:8080"
+    volumes:
+      - ../deploy/kubernetes/infra/files:/opt/keycloak/data/import:ro
+    depends_on:
+      - keycloak-db
+
   # --- Search ---
   elasticsearch:
     image: elasticsearch:9.5.3
@@ -214,3 +249,4 @@ volumes:
   grafana-data:
   loki-data:
   elasticsearch-data:
+  keycloak-data:
