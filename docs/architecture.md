@@ -214,6 +214,10 @@ Synchronous (gRPC)
   feed-service, cache-rebuilder -gRPC-> users-service (followers), posts-service (post details)
   notification-service -gRPC-> posts-service (post author)
 
+  every call: 5s default deadline, waits for a connection within it (WaitForReady);
+  reconnects back off at most 3s, and resolve the name on each attempt (passthrough
+  resolver), so a restarted upstream is reachable again within seconds (observability)
+
 Asynchronous (events)
   Service -> Redpanda topic -> consumer service -> side effect
     posts-service -> post.created -> feed-service (cache write)

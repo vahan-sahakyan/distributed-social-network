@@ -8,7 +8,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/resolver"
 )
 
 var (
@@ -18,6 +20,12 @@ var (
 
 func init() {
 	prometheus.MustRegister(serverMetrics, clientMetrics)
+	// Hand addresses to the dialer, which resolves them on every connect. gRPC's
+	// dns resolver retries a failed lookup (a stopped container) on its own backoff,
+	// up to 120s, so callers kept failing long after the upstream was back.
+	// Upstreams are single addresses (compose names, Kubernetes Services), so its
+	// multi-address balancing isn't used.
+	resolver.SetDefaultScheme("passthrough")
 }
 
 // GRPCServerOptions traces every call and records grpc_server_* metrics.
@@ -39,10 +47,17 @@ func InitGRPCMetrics(srv *grpc.Server) {
 const DefaultCallTimeout = 5 * time.Second
 
 // GRPCDialOptions is the plaintext dial config for in-cluster calls, traced and
-// recorded as grpc_client_* metrics. Unary calls without a deadline get DefaultCallTimeout.
+// recorded as grpc_client_* metrics. Unary calls without a deadline get
+// DefaultCallTimeout, and wait for a connection within it instead of failing while
+// the upstream restarts; reconnect backoff is capped at 3s.
 func GRPCDialOptions() []grpc.DialOption {
 	return []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultCallOptions(grpc.WaitForReady(true)),
+		grpc.WithConnectParams(grpc.ConnectParams{
+			Backoff:           backoff.Config{BaseDelay: 200 * time.Millisecond, Multiplier: 1.6, Jitter: 0.2, MaxDelay: 3 * time.Second},
+			MinConnectTimeout: 5 * time.Second,
+		}),
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 		grpc.WithChainUnaryInterceptor(withDefaultTimeout(DefaultCallTimeout), clientMetrics.UnaryClientInterceptor()),
 		grpc.WithChainStreamInterceptor(clientMetrics.StreamClientInterceptor()),
