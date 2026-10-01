@@ -99,6 +99,9 @@ func TestScyllaRelayPublishesInOrderWithTrace(t *testing.T) {
 	var keys string
 	for _, m := range pub.got {
 		keys += m.Key
+		if !strings.HasPrefix(m.ID, "test:") {
+			t.Errorf("message %s has event id %q, want test:<row id>", m.Key, m.ID)
+		}
 		if want := `{"k":"` + m.Key + `"}`; string(m.Value) != want {
 			t.Errorf("message %s carries %s, want %s", m.Key, m.Value, want)
 		}
@@ -138,8 +141,12 @@ func TestScyllaRelaySweepCatchesLateRows(t *testing.T) {
 		t.Fatalf("relayed %d, err %v", n, err)
 	}
 
-	// a write that lands after the relay moved past its id, e.g. a replayed batch
+	// a write that lands after the relay moved past its id, e.g. a replayed batch;
+	// kept in the on-time row's minute, which an earlier minute would not test
 	late := start.Add(-500 * time.Millisecond)
+	if minuteStart := time.Unix(bucketOf(start)*60, 0); late.Before(minuteStart) {
+		late = minuteStart
+	}
 	if err := db.Query(`INSERT INTO outbox (bucket, id, topic, key, payload, headers) VALUES (?, ?, 't', 'late', ?, {})`,
 		bucketOf(late), gocql.UUIDFromTime(late), []byte(`{}`)).Exec(); err != nil {
 		t.Fatal(err)

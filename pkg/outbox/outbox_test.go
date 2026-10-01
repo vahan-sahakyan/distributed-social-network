@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -119,6 +120,9 @@ func TestRelayPublishesCommittedEventsInOrder(t *testing.T) {
 	var keys string
 	for _, m := range pub.got {
 		keys += m.Key
+		if !strings.HasPrefix(m.ID, "test:") {
+			t.Errorf("message %s has event id %q, want test:<row id>", m.Key, m.ID)
+		}
 		if want := `{"k":"` + m.Key + `"}`; string(m.Value) != want {
 			t.Errorf("message %s carries %s, want %s", m.Key, m.Value, want)
 		}

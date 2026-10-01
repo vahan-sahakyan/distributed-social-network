@@ -55,6 +55,6 @@ A write that lands more than 2 minutes late into a closed minute (a batchlog rep
 
 - No event is lost while the database commit succeeds; a Redpanda outage delays events instead of dropping them
 - Up to ~100ms extra latency (poll interval) between commit and publish
-- **At-least-once**: a relay that crashes between publish and delete republishes the batch. Consumers that dedupe by Kafka offset (event-writer, notification-service) see the republish as a new message
+- **At-least-once**: a relay that crashes between publish and delete republishes the batch at new offsets. Each message carries an `event-id` header from its outbox row, and event-writer and notification-service dedupe on it; feed-service's cached counts don't (a rebuild corrects them)
 - Producers now wait for the broker's ack (`RequiredAcks: RequireAll`). kafka-go defaults to `RequireNone`, which reported success for writes into a connection to a stopped broker; the relay deleted those rows and the events were gone. This affected every publish before the outbox, too
 - One more table per database; `outbox_backlog` and `outbox_oldest_age_seconds` metrics and an `OutboxStuck` alert show a relay that can't publish

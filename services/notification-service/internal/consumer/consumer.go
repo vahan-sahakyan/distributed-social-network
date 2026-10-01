@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/service"
@@ -91,8 +90,8 @@ func (c *Consumer) handle(ctx context.Context, topic string, msg kafka.Message) 
 	return nil
 }
 
-// notificationID is derived from the message's Kafka coordinates, so a redelivery
-// after a failed commit produces the same id and the insert is skipped.
+// notificationID is derived from the event's identity, so a redelivery or a
+// republish by the outbox produces the same id and the insert is skipped.
 func notificationID(msg kafka.Message) string {
-	return id.Deterministic(msg.Topic, strconv.Itoa(msg.Partition), strconv.FormatInt(msg.Offset, 10))
+	return id.Deterministic(broker.DedupeKey(msg)...)
 }
