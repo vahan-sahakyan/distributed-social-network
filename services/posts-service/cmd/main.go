@@ -13,6 +13,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/outbox"
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/service"
@@ -39,7 +40,7 @@ func main() {
 		scyllaKeyspace = "posts"
 	}
 
-	if err := database.MigrateScylla(ctx, scyllaHosts, migrations.SQL); err != nil {
+	if err := database.MigrateScylla(ctx, scyllaHosts, migrations.SQL+";"+outbox.ScyllaSchema(scyllaKeyspace)); err != nil {
 		log.Fatalf("failed to run scylla migration: %v", err)
 	}
 
@@ -53,7 +54,8 @@ func main() {
 	defer producer.Close()
 
 	repo := repository.New(db)
-	svc := service.New(repo, producer)
+	svc := service.New(repo)
+	go outbox.NewScyllaRelay(db, producer, "posts-service").Run(ctx)
 
 	// gRPC server
 	grpcPort := os.Getenv("GRPC_PORT")
@@ -66,7 +68,12 @@ func main() {
 	}
 	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
 	postspb.RegisterPostsServiceServer(grpcSrv, grpcserver.New(svc, func(ctx context.Context) error {
-		return db.Query("TRUNCATE posts").WithContext(ctx).Exec()
+		for _, table := range []string{"posts", "outbox", "outbox_state"} {
+			if err := db.Query("TRUNCATE " + table).WithContext(ctx).Exec(); err != nil {
+				return err
+			}
+		}
+		return nil
 	}))
 	observability.InitGRPCMetrics(grpcSrv)
 	go func() {

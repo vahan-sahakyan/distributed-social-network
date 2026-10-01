@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/gocql/gocql"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/outbox"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/model"
 )
 
@@ -16,12 +17,15 @@ func New(db *gocql.Session) *Repository {
 	return &Repository{db: db}
 }
 
-func (r *Repository) Create(ctx context.Context, post *model.Post) error {
-	return r.db.Query(
-		`INSERT INTO posts (id, text, author_id, image_id, created_at)
-		 VALUES (?, ?, ?, ?, ?)`,
-		post.ID, post.Text, post.AuthorID, post.ImageID, post.CreatedAt,
-	).WithContext(ctx).Exec()
+// CreateWithEvent writes the post and its event in one LOGGED batch: both apply or neither.
+func (r *Repository) CreateWithEvent(ctx context.Context, post *model.Post, topic string) error {
+	b := r.db.NewBatch(gocql.LoggedBatch).WithContext(ctx)
+	b.Query(`INSERT INTO posts (id, text, author_id, image_id, created_at) VALUES (?, ?, ?, ?, ?)`,
+		post.ID, post.Text, post.AuthorID, post.ImageID, post.CreatedAt)
+	if err := outbox.AddToBatch(ctx, b, topic, post.ID, post); err != nil {
+		return err
+	}
+	return r.db.ExecuteBatch(b)
 }
 
 func (r *Repository) GetByID(ctx context.Context, id string) (*model.Post, error) {
