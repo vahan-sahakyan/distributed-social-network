@@ -7,6 +7,7 @@ COPY pkg/grpc/cache_rebuilder/ ./pkg/grpc/cache_rebuilder/
 COPY pkg/grpc/posts/ ./pkg/grpc/posts/
 COPY pkg/grpc/users/ ./pkg/grpc/users/
 COPY pkg/observability/ ./pkg/observability/
+COPY pkg/retry/ ./pkg/retry/
 COPY services/cache-rebuilder-service/ ./services/cache-rebuilder-service/
 WORKDIR /app/services/cache-rebuilder-service
 RUN go mod download

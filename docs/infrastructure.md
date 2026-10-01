@@ -80,7 +80,7 @@ See [Observability](observability.md).
 
 All app services are built from multi-stage Dockerfiles (`golang:1.27-alpine3.24` -> `alpine:3.24`). Each Dockerfile copies only the `pkg/` directories its service imports; `make dockerfiles` regenerates those lines and CI fails if they drift.
 
-- `restart: on-failure`, so a service that starts before its database is ready exits and retries
+- services wait for their dependencies in-process (`pkg/retry`); `restart: on-failure` only covers real crashes
 - All containers share the default compose network
 
 | Container | HTTP Port | gRPC Port (host-mapped) | Depends On |

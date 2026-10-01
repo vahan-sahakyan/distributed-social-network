@@ -7,6 +7,7 @@ import (
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/retry"
 )
 
 type MinioStorage struct {
@@ -14,7 +15,8 @@ type MinioStorage struct {
 	bucket string
 }
 
-func NewMinio(endpoint, accessKey, secretKey, bucket string) (*MinioStorage, error) {
+// NewMinio ensures the bucket exists and is public-read, retrying until MinIO answers or ctx is done.
+func NewMinio(ctx context.Context, endpoint, accessKey, secretKey, bucket string) (*MinioStorage, error) {
 	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: false,
@@ -23,14 +25,22 @@ func NewMinio(endpoint, accessKey, secretKey, bucket string) (*MinioStorage, err
 		return nil, fmt.Errorf("failed to create minio client: %w", err)
 	}
 
-	ctx := context.Background()
+	if err := retry.Do(ctx, "setting up minio bucket", func(ctx context.Context) error {
+		return setupBucket(ctx, client, bucket)
+	}); err != nil {
+		return nil, fmt.Errorf("setting up bucket %s: %w", bucket, err)
+	}
+	return &MinioStorage{client: client, bucket: bucket}, nil
+}
+
+func setupBucket(ctx context.Context, client *minio.Client, bucket string) error {
 	exists, err := client.BucketExists(ctx, bucket)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check bucket: %w", err)
+		return fmt.Errorf("checking bucket: %w", err)
 	}
 	if !exists {
 		if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
-			return nil, fmt.Errorf("failed to create bucket: %w", err)
+			return fmt.Errorf("creating bucket: %w", err)
 		}
 	}
 
@@ -44,10 +54,9 @@ func NewMinio(endpoint, accessKey, secretKey, bucket string) (*MinioStorage, err
 		}]
 	}`, bucket)
 	if err := client.SetBucketPolicy(ctx, bucket, policy); err != nil {
-		return nil, fmt.Errorf("failed to set bucket policy: %w", err)
+		return fmt.Errorf("setting bucket policy: %w", err)
 	}
-
-	return &MinioStorage{client: client, bucket: bucket}, nil
+	return nil
 }
 
 func (s *MinioStorage) Upload(ctx context.Context, objectName string, reader io.Reader, size int64, contentType string) (string, error) {

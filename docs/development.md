@@ -87,12 +87,15 @@ Shared code lives in `pkg/`:
 
 ```
 pkg/
-├── broker/     Producer, at-least-once Consume with retries + DLQ, EnsureTopics
-├── cache/      Memcached client, feed cache key builders
-├── database/   Postgres, ScyllaDB, ClickHouse connections + Migrate* helpers
-├── events/     Topic names
-├── grpc/       Generated gRPC stubs (from proto/, via make proto)
-└── id/         Random hex IDs and deterministic IDs
+├── broker/         Producer, at-least-once Consume/ConsumeBatch with retries + DLQ, EnsureTopics
+├── cache/          Memcached client, feed cache key builders
+├── database/       Postgres, ScyllaDB, ClickHouse connections (retried) + Migrate* helpers
+├── events/         Topic names
+├── grpc/           Generated gRPC stubs (from proto/, via make proto)
+├── id/             Random hex IDs and deterministic IDs
+├── observability/  Logger, tracer, instrumented gRPC server/dial options
+├── retry/          Backoff until a dependency answers or ctx is done
+└── validate/       Request field checks returning InvalidArgument
 ```
 
 ## Go Workspace
@@ -268,17 +271,9 @@ for t in data['data']['activeTargets']:
 
 ## Common Issues
 
-### Services crashing on startup
+### Services not ready right after `make up`
 
-Services connect to their database once at startup and exit if it is not ready. `restart: on-failure` restarts them until it is. Wait 10-15 seconds after `make up`.
-
-### Tables not found
-
-Each service applies its own embedded migrations on startup. If a database was not ready yet, the service exits and `restart: on-failure` retries it.
-
-### ScyllaDB slow to start
-
-ScyllaDB takes 30-60 seconds to initialize. posts-service restarts until it can connect and migrate.
+Services wait for their database, MinIO or Kafka at startup (`pkg/retry`: backoff up to 10s, logged as `... failed, retrying`) and serve `/health` only once connected. ScyllaDB takes 30-60 seconds, so posts-service is usually last. A service that keeps logging retries points at its dependency: `docker logs infrastructure-<service>-1`.
 
 ### Port conflicts
 

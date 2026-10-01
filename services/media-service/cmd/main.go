@@ -26,7 +26,7 @@ func main() {
 	shutdown := observability.Init(ctx, "media-service")
 	defer shutdown()
 
-	store, err := storage.NewMinio(
+	store, err := storage.NewMinio(ctx,
 		os.Getenv("MINIO_ENDPOINT"),
 		os.Getenv("MINIO_ACCESS_KEY"),
 		os.Getenv("MINIO_SECRET_KEY"),

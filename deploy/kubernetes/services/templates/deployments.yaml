@@ -45,16 +45,22 @@ spec:
           {{- end }}
           resources:
             {{- toYaml ($svc.resources | default $.Values.resources) | nindent 12 }}
+          # /health serves only once dependencies are connected; services retry them
+          # in-process, so allow up to 5 minutes before liveness takes over
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ $svc.port }}
+            periodSeconds: 5
+            failureThreshold: 60
           livenessProbe:
             httpGet:
               path: /health
               port: {{ $svc.port }}
-            initialDelaySeconds: 5
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /health
               port: {{ $svc.port }}
-            initialDelaySeconds: 3
             periodSeconds: 5
 {{- end }}
