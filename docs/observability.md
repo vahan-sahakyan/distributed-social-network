@@ -124,7 +124,7 @@ docker start infrastructure-posts-service-1
 make dlq                                   # two pending entries: feed-service-likes and notification-service
 make dlq CMD="replay --topic like.created" # one event replayed for both
 ```
-"DLQ awaiting replay" rises and returns to 0; the like then shows in the feed and as a notification. Within ~30s of the restart a consumer can still fail to reach posts-service (gRPC re-resolves DNS at most every 30s) and park the replay again; `make dlq` shows it, and a second replay delivers it. `CMD=skip` marks pending messages as handled without replaying.
+"DLQ awaiting replay" rises and returns to 0; the like then shows in the feed and as a notification.  A replay that still fails (the cause isn't fixed yet) is parked again; `make dlq` shows it. `CMD=skip` marks pending messages as handled without replaying.
 
 ### Query cheat sheet
 

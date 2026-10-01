@@ -16,7 +16,7 @@ http://localhost:8080/api/v1
 
 - **Authentication:** endpoints marked (auth) need `Authorization: Bearer <access token>` from Keycloak (realm `dsn`, see [Authentication](#authentication)). They act as the token's user: `user_id`, `author_id` or `follower_id` in a body is ignored. Missing, expired or foreign tokens get `401`. Everything else is public.
 - **Success:** resource JSON with 200, 201 or 204.
-- **Error:** `{"error": "<message>"}`. gRPC codes map to `NotFound` -> 404, `InvalidArgument` -> 400, `AlreadyExists` -> 409, `Unavailable` -> 503, `DeadlineExceeded` -> 504, anything else -> 500. Backend calls time out after 5s (cache rebuild: 2m). An unparseable body is 400. 5xx bodies are generic, `{"error": "internal error", "trace_id": "..."}`; the cause is in the gateway log under that trace id.
+- **Error:** `{"error": "<message>"}`. gRPC codes map to `NotFound` -> 404, `InvalidArgument` -> 400, `AlreadyExists` -> 409, `Unavailable` -> 503, `DeadlineExceeded` -> 504, anything else -> 500. Backend calls time out after 5s (cache rebuild: 2m), and wait for a restarting service within that time instead of failing at once; a service that stays down answers 504 after 5s. An unparseable body is 400. 5xx bodies are generic, `{"error": "internal error", "trace_id": "..."}`; the cause is in the gateway log under that trace id.
 - **Validation (400):** required ids and text must be non-blank; `username` is 1-32 letters, digits or underscores; `bio` <= 500, post `text` <= 5000 (a post needs `text` or `image_id`), comment `text` <= 2000 characters; users can't follow themselves.
 - **Responses are protobuf messages encoded with `encoding/json`:**
   - fields with zero values are omitted (`"likes": 0` does not appear, nor does an empty `image_id`)
