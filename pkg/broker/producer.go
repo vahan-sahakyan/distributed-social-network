@@ -68,6 +68,8 @@ type Message struct {
 	Topic string
 	Key   string
 	Value []byte
+	// ID identifies the event across republishes; sent as the event-id header
+	ID string
 }
 
 // PublishMessages writes msgs, keeping their order within each topic. It returns an
@@ -114,6 +116,9 @@ func (p *Producer) writeGroup(ctx context.Context, group []Message) error {
 		)
 		spans[i] = span
 		out[i] = kafka.Message{Key: []byte(m.Key), Value: m.Value}
+		if m.ID != "" {
+			out[i].Headers = append(out[i].Headers, kafka.Header{Key: EventIDHeader, Value: []byte(m.ID)})
+		}
 		otel.GetTextMapPropagator().Inject(spanCtx, headerCarrier{&out[i].Headers})
 	}
 

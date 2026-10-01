@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/segmentio/kafka-go"
@@ -74,10 +73,10 @@ func buildEvent(eventType string, msg kafka.Message) (*model.FeedEvent, error) {
 	}
 
 	event := &model.FeedEvent{
-		// Derived from the message's Kafka coordinates rather than generated, so a
-		// redelivery after a failed commit writes the same event_id and readers can
-		// collapse the duplicate instead of counting the like twice.
-		EventID:   id.Deterministic(msg.Topic, strconv.Itoa(msg.Partition), strconv.FormatInt(msg.Offset, 10)),
+		// Derived from the event's identity rather than generated, so a redelivery or
+		// a republish by the outbox writes the same event_id and readers collapse the
+		// duplicate instead of counting the like twice.
+		EventID:   id.Deterministic(broker.DedupeKey(msg)...),
 		EventType: eventType,
 		PostID:    payload.PostID,
 		UserID:    payload.UserID,

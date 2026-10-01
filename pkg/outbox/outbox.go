@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -175,6 +176,7 @@ func (r *Relay) relayOnce(ctx context.Context) (int, error) {
 			Topic: x.topic,
 			Key:   x.key,
 			Value: x.payload,
+			ID:    r.service + ":" + strconv.FormatInt(x.id, 10),
 		}
 		ids[i] = x.id
 	}

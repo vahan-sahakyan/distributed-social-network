@@ -187,6 +187,7 @@ func (r *ScyllaRelay) read(ctx context.Context, bucket int64, after, settled goc
 			Topic: topic,
 			Key:   key,
 			Value: payload,
+			ID:    r.service + ":" + id.String(),
 		})
 		ids = append(ids, id)
 		// the driver scans into these in place; the messages keep the previous ones
