@@ -2,6 +2,7 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
 
 	"github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/comments-service/internal/service"
@@ -35,6 +36,9 @@ func (s *Server) CreateComment(ctx context.Context, req *commentspb.CreateCommen
 		Text:     req.Text,
 	})
 	if err != nil {
+		if errors.Is(err, model.ErrPostNotFound) {
+			return nil, status.Error(codes.NotFound, "post not found")
+		}
 		return nil, status.Errorf(codes.Internal, "failed to create comment: %v", err)
 	}
 	return &commentspb.CreateCommentResponse{Comment: toProto(comment)}, nil

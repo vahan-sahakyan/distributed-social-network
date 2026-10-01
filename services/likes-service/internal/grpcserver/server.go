@@ -2,6 +2,7 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
 
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/service"
@@ -30,6 +31,9 @@ func (s *Server) CreateLike(ctx context.Context, req *likespb.CreateLikeRequest)
 		EntityID: req.EntityId,
 	})
 	if err != nil {
+		if errors.Is(err, model.ErrPostNotFound) {
+			return nil, status.Error(codes.NotFound, "post not found")
+		}
 		return nil, status.Errorf(codes.Internal, "failed to create like: %v", err)
 	}
 	return &likespb.CreateLikeResponse{Like: &likespb.Like{

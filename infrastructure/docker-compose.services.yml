@@ -70,7 +70,9 @@ services:
       GRPC_PORT: "9083"
       DATABASE_URL: postgres://postgres:postgres@comments-db:5432/comments?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
     depends_on:
+      - posts-service
       - comments-db
       - redpanda
 
@@ -87,7 +89,9 @@ services:
       GRPC_PORT: "9084"
       DATABASE_URL: postgres://postgres:postgres@likes-db:5432/likes?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
+      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
     depends_on:
+      - posts-service
       - likes-db
       - redpanda
 

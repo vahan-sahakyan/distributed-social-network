@@ -5,9 +5,11 @@ COPY pkg/broker/ ./pkg/broker/
 COPY pkg/database/ ./pkg/database/
 COPY pkg/events/ ./pkg/events/
 COPY pkg/grpc/comments/ ./pkg/grpc/comments/
+COPY pkg/grpc/posts/ ./pkg/grpc/posts/
 COPY pkg/id/ ./pkg/id/
 COPY pkg/observability/ ./pkg/observability/
 COPY pkg/outbox/ ./pkg/outbox/
+COPY pkg/posts/ ./pkg/posts/
 COPY pkg/retry/ ./pkg/retry/
 COPY pkg/validate/ ./pkg/validate/
 COPY services/comments-service/ ./services/comments-service/
