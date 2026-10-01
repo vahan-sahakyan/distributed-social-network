@@ -106,7 +106,8 @@ Every producing service publishes through a **transactional outbox** (`pkg/outbo
 
 Delivery is **at-least-once** (`pkg/broker.Consume`): the offset is committed only after the handler succeeds. A failing message is retried 3 times with backoff, then published to `<topic>.dlq` and skipped. Nothing consumes the DLQ topics yet. `pkg/broker.ConsumeBatch` (event-writer, search-service) does the same per batch of up to 500 messages or 200ms, and retries a failing batch message by message so only the bad ones are parked. Handlers are written to tolerate redelivery:
 - feed-service fanout is idempotent, and feed cache writes use memcache CAS to avoid lost updates between concurrent consumers
-- event-writer derives `event_id` from topic/partition/offset, so a redelivered message writes a row with the same id and readers deduplicate by it
+- every event carries an `event-id` header from its outbox row (`<service>:<row id>`); event-writer derives `event_id` from it (from topic/partition/offset for older messages without one), so a redelivered or republished event writes a row with the same id and readers deduplicate by it; notification-service derives its row id the same way
+- feed-service's cached counts are not deduplicated: a redelivered like adds again until `POST /api/v1/rebuild`
 - likes-service emits `like.created` / `like.deleted` only when the row actually changed, so a repeated like or unlike emits nothing
 
 ### CQRS for Search
@@ -154,7 +155,7 @@ All domain events are appended to ClickHouse:
 
 ```sql
 CREATE TABLE feed_events (
-    event_id UUID,         -- derived from topic/partition/offset
+    event_id UUID,         -- derived from the event-id header (topic/partition/offset without one)
     event_type String,     -- 'post.created', 'like.created', 'like.deleted', 'comment.created'
     post_id String,
     user_id String,

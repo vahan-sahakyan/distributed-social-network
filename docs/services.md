@@ -280,7 +280,7 @@ type Notification struct {
 INSERT INTO feed_events (event_id, event_type, post_id, user_id, likes_delta, comments_delta, created_at)
 ```
 
-`event_id` is derived from topic/partition/offset (`pkg/id.Deterministic`), so a redelivered message produces a duplicate row readers can collapse.
+`event_id` is derived from the message's `event-id` header (`broker.DedupeKey`; topic/partition/offset for messages without one), so a redelivered or republished event produces a duplicate row readers can collapse.
 
 **Environment:**
 | Variable | Default | Description |
