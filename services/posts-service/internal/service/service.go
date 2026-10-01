@@ -2,10 +2,8 @@ package service
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
-	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/model"
@@ -13,12 +11,11 @@ import (
 )
 
 type Service struct {
-	repo     *repository.Repository
-	producer *broker.Producer
+	repo *repository.Repository
 }
 
-func New(repo *repository.Repository, producer *broker.Producer) *Service {
-	return &Service{repo: repo, producer: producer}
+func New(repo *repository.Repository) *Service {
+	return &Service{repo: repo}
 }
 
 func (s *Service) CreatePost(ctx context.Context, req *model.CreatePostRequest) (*model.Post, error) {
@@ -30,14 +27,9 @@ func (s *Service) CreatePost(ctx context.Context, req *model.CreatePostRequest) 
 		CreatedAt: time.Now().UTC(),
 	}
 
-	if err := s.repo.Create(ctx, post); err != nil {
+	if err := s.repo.CreateWithEvent(ctx, post, events.PostCreated); err != nil {
 		return nil, err
 	}
-
-	if err := s.producer.Publish(ctx, events.PostCreated, post.ID, post); err != nil {
-		slog.ErrorContext(ctx, "publishing event", "topic", events.PostCreated, "post_id", post.ID, "error", err)
-	}
-
 	return post, nil
 }
 

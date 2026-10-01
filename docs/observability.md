@@ -53,7 +53,7 @@ Shared code: `pkg/observability` (logger, tracer, gRPC options) and `pkg/broker`
 | `grpc_server_handled_total`, `grpc_server_handling_seconds` | `grpc_service`, `grpc_method`, `grpc_code` | every gRPC server |
 | `grpc_client_handled_total`, `grpc_client_handling_seconds` | same | gateway, feed, notification, cache-rebuilder |
 | `broker_messages_published_total` | `topic`, `result` (`ok`, `error`) | producers |
-| `outbox_backlog`, `outbox_oldest_age_seconds` | `service` | comments, likes, users |
+| `outbox_backlog`, `outbox_oldest_age_seconds` | `service` | comments, likes, users, posts |
 | `broker_messages_consumed_total` | `topic`, `group`, `result` (`ok`, `dlq`, `dropped`, `error`) | consumers, final outcome per message |
 | `broker_handler_failures_total` | `topic`, `group` | consumers, each failed attempt (3 before DLQ) |
 | `broker_handler_duration_seconds` | `topic`, `group` | consumers, per attempt |

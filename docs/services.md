@@ -91,7 +91,7 @@ type Post struct {
 
 Like and comment counts are not stored on the post; feed-service keeps them in the feed cache.
 
-**Event published:** `post.created` -> Post JSON
+**Event published:** `post.created` -> Post JSON, written with the post in one LOGGED BATCH and relayed by `outbox.ScyllaRelay`
 
 **Environment:**
 | Variable | Default | Description |

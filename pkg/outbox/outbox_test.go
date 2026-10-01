@@ -119,6 +119,9 @@ func TestRelayPublishesCommittedEventsInOrder(t *testing.T) {
 	var keys string
 	for _, m := range pub.got {
 		keys += m.Key
+		if want := `{"k":"` + m.Key + `"}`; string(m.Value) != want {
+			t.Errorf("message %s carries %s, want %s", m.Key, m.Value, want)
+		}
 		if got := trace.SpanContextFromContext(m.Ctx).TraceID(); got != traceID {
 			t.Errorf("message %s lost the request trace: %s", m.Key, got)
 		}
