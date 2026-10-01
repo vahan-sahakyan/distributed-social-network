@@ -54,6 +54,18 @@ minio:
     requests: {cpu: 20m, memory: 128Mi}
     limits: {memory: 512Mi}
 
+elasticsearch:
+  image: elasticsearch:9.5.3
+  storage: 2Gi
+  javaOpts: -Xms512m -Xmx512m
+  # extra node settings as env vars; disk watermarks off so a nearly full local
+  # disk doesn't flip the indices to read-only
+  settings:
+    cluster.routing.allocation.disk.threshold_enabled: "false"
+  resources:
+    requests: {cpu: 100m, memory: 1Gi}
+    limits: {memory: 1536Mi}
+
 keycloak:
   image: quay.io/keycloak/keycloak:26.7.5
   # public origin of the UI, for login redirects, e.g. https://dsn.example.com

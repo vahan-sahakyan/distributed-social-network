@@ -297,10 +297,10 @@ Two Helm charts, deployed by Argo CD from [distributed-social-network-gitops](ht
 
 | Chart | Contents |
 |---|---|
-| `deploy/kubernetes/infra` | Postgres x4, Scylla, Redpanda, ClickHouse, MinIO, Memcached |
-| `deploy/kubernetes/services` | the 10 services except search, UI, ingress |
+| `deploy/kubernetes/infra` | Postgres x5 (one for Keycloak), Scylla, Redpanda, ClickHouse, MinIO, Memcached, Elasticsearch, Keycloak |
+| `deploy/kubernetes/services` | the 11 services, UI, ingress |
 
-The ingress routes `/api`, `/health` and `/images` to the gateway and everything else to the UI.
+The ingress routes `/api`, `/health` and `/images` to the gateway, `/auth` to Keycloak and everything else to the UI.
 
 Images: `ghcr.io/vahan-sahakyan/distributed-social-network/<name>:<sha>` (linux/arm64), published on every push by `.github/workflows/publish.yml`. On `main` the workflow also commits the new sha to the gitops repo, which Argo CD syncs.
 
@@ -308,7 +308,7 @@ Standalone install on a local cluster (plain dev secrets, `createDevSecrets: tru
 
 ```bash
 k3d cluster create dsn -p "8081:80@loadbalancer"
-helm install infra deploy/kubernetes/infra -n dsn --create-namespace
+helm install infra deploy/kubernetes/infra -n dsn --create-namespace --set keycloak.uiUrl=http://localhost:8081
 helm install services deploy/kubernetes/services -n dsn --set image.tag=main
-# app on http://localhost:8081
+# app on http://localhost:8081, Keycloak on http://localhost:8081/auth
 ```

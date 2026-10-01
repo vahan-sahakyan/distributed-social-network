@@ -26,6 +26,11 @@ spec:
         # a realm change restarts Keycloak; it only imports into an empty database
         checksum/realm: {{ .Files.Get "files/dsn-realm.json" | sha256sum }}
     spec:
+      # Keycloak exits when its database isn't up yet; wait instead of crash-looping
+      initContainers:
+        - name: wait-for-db
+          image: {{ .Values.postgres.image }}
+          command: [sh, -c, "until pg_isready -h keycloak-db -U {{ .Values.postgres.user }}; do sleep 2; done"]
       containers:
         - name: keycloak
           image: {{ .Values.keycloak.image }}

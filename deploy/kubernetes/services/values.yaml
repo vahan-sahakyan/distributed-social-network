@@ -54,6 +54,7 @@ services:
       MINIO_BUCKET: images
       # the gateway trusts tokens signed with these keys; OIDC_ISSUER is added from ingress.host
       OIDC_JWKS_URL: http://keycloak:8080/auth/realms/dsn/protocol/openid-connect/certs
+      SEARCH_SERVICE_GRPC_ADDR: search-service:9091
 
   posts:
     port: 8081
@@ -127,6 +128,13 @@ services:
       MEMCACHED_ADDR: memcached:11211
       USERS_SERVICE_GRPC_ADDR: users-service:9085
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081
+
+  search:
+    port: 8091
+    grpcPort: 9091
+    env:
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      KAFKA_BROKERS: redpanda:9092
 
   ui:
     image: ui
