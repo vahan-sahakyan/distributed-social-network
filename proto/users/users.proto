@@ -16,6 +16,8 @@ message User {
 message CreateUserRequest {
   string username = 1;
   string bio = 2;
+  // the identity provider's subject; the gateway sets it from the caller's token
+  string id = 3;
 }
 
 message CreateUserResponse {

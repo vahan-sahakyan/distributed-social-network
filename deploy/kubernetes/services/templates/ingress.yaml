@@ -26,6 +26,13 @@ spec:
                 port:
                   number: {{ $.Values.services.gateway.port }}
           {{- end }}
+          - path: /auth
+            pathType: Prefix
+            backend:
+              service:
+                name: keycloak
+                port:
+                  number: 8080
           - path: /
             pathType: Prefix
             backend:

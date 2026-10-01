@@ -5,7 +5,6 @@ COPY pkg/broker/ ./pkg/broker/
 COPY pkg/database/ ./pkg/database/
 COPY pkg/events/ ./pkg/events/
 COPY pkg/grpc/users/ ./pkg/grpc/users/
-COPY pkg/id/ ./pkg/id/
 COPY pkg/observability/ ./pkg/observability/
 COPY pkg/outbox/ ./pkg/outbox/
 COPY pkg/retry/ ./pkg/retry/

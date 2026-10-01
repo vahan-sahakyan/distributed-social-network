@@ -38,6 +38,10 @@ spec:
             - name: {{ $key }}
               value: {{ $val | quote }}
             {{- end }}
+            {{- if and (eq $name "gateway") $.Values.ingress.host }}
+            - name: OIDC_ISSUER
+              value: "{{ if $.Values.ingress.tls }}https{{ else }}http{{ end }}://{{ $.Values.ingress.host }}/auth/realms/dsn"
+            {{- end }}
           {{- if $svc.secret }}
           envFrom:
             - secretRef:

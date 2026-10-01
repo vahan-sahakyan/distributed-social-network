@@ -50,6 +50,9 @@ func translate(err error) error {
 	}
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == uniqueViolation {
+		if pgErr.ConstraintName == "users_pkey" {
+			return model.ErrUserExists
+		}
 		return model.ErrUsernameTaken
 	}
 	return err
