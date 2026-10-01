@@ -99,6 +99,7 @@ After startup, these are available:
 | `make down-clean` | Stop containers and **delete all data volumes** |
 | `make demo` | Run end-to-end demo script |
 | `make load` | Mixed traffic for the dashboards (`DURATION=120 WORKERS=4`) |
+| `make dlq` | List parked (DLQ) messages; `CMD="replay --topic like.created"` replays, `CMD=skip` discards |
 | `make kibana` | Start Kibana for the search indices (not part of `make up`) |
 | `make proto` | Regenerate gRPC stubs under `pkg/grpc/`, then `make dockerfiles` |
 | `make dockerfiles` | Regenerate the `pkg/` COPY lines in every service Dockerfile |
@@ -125,6 +126,7 @@ After startup, these are available:
 ├── scripts/
 │   ├── gen-dockerfiles.sh   Regenerates Dockerfile pkg/ COPY lines
 │   ├── demo.sh              End-to-end demo script
+│   ├── lib/auth.sh          Keycloak users and tokens for the scripts
 │   └── load.sh              Traffic generator (make load)
 ├── services/
 │   ├── gateway-service/     HTTP API, translates requests to gRPC
@@ -138,6 +140,7 @@ After startup, these are available:
 │   ├── event-writer-service/ Event store writer (ClickHouse)
 │   ├── cache-rebuilder-service/ Cache rebuild from event store
 │   └── search-service/      Post/user search, trending hashtags (Elasticsearch)
+├── tools/dlq/               CLI for parked messages (make dlq)
 ├── ui/                      React + Vite frontend
 ├── Makefile
 └── go.work                  Go workspace file

@@ -116,6 +116,16 @@ docker start infrastructure-redpanda-1
 ```
 "Outbox backlog" climbs per service while Redpanda is down (`OutboxStuck` fires after ~3m) and drops to 0 within seconds of the restart. In Jaeger, a like made during the outage is still one trace: the request, then `publish like.created` attempts backing off 1s, 2s, 4s, 8s until one succeeds, then the consumers. Consumers resume up to 30s after the broker returns (their reconnect backoff).
 
+**7. Replay what was parked.** Stop posts-service, like a post, start posts-service again:
+```bash
+docker stop infrastructure-posts-service-1
+# like a post in the UI
+docker start infrastructure-posts-service-1
+make dlq                                   # two pending entries: feed-service-likes and notification-service
+make dlq CMD="replay --topic like.created" # one event replayed for both
+```
+"DLQ awaiting replay" rises and returns to 0; the like then shows in the feed and as a notification. Within ~30s of the restart a consumer can still fail to reach posts-service (gRPC re-resolves DNS at most every 30s) and park the replay again; `make dlq` shows it, and a second replay delivers it. `CMD=skip` marks pending messages as handled without replaying.
+
 ### Query cheat sheet
 
 ```promql
