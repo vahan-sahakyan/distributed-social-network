@@ -1044,7 +1044,7 @@
       },
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 6,
         "x": 12,
         "y": 31
       },
@@ -1086,9 +1086,61 @@
       }
     },
     {
+      "type": "timeseries",
+      "title": "DLQ awaiting replay",
+      "description": "Parked messages not yet replayed or skipped: make dlq",
+      "id": 22,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 31
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (redpanda_topic) (redpanda_kafka_max_offset{redpanda_topic=~\".+\\\\.dlq\"}) - (sum by (redpanda_topic) (redpanda_kafka_consumer_group_committed_offset{redpanda_group=\"dlq-replay\"}) or 0 * sum by (redpanda_topic) (redpanda_kafka_max_offset{redpanda_topic=~\".+\\\\.dlq\"}))",
+          "legendFormat": "{{redpanda_topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
       "type": "row",
       "title": "Runtime",
-      "id": 22,
+      "id": 23,
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1102,7 +1154,7 @@
       "type": "timeseries",
       "title": "Memory (RSS)",
       "description": "",
-      "id": 23,
+      "id": 24,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1154,7 +1206,7 @@
       "type": "timeseries",
       "title": "CPU",
       "description": "",
-      "id": 24,
+      "id": 25,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1206,7 +1258,7 @@
       "type": "timeseries",
       "title": "Goroutines",
       "description": "",
-      "id": 25,
+      "id": 26,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1257,7 +1309,7 @@
     {
       "type": "row",
       "title": "Logs",
-      "id": 26,
+      "id": 27,
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1271,7 +1323,7 @@
       "type": "logs",
       "title": "Warnings and errors",
       "description": "Click a line, then the TraceID link, to open its trace",
-      "id": 27,
+      "id": 28,
       "datasource": {
         "type": "loki",
         "uid": "loki"
