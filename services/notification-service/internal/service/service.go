@@ -6,7 +6,6 @@ import (
 
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/repository"
-	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 )
 
 type Service struct {
@@ -17,9 +16,10 @@ func New(repo *repository.Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) CreateNotification(ctx context.Context, userID, notifType, actorID, entityID string) error {
+// CreateNotification stores the notification unless one with the same id exists.
+func (s *Service) CreateNotification(ctx context.Context, notificationID, userID, notifType, actorID, entityID string) error {
 	n := &model.Notification{
-		ID:        id.New(),
+		ID:        notificationID,
 		UserID:    userID,
 		Type:      notifType,
 		ActorID:   actorID,

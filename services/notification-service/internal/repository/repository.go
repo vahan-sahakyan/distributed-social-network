@@ -18,7 +18,8 @@ func New(db *pgxpool.Pool) *Repository {
 func (r *Repository) Create(ctx context.Context, n *model.Notification) error {
 	_, err := r.db.Exec(ctx,
 		`INSERT INTO notifications (id, user_id, type, actor_id, entity_id, read, created_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
+		 ON CONFLICT (id) DO NOTHING`,
 		n.ID, n.UserID, n.Type, n.ActorID, n.EntityID, n.Read, n.CreatedAt,
 	)
 	return err

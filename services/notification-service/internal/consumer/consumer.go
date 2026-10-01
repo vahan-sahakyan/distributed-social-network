@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/vahan-sahakyan/distributed-social-network/notification-service/internal/service"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 	"google.golang.org/grpc"
 )
 
@@ -55,19 +57,19 @@ func (c *Consumer) Start(ctx context.Context) {
 
 func (c *Consumer) handler(topic string) broker.Handler {
 	return func(ctx context.Context, msg kafka.Message) error {
-		return c.handle(ctx, topic, msg.Value)
+		return c.handle(ctx, topic, msg)
 	}
 }
 
 // handle returns an error when the notification could not be created, so a
 // posts-service blip is retried instead of losing the notification.
-func (c *Consumer) handle(ctx context.Context, topic string, data []byte) error {
+func (c *Consumer) handle(ctx context.Context, topic string, msg kafka.Message) error {
 	var event struct {
 		UserID   string `json:"user_id"`
 		EntityID string `json:"entity_id"`
 	}
 
-	if err := json.Unmarshal(data, &event); err != nil {
+	if err := json.Unmarshal(msg.Value, &event); err != nil {
 		return fmt.Errorf("unmarshaling event: %w", err)
 	}
 
@@ -83,8 +85,14 @@ func (c *Consumer) handle(ctx context.Context, topic string, data []byte) error 
 		return nil
 	}
 
-	if err := c.svc.CreateNotification(ctx, authorID, notifTypes[topic], event.UserID, event.EntityID); err != nil {
+	if err := c.svc.CreateNotification(ctx, notificationID(msg), authorID, notifTypes[topic], event.UserID, event.EntityID); err != nil {
 		return fmt.Errorf("creating notification: %w", err)
 	}
 	return nil
+}
+
+// notificationID is derived from the message's Kafka coordinates, so a redelivery
+// after a failed commit produces the same id and the insert is skipped.
+func notificationID(msg kafka.Message) string {
+	return id.Deterministic(msg.Topic, strconv.Itoa(msg.Partition), strconv.FormatInt(msg.Offset, 10))
 }
