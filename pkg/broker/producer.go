@@ -75,6 +75,8 @@ func (p *Producer) getWriter(topic string) *kafka.Writer {
 		Balancer: &kafka.Hash{},
 		// default of 1s makes every synchronous WriteMessages wait that long
 		BatchTimeout: 10 * time.Millisecond,
+		// the default, RequireNone, reports success for writes the broker never got
+		RequiredAcks: kafka.RequireAll,
 	}
 	p.writers[topic] = w
 	return w
