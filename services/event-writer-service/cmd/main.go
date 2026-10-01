@@ -24,7 +24,7 @@ func main() {
 	defer cancel()
 
 	shutdown := observability.Init(ctx, "event-writer-service")
-	defer shutdown(context.Background())
+	defer shutdown()
 
 	chAddr := os.Getenv("CLICKHOUSE_ADDR")
 	if chAddr == "" {

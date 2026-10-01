@@ -39,7 +39,9 @@ func (s *Server) GetUserFeed(_ context.Context, req *feedpb.GetUserFeedRequest) 
 }
 
 func (s *Server) Reset(_ context.Context, _ *feedpb.ResetRequest) (*feedpb.ResetResponse, error) {
-	s.mc.FlushAll()
+	if err := s.mc.FlushAll(); err != nil {
+		return nil, status.Errorf(codes.Internal, "reset failed: %v", err)
+	}
 	return &feedpb.ResetResponse{Status: "reset"}, nil
 }
 

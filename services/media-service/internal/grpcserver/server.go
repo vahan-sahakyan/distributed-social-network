@@ -3,6 +3,7 @@ package grpcserver
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 
 	"github.com/vahan-sahakyan/distributed-social-network/media-service/internal/service"
@@ -35,7 +36,7 @@ func (s *Server) Upload(stream mediapb.MediaService_UploadServer) error {
 	var buf bytes.Buffer
 	for {
 		msg, err := stream.Recv()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {

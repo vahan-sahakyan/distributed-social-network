@@ -102,14 +102,14 @@ After startup, these are available:
 | `make dockerfiles` | Regenerate the `pkg/` COPY lines in every service Dockerfile |
 | `make build` | Compile all service binaries into `bin/` |
 | `make test` | Run tests in `pkg` and all services |
-| `make lint` | Lint all services with golangci-lint |
+| `make lint` | Lint `pkg` and all services with golangci-lint (config: `.golangci.yml`) |
 | `make tidy` | Run `go mod tidy` in all modules |
 | `make k8s-up` / `make k8s-down` | Install / uninstall both Helm charts in the current kube context (images from GHCR, tag `main`) |
 
 ## Project Structure
 
 ```
-├── .github/workflows/       CI (vet, test, gofmt, UI lint/build) and image publish + deploy
+├── .github/workflows/       CI (vet, lint, test, gofmt, UI lint/build) and image publish + deploy
 ├── deploy/
 │   ├── images/minio/        MinIO built from source (upstream images discontinued)
 │   └── kubernetes/          Helm charts (infra, services), deployed via GitOps

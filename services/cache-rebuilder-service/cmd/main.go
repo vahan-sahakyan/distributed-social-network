@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net"
 	"os"
@@ -28,7 +29,7 @@ func main() {
 	defer cancel()
 
 	shutdown := observability.Init(ctx, "cache-rebuilder-service")
-	defer shutdown(context.Background())
+	defer shutdown()
 
 	chAddr := os.Getenv("CLICKHOUSE_ADDR")
 	if chAddr == "" {
@@ -87,9 +88,7 @@ func main() {
 	}
 	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
 	cacherebpb.RegisterCacheRebuilderServiceServer(grpcSrv, grpcserver.New(svc, func(ctx context.Context) error {
-		conn.Exec(ctx, "TRUNCATE TABLE IF EXISTS feed_events")
-		mc.FlushAll()
-		return nil
+		return errors.Join(conn.Exec(ctx, "TRUNCATE TABLE IF EXISTS feed_events"), mc.FlushAll())
 	}))
 	observability.InitGRPCMetrics(grpcSrv)
 	go func() {

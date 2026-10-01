@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -17,8 +18,8 @@ import (
 
 // Init sets a JSON slog default logger (the std log package included) and the global
 // tracer provider. Spans are exported over OTLP/HTTP only when OTEL_EXPORTER_OTLP_ENDPOINT
-// is set; trace context is propagated either way.
-func Init(ctx context.Context, service string) (shutdown func(context.Context) error) {
+// is set; trace context is propagated either way. The returned func flushes pending spans.
+func Init(ctx context.Context, service string) (shutdown func()) {
 	slog.SetDefault(slog.New(newTraceHandler(
 		slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel()}),
 	)).With("service", service))
@@ -27,7 +28,7 @@ func Init(ctx context.Context, service string) (shutdown func(context.Context) e
 		propagation.TraceContext{}, propagation.Baggage{},
 	))
 
-	noop := func(context.Context) error { return nil }
+	noop := func() {}
 	if os.Getenv("OTEL_EXPORTER_OTLP_ENDPOINT") == "" {
 		return noop
 	}
@@ -42,7 +43,13 @@ func Init(ctx context.Context, service string) (shutdown func(context.Context) e
 		sdktrace.WithResource(resource.NewSchemaless(attribute.String("service.name", service))),
 	)
 	otel.SetTracerProvider(tp)
-	return tp.Shutdown
+	return func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := tp.Shutdown(ctx); err != nil {
+			slog.Error("flushing traces", "error", err)
+		}
+	}
 }
 
 func logLevel() slog.Level {

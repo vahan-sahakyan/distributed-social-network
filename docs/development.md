@@ -11,6 +11,7 @@
 - **Node 22** (UI)
 - **curl** (for testing APIs)
 - **python3** (used by demo script for JSON formatting)
+- **golangci-lint v2.14.0** built with Go 1.27 (`GOTOOLCHAIN=go1.27.1 go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.14.0`), for `make lint`
 - **protoc v7.35.1** (`brew install protobuf` / `brew upgrade protobuf` -> 35.1)
 - **protoc-gen-go v1.36.11** (`go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11`)
 - **protoc-gen-go-grpc v1.5.1** (`go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.5.1`)
@@ -184,7 +185,7 @@ make test
 cd services/users-service && GOWORK=off go test -race ./...
 ```
 
-CI (`.github/workflows/ci.yml`) runs `gofmt`, `go vet` and `go test -race` per module, checks that the Dockerfiles match `make dockerfiles`, and lints and builds the UI.
+CI (`.github/workflows/ci.yml`) runs `gofmt`, `go vet`, golangci-lint (`.golangci.yml`, v2.14.0) and `go test -race` per module, checks that the Dockerfiles match `make dockerfiles`, and lints and builds the UI.
 
 ## Building Locally
 

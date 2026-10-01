@@ -439,7 +439,7 @@ POST /api/v1/reset
 
 **Response** `200 OK`: `{"status": "reset complete"}`
 
-> Calls `Reset` on every service: truncates all tables and the ClickHouse event store, and flushes Memcached. Uploaded files in MinIO are kept. Not access-controlled, and errors from individual services are ignored.
+> Calls `Reset` on every service: truncates all tables and the ClickHouse event store, flushes Memcached and empties the search indices. Uploaded files in MinIO are kept. Not access-controlled. Every service is attempted; if any fail it answers 500 `reset failed for <services>` with a `trace_id`.
 
 ---
 

@@ -28,7 +28,7 @@ func main() {
 	defer cancel()
 
 	shutdown := observability.Init(ctx, "feed-service")
-	defer shutdown(context.Background())
+	defer shutdown()
 
 	memcachedAddr := os.Getenv("MEMCACHED_ADDR")
 	if memcachedAddr == "" {

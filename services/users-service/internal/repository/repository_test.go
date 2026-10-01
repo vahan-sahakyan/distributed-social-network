@@ -25,7 +25,7 @@ func TestTranslate(t *testing.T) {
 			if errors.Is(got, model.ErrUsernameTaken) != tt.wantTaken {
 				t.Errorf("translate(%v) = %v, want taken=%v", tt.err, got, tt.wantTaken)
 			}
-			if !tt.wantTaken && got != tt.err {
+			if !tt.wantTaken && !errors.Is(got, tt.err) {
 				t.Errorf("translate(%v) = %v, want it unchanged", tt.err, got)
 			}
 		})
