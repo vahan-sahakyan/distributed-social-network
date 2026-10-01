@@ -1,10 +1,14 @@
+import { bearer } from './auth'
+
 const BASE = '/api/v1'
 
 async function req(method, path, body = null, isForm = false) {
   const url = BASE + path
-  const opts = { method }
+  const opts = { method, headers: {} }
+  const token = await bearer()
+  if (token) opts.headers.Authorization = `Bearer ${token}`
   if (body && !isForm) {
-    opts.headers = { 'Content-Type': 'application/json' }
+    opts.headers['Content-Type'] = 'application/json'
     opts.body = JSON.stringify(body)
   } else if (isForm) {
     opts.body = body
@@ -12,45 +16,47 @@ async function req(method, path, body = null, isForm = false) {
   const res = await fetch(url, opts)
   if (res.status === 204) return null
   const data = await res.json().catch(() => null)
-  if (!res.ok) throw new Error(data?.error || res.statusText)
+  if (!res.ok) {
+    const err = new Error(data?.error || res.statusText)
+    err.status = res.status
+    throw err
+  }
   return data
 }
 
 export const api = {
   health: () => fetch('/health').then(r => r.json()),
 
-  // Users
-  createUser: (username, bio) => req('POST', '/users/', { username, bio }),
+  // Users: writes act as the logged-in user
+  me: () => req('GET', '/me'),
+  createProfile: (bio) => req('POST', '/users/', { bio }),
   getUser: (id) => req('GET', `/users/${id}`),
   getUserByUsername: (username) => req('GET', `/users/by-username/${encodeURIComponent(username)}`),
-  followUser: (targetId, followerId) =>
-    req('POST', `/users/${targetId}/follow`, { follower_id: followerId }),
-  unfollowUser: (targetId, followerId) =>
-    req('DELETE', `/users/${targetId}/follow`, { follower_id: followerId }),
+  followUser: (targetId) => req('POST', `/users/${targetId}/follow`),
+  unfollowUser: (targetId) => req('DELETE', `/users/${targetId}/follow`),
   getFollowers: (id) => req('GET', `/users/${id}/followers`),
   getFollowing: (id) => req('GET', `/users/${id}/following`),
 
   // Posts
-  createPost: (authorId, text, imageId) =>
-    req('POST', '/posts/', { author_id: authorId, text, ...(imageId ? { image_id: imageId } : {}) }),
+  createPost: (text, imageId) =>
+    req('POST', '/posts/', { text, ...(imageId ? { image_id: imageId } : {}) }),
   getPost: (id) => req('GET', `/posts/${id}`),
 
   // Feed
-  getHomeFeed: (userId) => req('GET', `/feed/home?user_id=${userId}`),
+  getHomeFeed: () => req('GET', '/feed/home'),
   getUserFeed: (userId) => req('GET', `/feed/user/${userId}`),
 
   // Comments
-  createComment: (userId, entityId, text) =>
-    req('POST', '/comments/', { user_id: userId, entity_id: entityId, text }),
+  createComment: (entityId, text) => req('POST', '/comments/', { entity_id: entityId, text }),
   getComments: (entityId) => req('GET', `/comments/entity/${entityId}`),
 
   // Likes
-  like: (userId, entityId) => req('POST', '/likes/', { user_id: userId, entity_id: entityId }),
-  unlike: (userId, entityId) => req('DELETE', '/likes/', { user_id: userId, entity_id: entityId }),
-  hasLiked: (userId, entityId) => req('GET', `/likes/check?user_id=${userId}&entity_id=${entityId}`).then(r => r.liked),
+  like: (entityId) => req('POST', '/likes/', { entity_id: entityId }),
+  unlike: (entityId) => req('DELETE', '/likes/', { entity_id: entityId }),
+  hasLiked: (entityId) => req('GET', `/likes/check?entity_id=${entityId}`).then(r => r.liked),
 
   // Notifications
-  getNotifications: (userId) => req('GET', `/notifications/${userId}`),
+  getNotifications: () => req('GET', '/notifications'),
 
   // Media
   uploadMedia: (file) => {

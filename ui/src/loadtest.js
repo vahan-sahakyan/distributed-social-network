@@ -75,56 +75,36 @@ export async function runLoadTest(config = {}, onProgress = () => {}) {
 
   const results = []
 
-  // ── seed a user + post if none supplied ────────────────────────────────────
-  if (!seedUserId) {
-    onProgress('Seeding a user for read tests…')
-    try {
-      const u = await api.createUser(`loadtest_${Date.now()}`, 'load test bot')
-      seedUserId = u.id
-    } catch {
-      try {
-        const u = await api.getUserByUsername('alice')
-        seedUserId = u.id
-      } catch { /* best effort */ }
-    }
-  }
-
+  // writes act as the logged-in user (seedUserId), so they need a session
   if (!seedPostId && seedUserId) {
     onProgress('Seeding a post for read tests…')
     try {
-      const p = await api.createPost(seedUserId, 'Load test post – ignore me')
+      const p = await api.createPost('Load test post – ignore me')
       seedPostId = p.id
     } catch { /* best effort */ }
   }
 
   // ── write scenarios ────────────────────────────────────────────────────────
 
-  onProgress(`POST /users  (n=${n}, c=${concurrency})`)
-  results.push(await bench(
-    'POST /users',
-    () => api.createUser(`u_${Math.random().toString(36).slice(2)}`, 'load test'),
-    n, concurrency,
-  ))
-
   if (seedUserId && seedPostId) {
     onProgress(`POST /posts  (n=${n}, c=${concurrency})`)
     results.push(await bench(
       'POST /posts',
-      () => api.createPost(seedUserId, `load test post ${Math.random()}`),
+      () => api.createPost(`load test post ${Math.random()}`),
       n, concurrency,
     ))
 
     onProgress(`POST /likes  (n=${n}, c=${concurrency})`)
     results.push(await bench(
       'POST /likes',
-      () => api.like(seedUserId, seedPostId),
+      () => api.like(seedPostId),
       n, concurrency,
     ))
 
     onProgress(`POST /comments  (n=${n}, c=${concurrency})`)
     results.push(await bench(
       'POST /comments',
-      () => api.createComment(seedUserId, seedPostId, `comment ${Math.random()}`),
+      () => api.createComment(seedPostId, `comment ${Math.random()}`),
       n, concurrency,
     ))
   }
@@ -146,10 +126,10 @@ export async function runLoadTest(config = {}, onProgress = () => {}) {
       n, concurrency,
     ))
 
-    onProgress(`GET /notifications/:id  (n=${n}, c=${concurrency})`)
+    onProgress(`GET /notifications  (n=${n}, c=${concurrency})`)
     results.push(await bench(
-      'GET /notifications/:id',
-      () => api.getNotifications(seedUserId),
+      'GET /notifications',
+      () => api.getNotifications(),
       n, concurrency,
     ))
   }

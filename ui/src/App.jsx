@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { Zap, Home, Bell, User, Plus, RefreshCw, LogIn, Play, Trash2, BarChart2 } from 'lucide-react'
-import { runDemo } from './demo'
+import { Zap, Home, Bell, User, RefreshCw, LogIn, LogOut, Trash2, BarChart2 } from 'lucide-react'
 import { Avatar } from './components/Avatar'
 import { Toasts } from './components/Toast'
 import { HomePage } from './pages/HomePage'
@@ -10,48 +9,41 @@ import { NotificationsPage } from './pages/NotificationsPage'
 import { AuthPage } from './pages/AuthPage'
 import { LoadTestPage } from './pages/LoadTestPage'
 import { api } from './api'
+import { keycloak, logout } from './auth'
 import { useStore } from './store'
 
 function RequireUser({ children }) {
-  const { currentUser } = useStore()
-  if (!currentUser) return <Navigate to="/auth" replace />
+  const { currentUser, needsProfile } = useStore()
+  if (needsProfile) return <Navigate to="/auth" replace />
+  if (!currentUser) return keycloak.authenticated ? null : <Navigate to="/auth" replace />
   return children
 }
 
 function AppLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentUser, users, notifications, setCurrentUser, addUser, toast, clearUsers } = useStore()
+  const { currentUser, users, notifications, setCurrentUser, setNeedsProfile, toast, clearUsers } = useStore()
   const [health, setHealth] = useState(null)
-  const [showNewUser, setShowNewUser] = useState(false)
-  const [newUsername, setNewUsername] = useState('')
-  const [newBio, setNewBio] = useState('')
-  const [creating, setCreating] = useState(false)
   const [rebuilding, setRebuilding] = useState(false)
-  const [demoing, setDemoing] = useState(false)
 
   useEffect(() => {
     api.health().then(() => setHealth(true)).catch(() => setHealth(false))
   }, [])
 
-  async function handleCreateUser() {
-    if (!newUsername.trim() || creating) return
-    setCreating(true)
-    try {
-      const user = await api.createUser(newUsername.trim(), newBio.trim())
-      addUser(user)
-      setCurrentUser(user)
-      setShowNewUser(false)
-      setNewUsername('')
-      setNewBio('')
-      toast('Created @' + user.username + '!')
-      navigate('/home')
-    } catch (err) {
-      toast(err.message, 'error')
-    } finally {
-      setCreating(false)
-    }
-  }
+  // the profile behind the login session; none yet means the sign-up isn't finished
+  useEffect(() => {
+    if (!keycloak.authenticated) return
+    api.me()
+      .then(setCurrentUser)
+      .catch(err => {
+        if (err.status === 404) {
+          setNeedsProfile(true)
+          navigate('/auth')
+        } else {
+          toast(err.message, 'error')
+        }
+      })
+  }, [])
 
   async function handleRebuild() {
     setRebuilding(true)
@@ -62,23 +54,6 @@ function AppLayout() {
       toast(err.message, 'error')
     } finally {
       setRebuilding(false)
-    }
-  }
-
-  async function handleDemo() {
-    setDemoing(true)
-    try {
-      const { users: demoUsers, loginAs } = await runDemo(() => {})
-      Object.values(demoUsers).forEach(u => addUser(u))
-      if (loginAs) {
-        setCurrentUser(loginAs)
-        toast('Demo ready! Logged in as @' + loginAs.username)
-        navigate('/home')
-      }
-    } catch (err) {
-      toast(err.message, 'error')
-    } finally {
-      setDemoing(false)
     }
   }
 
@@ -133,67 +108,20 @@ function AppLayout() {
               </NavLink>
             </nav>
 
-            {/* Users section */}
-            <div className="flex items-center justify-between px-1 mb-2">
-              <span className="text-[10px] font-semibold text-muted uppercase tracking-widest">Users</span>
-              <button onClick={() => setShowNewUser(v => !v)} className="text-muted hover:text-text transition-colors" title="Create user">
-                <Plus size={13} />
-              </button>
-            </div>
+            <div className="flex-1" />
 
-            {showNewUser && (
-              <div className="mb-3 p-3 bg-surface border border-border rounded-xl space-y-2">
-                <input
-                  autoFocus
-                  value={newUsername}
-                  onChange={e => setNewUsername(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleCreateUser(); if (e.key === 'Escape') { setShowNewUser(false); setNewUsername(''); setNewBio('') } }}
-                  placeholder="Username"
-                  className="w-full bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder-muted outline-none focus:border-border-hover transition-colors"
-                />
-                <input
-                  value={newBio}
-                  onChange={e => setNewBio(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleCreateUser() }}
-                  placeholder="Bio (optional)"
-                  className="w-full bg-bg border border-border rounded-lg px-3 py-1.5 text-xs text-text placeholder-muted outline-none focus:border-border-hover transition-colors"
-                />
-                <button
-                  onClick={handleCreateUser}
-                  disabled={!newUsername.trim() || creating}
-                  className="w-full bg-accent hover:bg-accent-hover disabled:opacity-40 text-white text-xs font-semibold py-1.5 rounded-lg transition-colors"
-                >
-                  {creating ? 'Creating…' : 'Create User'}
-                </button>
-              </div>
-            )}
-
-            <div className="space-y-0.5 flex-1 overflow-y-auto min-h-0">
-              {users.map(u => (
-                <button
-                  key={u.id}
-                  onClick={() => setCurrentUser(u)}
-                  className={'w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left transition-colors group ' + (currentUser?.id === u.id ? 'bg-surface' : 'hover:bg-surface/40')}
-                >
-                  <Avatar username={u.username} size="xs" />
-                  <p className={'text-xs font-medium truncate flex-1 ' + (currentUser?.id === u.id ? 'text-text' : 'text-muted group-hover:text-text')}>
-                    @{u.username}
-                  </p>
-                  {currentUser?.id === u.id && <div className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />}
-                </button>
-              ))}
-              {users.length === 0 && <p className="text-xs text-muted/50 px-2 py-1">No users yet.</p>}
-            </div>
-
-            {/* Log out / switch user */}
             {currentUser && (
-              <div className="pt-3 border-t border-border mt-2">
+              <div className="pt-3 border-t border-border mt-2 space-y-1">
+                <div className="flex items-center gap-2.5 px-2 py-1.5">
+                  <Avatar username={currentUser.username} size="xs" />
+                  <p className="text-xs font-medium text-text truncate flex-1">@{currentUser.username}</p>
+                </div>
                 <button
-                  onClick={() => { setCurrentUser(null); navigate('/auth') }}
+                  onClick={() => { clearUsers(); logout() }}
                   className="w-full flex items-center gap-2 px-2 py-1.5 text-xs text-muted hover:text-text transition-colors rounded-lg hover:bg-surface/40"
                 >
-                  <LogIn size={12} className="rotate-180" />
-                  Switch user
+                  <LogOut size={12} />
+                  Log out
                 </button>
               </div>
             )}
@@ -268,26 +196,25 @@ function AppLayout() {
                   {health === true ? '● Online' : health === false ? '● Offline' : '○ Checking…'}
                 </span>
               </div>
-              <button
-                onClick={handleDemo}
-                disabled={demoing}
-                className="w-full flex items-center justify-center gap-2 text-xs font-semibold bg-accent hover:bg-accent-hover disabled:opacity-50 text-white rounded-lg px-3 py-2 transition-colors"
-              >
-                <Play size={11} fill="white" />
-                {demoing ? 'Running demo…' : 'Run Demo'}
-              </button>
-              <button
+              {currentUser && <button
                 onClick={handleRebuild}
                 disabled={rebuilding}
                 className="w-full flex items-center justify-center gap-2 text-xs text-muted hover:text-text border border-border hover:border-border-hover rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
               >
                 <RefreshCw size={11} className={rebuilding ? 'animate-spin' : ''} />
                 {rebuilding ? 'Rebuilding…' : 'Rebuild Feed Cache'}
-              </button>
+              </button>}
               <button
                 onClick={async () => {
-                  await api.resetAll().catch(() => {})
+                  try {
+                    await api.resetAll()
+                  } catch (err) {
+                    toast(err.message, 'error')
+                    return
+                  }
+                  // accounts live in Keycloak and survive; only the profile has to be recreated
                   clearUsers()
+                  setNeedsProfile(keycloak.authenticated)
                   navigate('/auth')
                   toast('All data wiped.')
                 }}

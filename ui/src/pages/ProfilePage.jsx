@@ -47,14 +47,14 @@ export function ProfilePage() {
     setFollowLoading(true)
     try {
       if (isFollowing) {
-        await api.unfollowUser(profileUserId, currentUser.id)
+        await api.unfollowUser(profileUserId)
         setFollowers(f => f.filter(id => id !== currentUser.id))
         toast(`Unfollowed @${user?.username}`)
         // rebuild only this user's feed then clear local state so home reloads
         api.rebuildUserFeed(currentUser.id).catch(() => {})
         setFeed([])
       } else {
-        await api.followUser(profileUserId, currentUser.id)
+        await api.followUser(profileUserId)
         setFollowers(f => [...f, currentUser.id])
         toast(`Now following @${user?.username}!`)
       }

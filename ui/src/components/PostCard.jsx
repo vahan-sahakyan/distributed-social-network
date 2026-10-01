@@ -9,17 +9,18 @@ import { timeAgo, shortId } from '../utils'
 
 export function PostCard({ post }) {
   const navigate = useNavigate()
-  const { currentUser, usersById, toast } = useStore()
+  const { currentUser, usersById, ensureUser, toast } = useStore()
   const [liked, setLiked] = useState(false)
   const [likes, setLikes] = useState(post.likesCount)
   const [showComments, setShowComments] = useState(false)
 
   const author = usersById[post.authorId]
+  useEffect(() => { ensureUser(post.authorId) }, [post.authorId, ensureUser])
   const username = author?.username || shortId(post.authorId)
 
   useEffect(() => {
     if (!currentUser) return
-    api.hasLiked(currentUser.id, post.id)
+    api.hasLiked(post.id)
       .then(v => setLiked(v))
       .catch(() => {})
   }, [currentUser?.id, post.id])
@@ -30,7 +31,7 @@ export function PostCard({ post }) {
       setLiked(false)
       setLikes(l => l - 1)
       try {
-        await api.unlike(currentUser.id, post.id)
+        await api.unlike(post.id)
       } catch (err) {
         setLiked(true)
         setLikes(l => l + 1)
@@ -40,7 +41,7 @@ export function PostCard({ post }) {
       setLiked(true)
       setLikes(l => l + 1)
       try {
-        await api.like(currentUser.id, post.id)
+        await api.like(post.id)
       } catch (err) {
         setLiked(false)
         setLikes(l => l - 1)
