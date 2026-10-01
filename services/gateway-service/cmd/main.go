@@ -153,7 +153,7 @@ func main() {
 		search:         searchpb.NewSearchServiceClient(mustDial(envOrDefault("SEARCH_SERVICE_GRPC_ADDR", "localhost:9091"))),
 	}
 
-	registerRoutes(app, cl)
+	registerRoutes(app, cl, requireUser(newVerifier(context.Background())))
 
 	// media URLs are bucket paths, served from the public-read bucket
 	minioAddr := envOrDefault("MINIO_ENDPOINT", "localhost:9000")
@@ -170,18 +170,31 @@ func main() {
 	log.Fatal(app.Listen(":" + port))
 }
 
-func registerRoutes(app *fiber.App, cl *clients) {
+// registerRoutes wires the API; routes behind auth act as the token's user and
+// ignore any user id in the request.
+func registerRoutes(app *fiber.App, cl *clients, auth fiber.Handler) {
 	// --- users ---
-	app.Post("/api/v1/users/", func(c *fiber.Ctx) error {
-		var req userspb.CreateUserRequest
-		if err := c.BodyParser(&req); err != nil {
+	// creates the caller's profile: id and username come from the token
+	app.Post("/api/v1/users/", auth, func(c *fiber.Ctx) error {
+		var body struct {
+			Bio string `json:"bio"`
+		}
+		if err := c.BodyParser(&body); err != nil && len(c.Body()) > 0 {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid body"})
 		}
-		resp, err := cl.users.CreateUser(c.UserContext(), &req)
+		me := caller(c)
+		resp, err := cl.users.CreateUser(c.UserContext(), &userspb.CreateUserRequest{Id: me.ID, Username: me.Username, Bio: body.Bio})
 		if err != nil {
 			return grpcErrStatus(c, err)
 		}
 		return c.Status(fiber.StatusCreated).JSON(resp.User)
+	})
+	app.Get("/api/v1/me", auth, func(c *fiber.Ctx) error {
+		resp, err := cl.users.GetUser(c.UserContext(), &userspb.GetUserRequest{Id: caller(c).ID})
+		if err != nil {
+			return grpcErrStatus(c, err)
+		}
+		return c.JSON(resp.User)
 	})
 	app.Get("/api/v1/users/by-username/:username", func(c *fiber.Ctx) error {
 		resp, err := cl.users.GetUserByUsername(c.UserContext(), &userspb.GetUserByUsernameRequest{Username: c.Params("username")})
@@ -197,23 +210,15 @@ func registerRoutes(app *fiber.App, cl *clients) {
 		}
 		return c.JSON(resp.User)
 	})
-	app.Post("/api/v1/users/:id/follow", func(c *fiber.Ctx) error {
-		var req userspb.FollowUserRequest
-		if err := c.BodyParser(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid body"})
-		}
-		req.TargetId = c.Params("id")
+	app.Post("/api/v1/users/:id/follow", auth, func(c *fiber.Ctx) error {
+		req := userspb.FollowUserRequest{FollowerId: caller(c).ID, TargetId: c.Params("id")}
 		if _, err := cl.users.FollowUser(c.UserContext(), &req); err != nil {
 			return grpcErrStatus(c, err)
 		}
 		return c.SendStatus(fiber.StatusNoContent)
 	})
-	app.Delete("/api/v1/users/:id/follow", func(c *fiber.Ctx) error {
-		var req userspb.UnfollowUserRequest
-		if err := c.BodyParser(&req); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid body"})
-		}
-		req.TargetId = c.Params("id")
+	app.Delete("/api/v1/users/:id/follow", auth, func(c *fiber.Ctx) error {
+		req := userspb.UnfollowUserRequest{FollowerId: caller(c).ID, TargetId: c.Params("id")}
 		if _, err := cl.users.UnfollowUser(c.UserContext(), &req); err != nil {
 			return grpcErrStatus(c, err)
 		}
@@ -235,11 +240,12 @@ func registerRoutes(app *fiber.App, cl *clients) {
 	})
 
 	// --- posts ---
-	app.Post("/api/v1/posts/", func(c *fiber.Ctx) error {
+	app.Post("/api/v1/posts/", auth, func(c *fiber.Ctx) error {
 		var req postspb.CreatePostRequest
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid body"})
 		}
+		req.AuthorId = caller(c).ID
 		resp, err := cl.posts.CreatePost(c.UserContext(), &req)
 		if err != nil {
 			return grpcErrStatus(c, err)
@@ -255,11 +261,12 @@ func registerRoutes(app *fiber.App, cl *clients) {
 	})
 
 	// --- comments ---
-	app.Post("/api/v1/comments/", func(c *fiber.Ctx) error {
+	app.Post("/api/v1/comments/", auth, func(c *fiber.Ctx) error {
 		var req commentspb.CreateCommentRequest
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid body"})
 		}
+		req.UserId = caller(c).ID
 		resp, err := cl.comments.CreateComment(c.UserContext(), &req)
 		if err != nil {
 			return grpcErrStatus(c, err)
@@ -275,20 +282,21 @@ func registerRoutes(app *fiber.App, cl *clients) {
 	})
 
 	// --- likes ---
-	app.Post("/api/v1/likes/", func(c *fiber.Ctx) error {
+	app.Post("/api/v1/likes/", auth, func(c *fiber.Ctx) error {
 		var req likespb.CreateLikeRequest
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid body"})
 		}
+		req.UserId = caller(c).ID
 		resp, err := cl.likes.CreateLike(c.UserContext(), &req)
 		if err != nil {
 			return grpcErrStatus(c, err)
 		}
 		return c.Status(fiber.StatusCreated).JSON(resp.Like)
 	})
-	app.Get("/api/v1/likes/check", func(c *fiber.Ctx) error {
+	app.Get("/api/v1/likes/check", auth, func(c *fiber.Ctx) error {
 		resp, err := cl.likes.HasLiked(c.UserContext(), &likespb.HasLikedRequest{
-			UserId:   c.Query("user_id"),
+			UserId:   caller(c).ID,
 			EntityId: c.Query("entity_id"),
 		})
 		if err != nil {
@@ -296,11 +304,12 @@ func registerRoutes(app *fiber.App, cl *clients) {
 		}
 		return c.JSON(fiber.Map{"liked": resp.Liked})
 	})
-	app.Delete("/api/v1/likes/", func(c *fiber.Ctx) error {
+	app.Delete("/api/v1/likes/", auth, func(c *fiber.Ctx) error {
 		var req likespb.UnlikeRequest
 		if err := c.BodyParser(&req); err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "invalid body"})
 		}
+		req.UserId = caller(c).ID
 		if _, err := cl.likes.Unlike(c.UserContext(), &req); err != nil {
 			return grpcErrStatus(c, err)
 		}
@@ -308,8 +317,8 @@ func registerRoutes(app *fiber.App, cl *clients) {
 	})
 
 	// --- feed ---
-	app.Get("/api/v1/feed/home", func(c *fiber.Ctx) error {
-		resp, err := cl.feed.GetHomeFeed(c.UserContext(), &feedpb.GetHomeFeedRequest{UserId: c.Query("user_id")})
+	app.Get("/api/v1/feed/home", auth, func(c *fiber.Ctx) error {
+		resp, err := cl.feed.GetHomeFeed(c.UserContext(), &feedpb.GetHomeFeedRequest{UserId: caller(c).ID})
 		if err != nil {
 			return grpcErrStatus(c, err)
 		}
@@ -324,7 +333,7 @@ func registerRoutes(app *fiber.App, cl *clients) {
 	})
 
 	// --- media ---
-	app.Post("/api/v1/media/upload", func(c *fiber.Ctx) error {
+	app.Post("/api/v1/media/upload", auth, func(c *fiber.Ctx) error {
 		file, err := c.FormFile("file")
 		if err != nil {
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": "file required"})
@@ -382,8 +391,8 @@ func registerRoutes(app *fiber.App, cl *clients) {
 	})
 
 	// --- notifications ---
-	app.Get("/api/v1/notifications/:user_id", func(c *fiber.Ctx) error {
-		resp, err := cl.notifications.GetNotifications(c.UserContext(), &notificationspb.GetNotificationsRequest{UserId: c.Params("user_id")})
+	app.Get("/api/v1/notifications", auth, func(c *fiber.Ctx) error {
+		resp, err := cl.notifications.GetNotifications(c.UserContext(), &notificationspb.GetNotificationsRequest{UserId: caller(c).ID})
 		if err != nil {
 			return grpcErrStatus(c, err)
 		}
@@ -423,7 +432,7 @@ func registerRoutes(app *fiber.App, cl *clients) {
 	})
 
 	// --- cache rebuild ---
-	app.Post("/api/v1/rebuild", func(c *fiber.Ctx) error {
+	app.Post("/api/v1/rebuild", auth, func(c *fiber.Ctx) error {
 		// a full rebuild replays up to 1000 events, well past the default call timeout
 		ctx, cancel := context.WithTimeout(c.UserContext(), 2*time.Minute)
 		defer cancel()
@@ -436,7 +445,14 @@ func registerRoutes(app *fiber.App, cl *clients) {
 		return c.JSON(fiber.Map{"status": resp.Status})
 	})
 
+	app.Get("/health", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{"status": "ok"})
+	})
+
 	// --- reset (dev only) ---
+	if os.Getenv("ALLOW_RESET") != "true" {
+		return
+	}
 	app.Post("/api/v1/reset", func(c *fiber.Ctx) error {
 		ctx := c.UserContext()
 		results := map[string]error{
@@ -464,9 +480,6 @@ func registerRoutes(app *fiber.App, cl *clients) {
 		return c.JSON(fiber.Map{"status": "reset complete"})
 	})
 
-	app.Get("/health", func(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"status": "ok"})
-	})
 }
 
 func errOnly[T any](_ T, err error) error {

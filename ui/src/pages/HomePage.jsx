@@ -1,45 +1,25 @@
 import { useEffect, useState } from 'react'
-import { RefreshCw, Play } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { RefreshCw } from 'lucide-react'
 import { PostComposer } from '../components/PostComposer'
 import { PostCard } from '../components/PostCard'
 import { api } from '../api'
 import { useStore } from '../store'
 import { normalizePost } from '../utils'
-import { runDemo } from '../demo'
 
 export function HomePage() {
-  const navigate = useNavigate()
-  const { currentUser, feed, setFeed, addUser, setCurrentUser, toast } = useStore()
+  const { currentUser, feed, setFeed, toast } = useStore()
   const [loading, setLoading] = useState(false)
-  const [demoRunning, setDemoRunning] = useState(false)
 
   async function loadFeed() {
     if (!currentUser) return
     setLoading(true)
     try {
-      const data = await api.getHomeFeed(currentUser.id)
+      const data = await api.getHomeFeed()
       setFeed((Array.isArray(data) ? data : []).map(normalizePost))
     } catch (err) {
       toast(err.message, 'error')
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleDemo() {
-    setDemoRunning(true)
-    try {
-      const { users, loginAs } = await runDemo(() => {})
-      Object.values(users).forEach(u => addUser(u))
-      if (loginAs) {
-        setCurrentUser(loginAs)
-        toast('Demo ready! Feed loaded as @' + loginAs.username)
-      }
-    } catch (err) {
-      toast(err.message, 'error')
-    } finally {
-      setDemoRunning(false)
     }
   }
 
@@ -65,7 +45,7 @@ export function HomePage() {
 
       {!currentUser && (
         <div className="py-20 text-center px-6">
-          <p className="text-muted text-sm">Select or create a user in the sidebar to get started.</p>
+          <p className="text-muted text-sm">Log in to see your feed.</p>
         </div>
       )}
 
@@ -73,16 +53,8 @@ export function HomePage() {
         <div className="py-16 text-center px-8 space-y-5">
           <p className="text-muted text-sm">Your feed is empty.</p>
           <p className="text-xs text-muted/60 max-w-xs mx-auto">
-            Follow some users and create posts, then hit <strong className="text-muted">Rebuild Cache</strong> in the right panel — or just run the demo.
+            Follow some users and create posts, or run <code className="text-muted">make demo</code> and log in as alice, bob or charlie.
           </p>
-          <button
-            onClick={handleDemo}
-            disabled={demoRunning}
-            className="inline-flex items-center gap-2 bg-accent hover:bg-accent-hover disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-full transition-colors"
-          >
-            <Play size={13} fill="white" />
-            {demoRunning ? 'Setting up…' : 'Run Demo Setup'}
-          </button>
         </div>
       )}
 

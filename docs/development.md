@@ -59,7 +59,7 @@ npm run lint    # oxlint
 npm run build
 ```
 
-With compose running, the dev server talks to the compose gateway. `make ui` instead port-forwards a Kubernetes `gateway-service` to 8080 before starting Vite, so use it only against a cluster, with compose stopped.
+With compose running, the dev server talks to the compose gateway and logs in through the compose Keycloak (`VITE_KEYCLOAK_URL` in `ui/.env.development`; a production build uses `<origin>/auth`). `make demo` creates alice, bob and charlie with password `password`. `make ui` instead port-forwards a Kubernetes `gateway-service` to 8080 before starting Vite, so use it only against a cluster, with compose stopped.
 
 ## Project Layout
 
@@ -250,8 +250,13 @@ docker exec infrastructure-redpanda-1 rpk topic consume post.created --num 5
 ### Test endpoints directly
 
 ```bash
-# Through gateway
+# Through gateway: public reads need nothing
 curl -s http://localhost:8080/api/v1/users/by-username/alice | python3 -m json.tool
+
+# writes need a token; scripts/lib/auth.sh has helpers (kc_login, kc_ensure_user, kc_token)
+source scripts/lib/auth.sh
+curl -s -X POST http://localhost:8080/api/v1/posts/ -H "Authorization: Bearer $(kc_token alice)" \
+  -H 'Content-Type: application/json' -d '{"text":"hi"}'
 
 # Directly to a service over gRPC (no server reflection, so pass the proto)
 grpcurl -plaintext -import-path proto -proto users/users.proto \

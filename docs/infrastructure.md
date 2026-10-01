@@ -6,11 +6,11 @@
 
 ## Container Overview
 
-Locally the system runs **28 containers** (plus optional Kibana) via two Docker Compose files:
+Locally the system runs **30 containers** (plus optional Kibana) via two Docker Compose files:
 
 ```
 infrastructure/
-├── docker-compose.yml           # 17 infra containers (redpanda-init exits after setup), Kibana behind a profile
+├── docker-compose.yml           # 19 infra containers (redpanda-init exits after setup), Kibana behind a profile
 └── docker-compose.services.yml  # 11 app service containers
 ```
 
@@ -27,6 +27,7 @@ The UI is not in compose; run it with `npm run dev` (see [Development](developme
 | likes-db | `postgres:16.14-alpine` | 5432 | 5434 | Likes storage |
 | users-db | `postgres:16.14-alpine` | 5432 | 5436 | Users + follows storage |
 | notifications-db | `postgres:16.14-alpine` | 5432 | 5437 | Notifications storage |
+| keycloak-db | `postgres:16.14-alpine` | 5432 | - | Keycloak's own store |
 
 All PostgreSQL instances use:
 - User: `postgres`
@@ -34,6 +35,14 @@ All PostgreSQL instances use:
 - Each has its own named database matching the service
 
 ScyllaDB runs with `--smp 1 --memory 512M --overprovisioned 1`.
+
+### Identity
+
+| Container | Image | Host Ports | Purpose |
+|-----------|-------|-------|---------|
+| keycloak | `quay.io/keycloak/keycloak:26.7.5` | 8180 | OIDC provider, served under `/auth`; admin console admin/admin |
+
+The realm (`deploy/kubernetes/infra/files/dsn-realm.json`, shared with Helm) is imported only into an empty `keycloak-db`; after editing it, recreate the volume (`docker compose -f infrastructure/docker-compose.yml rm -sf keycloak keycloak-db && docker volume rm infrastructure_keycloak-data`) or change the realm in the admin console. Tokens carry the issuer `http://localhost:8180/auth/realms/dsn` however Keycloak is reached (`KC_HOSTNAME`). In Helm, set `keycloak.uiUrl` (infra chart) to the UI's public origin, and `ingress.host` (services chart) so the gateway checks the issuer.
 
 ### Event & Analytics
 
@@ -110,7 +119,8 @@ Persistent named volumes for all stateful services:
 ```
 posts-db-data, comments-db-data, likes-db-data, users-db-data,
 notifications-db-data, clickhouse-data, redpanda-data,
-minio-data, prometheus-data, grafana-data, loki-data, elasticsearch-data
+minio-data, prometheus-data, grafana-data, loki-data, elasticsearch-data,
+keycloak-data
 ```
 
 `make down-clean` (and `make fresh`) wipe all volumes.

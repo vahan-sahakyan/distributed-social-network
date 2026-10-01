@@ -38,9 +38,11 @@ Backend services serve their API over gRPC (`GRPC_PORT`, definitions in `proto/`
 /api/v1/likes/*          -> likes-service (gRPC)
 /api/v1/feed/*           -> feed-service (gRPC)
 /api/v1/media/*          -> media-service (gRPC, uploads streamed in 32 KB chunks)
-/api/v1/notifications/*  -> notification-service (gRPC)
+/api/v1/me               -> users-service (caller's profile)
+/api/v1/notifications    -> notification-service (gRPC)
+/api/v1/search/*         -> search-service (gRPC)
 /api/v1/rebuild          -> cache-rebuilder-service (gRPC)
-/api/v1/reset            -> Reset on every service (dev)
+/api/v1/reset            -> Reset on every service (only with ALLOW_RESET=true)
 /images/*                -> MinIO (HTTP proxy to the public-read bucket)
 /health                  -> local ({"status":"ok"})
 /metrics                 -> Prometheus metrics
@@ -60,6 +62,13 @@ Backend services serve their API over gRPC (`GRPC_PORT`, definitions in `proto/`
 | `CACHE_REBUILDER_SERVICE_GRPC_ADDR` | localhost:9089 | cache-rebuilder-service |
 | `MINIO_ENDPOINT` | localhost:9000 | MinIO, for `/images/*` |
 | `MINIO_BUCKET` | images | Bucket served under `/<bucket>/*` |
+| `SEARCH_SERVICE_GRPC_ADDR` | localhost:9091 | search-service |
+| `OIDC_JWKS_URL` | - (required) | Keycloak signing keys; the trust anchor for tokens |
+| `OIDC_ISSUER` | - | Expected `iss`, the public realm URL; unchecked when empty |
+| `OIDC_AUDIENCE` | dsn-api | Required `aud` |
+| `ALLOW_RESET` | - | `true` registers `POST /api/v1/reset` |
+
+Writes and private reads require a bearer token and act as its `sub`; see [API](api.md#authentication).
 
 ---
 

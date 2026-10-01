@@ -51,10 +51,12 @@ for i in $(seq 1 30); do
 done
 echo -e "${GREEN}All services ready!${NC}"
 
-# Helper to POST JSON and extract field
+source "$(dirname "$0")/lib/auth.sh"
+
+# post_json <url> <json> <token>: POST as the token's user, exit on an error response
 post_json() {
   local response
-  response=$(curl -s -X POST "$1" -H "Content-Type: application/json" -d "$2")
+  response=$(curl -s -X POST "$1" -H "Content-Type: application/json" -H "Authorization: Bearer $3" -d "$2")
   if echo "$response" | grep -q '"error"'; then
     echo "ERROR: $response" >&2
     exit 1
@@ -62,25 +64,33 @@ post_json() {
   echo "$response"
 }
 
-# create_user returns the existing user when the username is taken, so the demo can rerun
-create_user() {
-  local response code
-  response=$(curl -s -w '\n%{http_code}' -X POST "$API/users/" -H "Content-Type: application/json" -d "$2")
-  code="${response##*$'\n'}"
-  response="${response%$'\n'*}"
-  if [[ "$code" == 409 ]]; then
-    curl -s "$API/users/by-username/$1"
-    return
+# get_json <url> [token]
+get_json() {
+  if [[ -n "${2:-}" ]]; then
+    curl -s "$1" -H "Authorization: Bearer $2"
+  else
+    curl -s "$1"
   fi
-  if [[ "$code" != 201 ]]; then
-    echo "ERROR: $response" >&2
-    exit 1
-  fi
-  echo "$response"
 }
 
-get_json() {
-  curl -s "$1"
+# follow <target id> <token>
+follow() {
+  curl -sf -X POST "$API/users/$1/follow" -H "Authorization: Bearer $2" -o /dev/null -w "  HTTP %{http_code}\n"
+}
+
+# sign_up <username> <bio>: ensures the Keycloak account, prints its token, and
+# creates the profile on first run (a rerun finds it via /me)
+sign_up() {
+  kc_ensure_user "$1" >&2
+  local token code
+  token=$(kc_token "$1")
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/users/" \
+    -H "Content-Type: application/json" -H "Authorization: Bearer $token" -d "{\"bio\":\"$2\"}")
+  if [[ "$code" != 201 && "$code" != 409 ]]; then
+    echo "ERROR: creating profile for $1: HTTP $code" >&2
+    exit 1
+  fi
+  echo "$token"
 }
 
 extract() {
@@ -92,45 +102,42 @@ pretty() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-section "1. CREATE USERS"
+section "1. SIGN UP (Keycloak accounts + profiles)"
 # ─────────────────────────────────────────────────────────────────────────────
 
-step "Creating Alice (software engineer)..."
-ALICE_RAW=$(create_user alice '{"username":"alice","display_name":"Alice Johnson","bio":"Software engineer & open source enthusiast"}')
-ALICE_ID=$(echo "$ALICE_RAW" | extract id)
-echo "$ALICE_RAW" | pretty
-info "Alice ID: $ALICE_ID"
+kc_login
+info "Accounts use password '$DEMO_PASSWORD'; log in to the UI as any of them."
 
-step "Creating Bob (DevOps wizard)..."
-BOB_RAW=$(create_user bob '{"username":"bob","display_name":"Bob Smith","bio":"DevOps wizard, coffee addict"}')
-BOB_ID=$(echo "$BOB_RAW" | extract id)
-echo "$BOB_RAW" | pretty
-info "Bob ID: $BOB_ID"
+step "Alice (software engineer)..."
+ALICE=$(sign_up alice "Software engineer & open source enthusiast")
+ALICE_ID=$(get_json "$API/me" "$ALICE" | extract id)
+get_json "$API/me" "$ALICE" | pretty
 
-step "Creating Charlie (full-stack dev)..."
-CHARLIE_RAW=$(create_user charlie '{"username":"charlie","display_name":"Charlie Davis","bio":"Full-stack developer & writer"}')
-CHARLIE_ID=$(echo "$CHARLIE_RAW" | extract id)
-echo "$CHARLIE_RAW" | pretty
-info "Charlie ID: $CHARLIE_ID"
+step "Bob (DevOps wizard)..."
+BOB=$(sign_up bob "DevOps wizard, coffee addict")
+BOB_ID=$(get_json "$API/me" "$BOB" | extract id)
+get_json "$API/me" "$BOB" | pretty
+
+step "Charlie (full-stack dev)..."
+CHARLIE=$(sign_up charlie "Full-stack developer & writer")
+CHARLIE_ID=$(get_json "$API/me" "$CHARLIE" | extract id)
+get_json "$API/me" "$CHARLIE" | pretty
+
+step "Writes need a token: posting without one..."
+curl -s -X POST "$API/posts/" -H "Content-Type: application/json" -d '{"text":"anonymous"}' -w "  HTTP %{http_code}\n"
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "2. FOLLOW RELATIONSHIPS"
 # ─────────────────────────────────────────────────────────────────────────────
 
 step "Bob follows Alice..."
-curl -sf -X POST "$API/users/$ALICE_ID/follow" \
-  -H "Content-Type: application/json" \
-  -d "{\"follower_id\":\"$BOB_ID\"}" -o /dev/null -w "  HTTP %{http_code}\n"
+follow "$ALICE_ID" "$BOB"
 
 step "Charlie follows Alice..."
-curl -sf -X POST "$API/users/$ALICE_ID/follow" \
-  -H "Content-Type: application/json" \
-  -d "{\"follower_id\":\"$CHARLIE_ID\"}" -o /dev/null -w "  HTTP %{http_code}\n"
+follow "$ALICE_ID" "$CHARLIE"
 
 step "Alice follows Bob..."
-curl -sf -X POST "$API/users/$BOB_ID/follow" \
-  -H "Content-Type: application/json" \
-  -d "{\"follower_id\":\"$ALICE_ID\"}" -o /dev/null -w "  HTTP %{http_code}\n"
+follow "$BOB_ID" "$ALICE"
 
 step "Verifying: Alice's followers"
 get_json "$API/users/$ALICE_ID/followers" | pretty
@@ -143,17 +150,15 @@ section "3. CREATE POSTS"
 # ─────────────────────────────────────────────────────────────────────────────
 
 step "Alice posts about microservices..."
-POST1_RAW=$(post_json "$API/posts/" "{\"author_id\":\"$ALICE_ID\",\"text\":\"Just deployed our new microservices architecture! 10 services running with full observability. #distributed #golang\"}")
+POST1_RAW=$(post_json "$API/posts/" '{"text":"Just deployed our new microservices architecture! 11 services running with full observability. #distributed #golang"}' "$ALICE")
 POST1_ID=$(echo "$POST1_RAW" | extract id)
 echo "$POST1_RAW" | pretty
 
 step "Alice posts a pro tip..."
-POST2_RAW=$(post_json "$API/posts/" "{\"author_id\":\"$ALICE_ID\",\"text\":\"Pro tip: Always add Prometheus metrics to your services from day one. You'll thank yourself later.\"}")
-POST2_ID=$(echo "$POST2_RAW" | extract id)
-echo "$POST2_RAW" | pretty
+post_json "$API/posts/" "{\"text\":\"Pro tip: Always add Prometheus metrics to your services from day one. You'll thank yourself later.\"}" "$ALICE" | pretty
 
 step "Bob posts about Docker..."
-POST3_RAW=$(post_json "$API/posts/" "{\"author_id\":\"$BOB_ID\",\"text\":\"Docker Compose + Go services = chefs kiss. Our local dev environment spins up 24 containers in seconds.\"}")
+POST3_RAW=$(post_json "$API/posts/" '{"text":"Docker Compose + Go services = chefs kiss. Our local dev environment spins up 30 containers in seconds."}' "$BOB")
 POST3_ID=$(echo "$POST3_RAW" | extract id)
 echo "$POST3_RAW" | pretty
 
@@ -162,26 +167,26 @@ section "4. LIKES"
 # ─────────────────────────────────────────────────────────────────────────────
 
 step "Bob likes Alice's microservices post..."
-post_json "$API/likes/" "{\"entity_id\":\"$POST1_ID\",\"user_id\":\"$BOB_ID\"}" | pretty
+post_json "$API/likes/" "{\"entity_id\":\"$POST1_ID\"}" "$BOB" | pretty
 
 step "Charlie likes Alice's microservices post..."
-post_json "$API/likes/" "{\"entity_id\":\"$POST1_ID\",\"user_id\":\"$CHARLIE_ID\"}" | pretty
+post_json "$API/likes/" "{\"entity_id\":\"$POST1_ID\"}" "$CHARLIE" | pretty
 
 step "Alice likes Bob's Docker post..."
-post_json "$API/likes/" "{\"entity_id\":\"$POST3_ID\",\"user_id\":\"$ALICE_ID\"}" | pretty
+post_json "$API/likes/" "{\"entity_id\":\"$POST3_ID\"}" "$ALICE" | pretty
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "5. COMMENTS"
 # ─────────────────────────────────────────────────────────────────────────────
 
 step "Bob comments on Alice's post..."
-post_json "$API/comments/" "{\"entity_id\":\"$POST1_ID\",\"user_id\":\"$BOB_ID\",\"text\":\"This is incredible! How long did the migration take?\"}" | pretty
+post_json "$API/comments/" "{\"entity_id\":\"$POST1_ID\",\"text\":\"This is incredible! How long did the migration take?\"}" "$BOB" | pretty
 
 step "Charlie comments on Alice's post..."
-post_json "$API/comments/" "{\"entity_id\":\"$POST1_ID\",\"user_id\":\"$CHARLIE_ID\",\"text\":\"Love the architecture! Would you recommend ScyllaDB for the posts store?\"}" | pretty
+post_json "$API/comments/" "{\"entity_id\":\"$POST1_ID\",\"text\":\"Love the architecture! Would you recommend ScyllaDB for the posts store?\"}" "$CHARLIE" | pretty
 
 step "Alice replies on Bob's post..."
-post_json "$API/comments/" "{\"entity_id\":\"$POST3_ID\",\"user_id\":\"$ALICE_ID\",\"text\":\"Thanks! Go fast compile times make iteration a breeze.\"}" | pretty
+post_json "$API/comments/" "{\"entity_id\":\"$POST3_ID\",\"text\":\"Thanks! Go fast compile times make iteration a breeze.\"}" "$ALICE" | pretty
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "6. MEDIA UPLOAD"
@@ -189,7 +194,7 @@ section "6. MEDIA UPLOAD"
 
 step "Uploading a test file to MinIO via media-service..."
 echo "Hello from the Distributed Social Network! 🌐" > /tmp/dsn-demo-upload.txt
-curl -sf -X POST "$API/media/upload" -F "file=@/tmp/dsn-demo-upload.txt" | pretty
+curl -sf -X POST "$API/media/upload" -H "Authorization: Bearer $ALICE" -F "file=@/tmp/dsn-demo-upload.txt" | pretty
 rm -f /tmp/dsn-demo-upload.txt
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -210,14 +215,14 @@ section "8. FEED SERVICE"
 # ─────────────────────────────────────────────────────────────────────────────
 
 step "Bob's home feed (Memcached-backed, populated via event fanout)..."
-get_json "$API/feed/user/$BOB_ID" | pretty
+get_json "$API/feed/home" "$BOB" | pretty
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "9. NOTIFICATIONS"
 # ─────────────────────────────────────────────────────────────────────────────
 
 step "Alice's notifications (from likes/comments events)..."
-get_json "$API/notifications/$ALICE_ID" | pretty
+get_json "$API/notifications" "$ALICE" | pretty
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "10. EVENT STREAMING (Redpanda → ClickHouse)"
@@ -295,6 +300,8 @@ echo "
 │  Gateway:           $BASE_URL                                    │
 │  Prometheus:        http://localhost:9090                                    │
 │  Grafana:           http://localhost:3000  (admin/admin, DSN Overview)       │
+│  Keycloak:          http://localhost:8180/auth  (admin/admin; users: pw     │
+│                     "password")                                              │
 │  Jaeger:            http://localhost:16686                                   │
 │  Redpanda Console:  http://localhost:8888                                    │
 │  Elasticsearch:     http://localhost:9200  (make kibana for Kibana :5601)    │

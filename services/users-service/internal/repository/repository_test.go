@@ -16,7 +16,7 @@ func TestTranslate(t *testing.T) {
 		err       error
 		wantTaken bool
 	}{
-		{"wrapped unique violation", fmt.Errorf("insert: %w", &pgconn.PgError{Code: "23505"}), true},
+		{"wrapped unique violation", fmt.Errorf("insert: %w", &pgconn.PgError{Code: "23505", ConstraintName: "users_username_key"}), true},
 		{"not null violation", &pgconn.PgError{Code: "23502"}, false},
 		{"non pg error", errors.New("boom"), false},
 	}
@@ -33,6 +33,9 @@ func TestTranslate(t *testing.T) {
 	}
 	if !errors.Is(translate(fmt.Errorf("scan: %w", pgx.ErrNoRows)), model.ErrUserNotFound) {
 		t.Error("no rows should be ErrUserNotFound")
+	}
+	if !errors.Is(translate(&pgconn.PgError{Code: "23505", ConstraintName: "users_pkey"}), model.ErrUserExists) {
+		t.Error("a duplicate id should be ErrUserExists")
 	}
 	if translate(nil) != nil {
 		t.Error("translate(nil) != nil")

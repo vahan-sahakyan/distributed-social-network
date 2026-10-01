@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
-	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/repository"
 )
@@ -20,7 +19,7 @@ func New(repo *repository.Repository) *Service {
 
 func (s *Service) CreateUser(ctx context.Context, req *model.CreateUserRequest) (*model.User, error) {
 	user := &model.User{
-		ID:        id.New(),
+		ID:        req.ID,
 		Username:  req.Username,
 		Bio:       req.Bio,
 		CreatedAt: time.Now().UTC(),

@@ -1,14 +1,20 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { api } from './api'
+
+// profile lookups in flight, so a feed of one author's posts fetches it once
+const loading = new Set()
 
 export const useStore = create(
   persist(
     (set, get) => ({
-      // persisted across sessions
+      // persisted across sessions: profiles seen, for names and the People list
       users: [],
       usersById: {},
-      // session-only
+      // session-only; set from the login session via /me
       currentUser: null,
+      // logged in to Keycloak but no profile created yet
+      needsProfile: false,
       feed: [],
       notifications: [],
       toasts: [],
@@ -26,7 +32,26 @@ export const useStore = create(
 
       setCurrentUser(user) {
         if (user) get().addUser(user)
-        set({ currentUser: user, feed: [], notifications: [] })
+        // the same user again (e.g. a repeated /me) keeps the loaded feed
+        if (user?.id && user.id === get().currentUser?.id) {
+          set({ currentUser: user, needsProfile: false })
+          return
+        }
+        set({ currentUser: user, needsProfile: false, feed: [], notifications: [] })
+      },
+
+      setNeedsProfile(needsProfile) { set({ needsProfile }) },
+
+      /** Fetch and cache a profile not seen yet, for showing usernames. */
+      async ensureUser(id) {
+        if (!id || get().usersById[id] || loading.has(id)) return
+        loading.add(id)
+        try {
+          get().addUser(await api.getUser(id))
+        } catch { /* unknown or deleted: keep the short id */ }
+        finally {
+          loading.delete(id)
+        }
       },
 
       setFeed(feed) { set({ feed }) },
@@ -61,7 +86,7 @@ export const useStore = create(
     }),
     {
       name: 'socialnet-store',
-      partialize: s => ({ users: s.users, usersById: s.usersById, currentUser: s.currentUser }),
+      partialize: s => ({ users: s.users, usersById: s.usersById }),
     }
   )
 )

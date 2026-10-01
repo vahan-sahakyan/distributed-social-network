@@ -14,7 +14,7 @@ http://localhost:8080/api/v1
 
 ## Conventions
 
-- **No authentication.** The acting user is passed in the body or query (`user_id`, `follower_id`, `author_id`).
+- **Authentication:** endpoints marked (auth) need `Authorization: Bearer <access token>` from Keycloak (realm `dsn`, see [Authentication](#authentication)). They act as the token's user: `user_id`, `author_id` or `follower_id` in a body is ignored. Missing, expired or foreign tokens get `401`. Everything else is public.
 - **Success:** resource JSON with 200, 201 or 204.
 - **Error:** `{"error": "<message>"}`. gRPC codes map to `NotFound` -> 404, `InvalidArgument` -> 400, `AlreadyExists` -> 409, `Unavailable` -> 503, `DeadlineExceeded` -> 504, anything else -> 500. Backend calls time out after 5s (cache rebuild: 2m). An unparseable body is 400. 5xx bodies are generic, `{"error": "internal error", "trace_id": "..."}`; the cause is in the gateway log under that trace id.
 - **Validation (400):** required ids and text must be non-blank; `username` is 1-32 letters, digits or underscores; `bio` <= 500, post `text` <= 5000 (a post needs `text` or `image_id`), comment `text` <= 2000 characters; users can't follow themselves.
@@ -25,16 +25,29 @@ http://localhost:8080/api/v1
 
 ---
 
+## Authentication
+
+Accounts live in Keycloak (`http://localhost:8180/auth` in compose, `/auth` on the cluster host). Browsers use the `dsn-ui` client (authorization code + PKCE); local scripts can use the `dsn-cli` password grant:
+
+```bash
+curl -s -X POST http://localhost:8180/auth/realms/dsn/protocol/openid-connect/token \
+  -d grant_type=password -d client_id=dsn-cli -d username=alice -d password=password
+```
+
+Tokens last 15 minutes. A new account has no profile until it calls `POST /api/v1/users/`. Decision record: [ADR 0003](adr/0003-authentication-oidc-keycloak.md).
+
+---
+
 ## Users
 
-### Create User
+### Create Profile (auth)
 
 ```http
 POST /api/v1/users/
+Authorization: Bearer <token>
 Content-Type: application/json
 
 {
-  "username": "alice",
   "bio": "Software engineer"
 }
 ```
@@ -42,12 +55,22 @@ Content-Type: application/json
 **Response** `201 Created`:
 ```json
 {
-  "id": "30a46156e6b96a2a9d2c96bc765ab511",
+  "id": "ac9b4762-85c6-43fe-a280-c452e609d2d3",
   "username": "alice",
   "bio": "Software engineer",
   "created_at": {"seconds": 1781488793, "nanos": 301000000}
 }
 ```
+
+> `id` is the token's subject and `username` its `preferred_username`. `409` if the caller already has a profile.
+
+### Get Own Profile (auth)
+
+```http
+GET /api/v1/me
+```
+
+**Response** `200 OK`: the profile, as above. `404` until the caller created one.
 
 ### Get User
 
@@ -58,21 +81,16 @@ GET /api/v1/users/by-username/:username
 
 **Response** `200 OK`: the user, as above. `404` if not found.
 
-### Follow / Unfollow User
+### Follow / Unfollow User (auth)
 
 ```http
 POST   /api/v1/users/:id/follow
 DELETE /api/v1/users/:id/follow
-Content-Type: application/json
-
-{
-  "follower_id": "c3abbc40aa9c8de72e21ee92d3f4e5cf"
-}
 ```
 
 **Response** `204 No Content`
 
-> `:id` is the user being followed. `follower_id` is the user doing the following.
+> The caller follows or unfollows `:id`.
 
 ### Get Followers
 
@@ -109,7 +127,7 @@ GET /api/v1/users/:id/following
 
 ## Posts
 
-### Create Post
+### Create Post (auth)
 
 ```http
 POST /api/v1/posts/
@@ -117,7 +135,6 @@ Content-Type: application/json
 
 {
   "text": "Hello distributed world!",
-  "author_id": "30a46156e6b96a2a9d2c96bc765ab511",
   "image_id": "optional-media-id"
 }
 ```
@@ -147,14 +164,13 @@ GET /api/v1/posts/:id
 
 ## Comments
 
-### Create Comment
+### Create Comment (auth)
 
 ```http
 POST /api/v1/comments/
 Content-Type: application/json
 
 {
-  "user_id": "c3abbc40aa9c8de72e21ee92d3f4e5cf",
   "entity_id": "8316cac68f930d1006c9bcac26a6b3c9",
   "text": "Great post!"
 }
@@ -185,14 +201,13 @@ GET /api/v1/comments/entity/:entity_id
 
 ## Likes
 
-### Like
+### Like (auth)
 
 ```http
 POST /api/v1/likes/
 Content-Type: application/json
 
 {
-  "user_id": "c3abbc40aa9c8de72e21ee92d3f4e5cf",
   "entity_id": "8316cac68f930d1006c9bcac26a6b3c9"
 }
 ```
@@ -210,14 +225,13 @@ Content-Type: application/json
 
 > Idempotent: a repeated like returns 201 but stores nothing and publishes no event.
 
-### Unlike
+### Unlike (auth)
 
 ```http
 DELETE /api/v1/likes/
 Content-Type: application/json
 
 {
-  "user_id": "c3abbc40aa9c8de72e21ee92d3f4e5cf",
   "entity_id": "8316cac68f930d1006c9bcac26a6b3c9"
 }
 ```
@@ -226,10 +240,10 @@ Content-Type: application/json
 
 **Side effect:** Publishes `like.deleted` if a like was removed.
 
-### Check Like
+### Check Like (auth)
 
 ```http
-GET /api/v1/likes/check?user_id=:user_id&entity_id=:entity_id
+GET /api/v1/likes/check?entity_id=:entity_id
 ```
 
 **Response** `200 OK`:
@@ -243,7 +257,7 @@ GET /api/v1/likes/check?user_id=:user_id&entity_id=:entity_id
 
 ## Media
 
-### Upload File
+### Upload File (auth)
 
 ```http
 POST /api/v1/media/upload
@@ -305,10 +319,10 @@ GET /api/v1/feed/user/:user_id
 
 > `image_url` currently holds the media id, not a URL. `likes_count`, `comments_count` and `image_url` are omitted when zero or empty.
 
-### Get Home Feed
+### Get Home Feed (auth)
 
 ```http
-GET /api/v1/feed/home?user_id=:user_id
+GET /api/v1/feed/home
 ```
 
 Same response format. Returns posts from the users the given user follows, plus their own.
@@ -319,10 +333,10 @@ Same response format. Returns posts from the users the given user follows, plus 
 
 ## Notifications
 
-### Get User Notifications
+### Get Notifications (auth)
 
 ```http
-GET /api/v1/notifications/:user_id
+GET /api/v1/notifications
 ```
 
 **Response** `200 OK`:
@@ -413,7 +427,7 @@ Hashtags by number of posts created in the last `hours` (default 24, max 720). `
 
 ## Cache Rebuilder
 
-### Trigger Rebuild
+### Trigger Rebuild (auth)
 
 ```http
 POST /api/v1/rebuild
@@ -439,7 +453,7 @@ POST /api/v1/reset
 
 **Response** `200 OK`: `{"status": "reset complete"}`
 
-> Calls `Reset` on every service: truncates all tables and the ClickHouse event store, flushes Memcached and empties the search indices. Uploaded files in MinIO are kept. Not access-controlled. Every service is attempted; if any fail it answers 500 `reset failed for <services>` with a `trace_id`.
+> Only registered when the gateway runs with `ALLOW_RESET=true` (compose); `404` elsewhere. Calls `Reset` on every service: truncates all tables and the ClickHouse event store, flushes Memcached and empties the search indices. Uploaded files in MinIO and Keycloak accounts are kept, so users recreate their profile on the next login. Every service is attempted; if any fail it answers 500 `reset failed for <services>` with a `trace_id`.
 
 ---
 

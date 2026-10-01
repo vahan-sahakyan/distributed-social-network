@@ -91,9 +91,11 @@ func (x *User) GetCreatedAt() *timestamppb.Timestamp {
 }
 
 type CreateUserRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Username      string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
-	Bio           string                 `protobuf:"bytes,2,opt,name=bio,proto3" json:"bio,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Username string                 `protobuf:"bytes,1,opt,name=username,proto3" json:"username,omitempty"`
+	Bio      string                 `protobuf:"bytes,2,opt,name=bio,proto3" json:"bio,omitempty"`
+	// the identity provider's subject; the gateway sets it from the caller's token
+	Id            string `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -138,6 +140,13 @@ func (x *CreateUserRequest) GetUsername() string {
 func (x *CreateUserRequest) GetBio() string {
 	if x != nil {
 		return x.Bio
+	}
+	return ""
+}
+
+func (x *CreateUserRequest) GetId() string {
+	if x != nil {
+		return x.Id
 	}
 	return ""
 }
@@ -804,10 +813,11 @@ const file_users_users_proto_rawDesc = "" +
 	"\busername\x18\x02 \x01(\tR\busername\x12\x10\n" +
 	"\x03bio\x18\x03 \x01(\tR\x03bio\x129\n" +
 	"\n" +
-	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"A\n" +
+	"created_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\"Q\n" +
 	"\x11CreateUserRequest\x12\x1a\n" +
 	"\busername\x18\x01 \x01(\tR\busername\x12\x10\n" +
-	"\x03bio\x18\x02 \x01(\tR\x03bio\"5\n" +
+	"\x03bio\x18\x02 \x01(\tR\x03bio\x12\x0e\n" +
+	"\x02id\x18\x03 \x01(\tR\x02id\"5\n" +
 	"\x12CreateUserResponse\x12\x1f\n" +
 	"\x04user\x18\x01 \x01(\v2\v.users.UserR\x04user\" \n" +
 	"\x0eGetUserRequest\x12\x0e\n" +

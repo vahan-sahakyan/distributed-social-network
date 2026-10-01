@@ -6,7 +6,7 @@ import { useStore } from '../store'
 import { timeAgo, shortId, parseTimestamp } from '../utils'
 
 export function CommentSection({ postId }) {
-  const { currentUser, usersById, toast } = useStore()
+  const { currentUser, usersById, toast, ensureUser } = useStore()
   const [comments, setComments] = useState([])
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(true)
@@ -23,7 +23,7 @@ export function CommentSection({ postId }) {
     if (!text.trim() || !currentUser || posting) return
     setPosting(true)
     try {
-      const c = await api.createComment(currentUser.id, postId, text.trim())
+      const c = await api.createComment(postId, text.trim())
       setComments(prev => [...prev, c])
       setText('')
     } catch (err) {
@@ -32,6 +32,8 @@ export function CommentSection({ postId }) {
       setPosting(false)
     }
   }
+
+  useEffect(() => { comments.forEach(c => ensureUser(c.user_id)) }, [comments, ensureUser])
 
   const username = (userId) => usersById[userId]?.username || shortId(userId)
 

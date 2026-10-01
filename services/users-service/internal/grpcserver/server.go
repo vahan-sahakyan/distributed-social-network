@@ -24,6 +24,9 @@ func New(svc *service.Service, resetFn func(ctx context.Context) error) *Server 
 }
 
 func (s *Server) CreateUser(ctx context.Context, req *userspb.CreateUserRequest) (*userspb.CreateUserResponse, error) {
+	if err := validate.Required("id", req.Id); err != nil {
+		return nil, err
+	}
 	if err := validate.Username(req.Username); err != nil {
 		return nil, err
 	}
@@ -31,9 +34,13 @@ func (s *Server) CreateUser(ctx context.Context, req *userspb.CreateUserRequest)
 		return nil, err
 	}
 	user, err := s.svc.CreateUser(ctx, &model.CreateUserRequest{
+		ID:       req.Id,
 		Username: req.Username,
 		Bio:      req.Bio,
 	})
+	if errors.Is(err, model.ErrUserExists) {
+		return nil, status.Error(codes.AlreadyExists, "profile already exists")
+	}
 	if errors.Is(err, model.ErrUsernameTaken) {
 		return nil, status.Errorf(codes.AlreadyExists, "username %q is already taken", req.Username)
 	}

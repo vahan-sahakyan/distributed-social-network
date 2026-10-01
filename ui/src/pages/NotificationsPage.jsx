@@ -16,14 +16,14 @@ const TYPE_LABEL = {
 }
 
 export function NotificationsPage() {
-  const { currentUser, notifications, setNotifications, usersById, toast } = useStore()
+  const { currentUser, notifications, setNotifications, usersById, ensureUser, toast } = useStore()
   const [loading, setLoading] = useState(false)
 
   async function load() {
     if (!currentUser) return
     setLoading(true)
     try {
-      const data = await api.getNotifications(currentUser.id)
+      const data = await api.getNotifications()
       setNotifications(data?.notifications || [])
     } catch (err) {
       toast(err.message, 'error')
@@ -33,6 +33,8 @@ export function NotificationsPage() {
   }
 
   useEffect(() => { load() }, [currentUser?.id])
+
+  useEffect(() => { notifications.forEach(n => ensureUser(n.actor_id)) }, [notifications, ensureUser])
 
   const username = (id) => usersById[id]?.username || shortId(id)
 

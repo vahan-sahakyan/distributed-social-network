@@ -8,6 +8,7 @@ import (
 var (
 	ErrUsernameTaken = errors.New("username already taken")
 	ErrUserNotFound  = errors.New("user not found")
+	ErrUserExists    = errors.New("profile already exists")
 )
 
 type User struct {
@@ -18,6 +19,7 @@ type User struct {
 }
 
 type CreateUserRequest struct {
+	ID       string `json:"id"`
 	Username string `json:"username"`
 	Bio      string `json:"bio,omitempty"`
 }

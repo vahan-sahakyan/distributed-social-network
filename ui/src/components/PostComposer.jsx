@@ -35,7 +35,7 @@ export function PostComposer({ onPost }) {
     if (!text.trim() || posting) return
     setPosting(true)
     try {
-      const post = await api.createPost(currentUser.id, text.trim(), imageId)
+      const post = await api.createPost(text.trim(), imageId)
       setText('')
       setImageId(null)
       if (imagePreview) {
