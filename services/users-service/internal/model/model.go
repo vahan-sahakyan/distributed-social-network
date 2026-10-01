@@ -5,7 +5,10 @@ import (
 	"time"
 )
 
-var ErrUsernameTaken = errors.New("username already taken")
+var (
+	ErrUsernameTaken = errors.New("username already taken")
+	ErrUserNotFound  = errors.New("user not found")
+)
 
 type User struct {
 	ID        string    `json:"id"`

@@ -2,6 +2,7 @@ package grpcserver
 
 import (
 	"context"
+	"errors"
 	"strings"
 
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
@@ -46,8 +47,11 @@ func (s *Server) CreatePost(ctx context.Context, req *postspb.CreatePostRequest)
 
 func (s *Server) GetPost(ctx context.Context, req *postspb.GetPostRequest) (*postspb.GetPostResponse, error) {
 	post, err := s.svc.GetPost(ctx, req.Id)
+	if errors.Is(err, model.ErrPostNotFound) {
+		return nil, status.Error(codes.NotFound, "post not found")
+	}
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "post not found")
+		return nil, status.Errorf(codes.Internal, "getting post: %v", err)
 	}
 	return &postspb.GetPostResponse{Post: toProto(post)}, nil
 }

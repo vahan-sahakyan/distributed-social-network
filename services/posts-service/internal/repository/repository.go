@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"errors"
 
 	"github.com/gocql/gocql"
 	"github.com/vahan-sahakyan/distributed-social-network/posts-service/internal/model"
@@ -28,6 +29,9 @@ func (r *Repository) GetByID(ctx context.Context, id string) (*model.Post, error
 	err := r.db.Query(
 		`SELECT id, text, author_id, image_id, created_at FROM posts WHERE id = ?`, id,
 	).WithContext(ctx).Scan(&post.ID, &post.Text, &post.AuthorID, &post.ImageID, &post.CreatedAt)
+	if errors.Is(err, gocql.ErrNotFound) {
+		return nil, model.ErrPostNotFound
+	}
 	if err != nil {
 		return nil, err
 	}
