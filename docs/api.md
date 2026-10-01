@@ -189,6 +189,8 @@ Content-Type: application/json
 
 **Side effect:** Publishes `comment.created`.
 
+> `404` if the post doesn't exist.
+
 ### Get Comments by Entity
 
 ```http
@@ -223,7 +225,7 @@ Content-Type: application/json
 
 **Side effect:** Publishes `like.created`.
 
-> Idempotent: a repeated like returns 201 but stores nothing and publishes no event.
+> Idempotent: a repeated like returns 201 but stores nothing and publishes no event. `404` if the post doesn't exist ([ADR 0004](adr/0004-post-existence-check.md)); unlike is not checked.
 
 ### Unlike (auth)
 

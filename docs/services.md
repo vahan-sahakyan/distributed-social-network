@@ -156,6 +156,7 @@ type Comment struct {
 | `GRPC_PORT` | 9083 | gRPC port |
 | `DATABASE_URL` | - | PostgreSQL connection string |
 | `KAFKA_BROKERS` | - | Redpanda brokers |
+| `POSTS_SERVICE_GRPC_ADDR` | localhost:9081 | posts-service (rejects writes on unknown posts) |
 
 ---
 
@@ -183,6 +184,7 @@ type Like struct {
 | `GRPC_PORT` | 9084 | gRPC port |
 | `DATABASE_URL` | - | PostgreSQL connection string |
 | `KAFKA_BROKERS` | - | Redpanda brokers |
+| `POSTS_SERVICE_GRPC_ADDR` | localhost:9081 | posts-service (rejects writes on unknown posts) |
 
 ---
 

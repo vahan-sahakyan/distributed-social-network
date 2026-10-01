@@ -159,6 +159,7 @@ After startup, these are available:
 | [ADR 0001](docs/adr/0001-search-engine.md) | Why Elasticsearch for search |
 | [ADR 0002](docs/adr/0002-transactional-outbox.md) | Why a transactional outbox for events |
 | [ADR 0003](docs/adr/0003-authentication-oidc-keycloak.md) | Why OIDC with Keycloak for authentication |
+| [ADR 0004](docs/adr/0004-post-existence-check.md) | Why likes and comments check the post synchronously |
 | [Observability](docs/observability.md) | Metrics, logs, traces, dashboard, alerts, things to try |
 | [DataGrip](docs/datagrip.md) | Connecting a DB client to the local databases |
 

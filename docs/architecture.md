@@ -213,6 +213,7 @@ Synchronous (gRPC)
   Client -HTTP-> Gateway -gRPC-> Service -> Database
   feed-service, cache-rebuilder -gRPC-> users-service (followers), posts-service (post details)
   notification-service -gRPC-> posts-service (post author)
+  likes-service, comments-service -gRPC-> posts-service (does the post exist, ADR 0004)
 
   every call: 5s default deadline, waits for a connection within it (WaitForReady);
   reconnects back off at most 3s, and resolve the name on each attempt (passthrough
