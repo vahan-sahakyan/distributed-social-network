@@ -1,6 +1,6 @@
 # ADR 0002: Transactional outbox for domain events
 
-- **Status:** accepted for the PostgreSQL services; posts-service (ScyllaDB) pending
+- **Status:** accepted; ScyllaDB variant for posts-service added 2026-10-01
 - **Date:** 2026-10-01
 
 ## Context
@@ -34,7 +34,22 @@ Transactional outbox with an in-process polling relay, in `pkg/outbox`:
 3. `pg_try_advisory_xact_lock` lets only one relay per database publish at a time, so per-key order holds with several replicas
 4. The request's trace context is stored on the row, so the delayed publish still joins the request's trace
 
-posts-service is excluded: ScyllaDB has no multi-table transactions. Candidates are a LOGGED BATCH into `posts` + an outbox table (atomic, but a tombstone-heavy queue table) or Scylla CDC. Separate decision.
+### posts-service (ScyllaDB)
+
+ScyllaDB has no multi-table transactions.
+
+| Option | For | Against |
+|--------|-----|---------|
+| Scylla CDC on `posts` | No dual write; the post row is the event | CDC readers wait out a confidence window (~30s by default) before emitting, so feeds lag; no place for the request's trace context |
+| **LOGGED BATCH: post + outbox row** | Both apply or neither (batchlog); sub-second relay; trace headers on the row | A queue table in an LSM store: deletes leave tombstones that later reads scan |
+
+Chosen: the LOGGED BATCH, with an outbox built around the tombstone problem (`outbox.ScyllaRelay`):
+- partitioned by minute (`bucket`), rows ordered by `timeuuid`, 7-day TTL
+- polls read a minute from the last relayed id onward, so they skip the tombstones of relayed rows, and wait 200ms for rows to settle
+- before a minute is closed (once drained and 2 minutes old) it is read once from its start, catching a write that landed late with an earlier id; then the whole partition is dropped and a persisted cursor moves past it
+- one relay per keyspace via a lease row (`INSERT ... IF NOT EXISTS USING TTL`, renewed with `UPDATE ... IF owner = ?`)
+
+A write that lands more than 2 minutes late into a closed minute (a batchlog replay after a long outage) is not relayed.
 
 ## Consequences
 
