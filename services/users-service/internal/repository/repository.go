@@ -7,15 +7,30 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/database"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/outbox"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/model"
 )
 
 type Repository struct {
-	db *pgxpool.Pool
+	pool *pgxpool.Pool
+	db   database.Querier
 }
 
 func New(db *pgxpool.Pool) *Repository {
-	return &Repository{db: db}
+	return &Repository{pool: db, db: db}
+}
+
+// Tx runs fn with a repository bound to one transaction, committed if fn returns nil.
+func (r *Repository) Tx(ctx context.Context, fn func(tx *Repository) error) error {
+	return pgx.BeginFunc(ctx, r.pool, func(tx pgx.Tx) error {
+		return fn(&Repository{pool: r.pool, db: tx})
+	})
+}
+
+// Enqueue stores an event that is published once the transaction commits.
+func (r *Repository) Enqueue(ctx context.Context, topic, key string, payload any) error {
+	return outbox.Enqueue(ctx, r.db, topic, key, payload)
 }
 
 func (r *Repository) Create(ctx context.Context, user *model.User) error {

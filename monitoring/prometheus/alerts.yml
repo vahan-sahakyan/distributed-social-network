@@ -44,3 +44,11 @@ groups:
           severity: warning
         annotations:
           summary: "{{ $labels.redpanda_group }} is {{ $value }} messages behind"
+
+      - alert: OutboxStuck
+        expr: max by (service) (outbox_oldest_age_seconds) > 60
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} has had an unpublished event for {{ $value | humanizeDuration }}"

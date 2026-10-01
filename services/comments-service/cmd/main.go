@@ -17,6 +17,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	commentspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/comments"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/outbox"
 
 	"github.com/ansrivas/fiberprometheus/v2"
 	"github.com/gofiber/fiber/v2"
@@ -36,7 +37,7 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := database.MigratePostgres(ctx, db, migrations.SQL); err != nil {
+	if err := database.MigratePostgres(ctx, db, migrations.SQL+";"+outbox.Schema); err != nil {
 		log.Fatalf("failed to run migration: %v", err)
 	}
 
@@ -44,7 +45,8 @@ func main() {
 	defer producer.Close()
 
 	repo := repository.New(db)
-	svc := service.New(repo, producer)
+	svc := service.New(repo)
+	go outbox.NewRelay(db, producer, "comments-service").Run(ctx)
 
 	// gRPC server
 	grpcPort := os.Getenv("GRPC_PORT")
@@ -57,7 +59,7 @@ func main() {
 	}
 	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
 	commentspb.RegisterCommentsServiceServer(grpcSrv, grpcserver.New(svc, func(ctx context.Context) error {
-		_, err := db.Exec(ctx, "TRUNCATE comments")
+		_, err := db.Exec(ctx, "TRUNCATE comments, outbox")
 		return err
 	}))
 	observability.InitGRPCMetrics(grpcSrv)

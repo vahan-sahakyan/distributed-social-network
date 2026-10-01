@@ -51,6 +51,35 @@ jobs:
           working-directory: ${{ matrix.module }}
       - run: go test -race ./...
 
+  outbox:
+    name: outbox against postgres
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16.14-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 15
+    defaults:
+      run:
+        working-directory: pkg
+    env:
+      GOWORK: "off"
+      OUTBOX_TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.x"
+          cache-dependency-path: pkg/go.sum
+      - run: go test -race -count=1 -v ./outbox/
+
   dockerfiles:
     name: dockerfiles in sync
     runs-on: ubuntu-latest
