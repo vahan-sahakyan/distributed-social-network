@@ -650,14 +650,14 @@
     {
       "type": "timeseries",
       "title": "Non-OK calls by code",
-      "description": "",
+      "description": "NotFound and InvalidArgument are client errors; Internal, Unavailable, Unknown are ours",
       "id": 13,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": "NotFound and InvalidArgument are client errors; Internal, Unavailable, Unknown are ours",
+        "h": 8,
         "w": 8,
         "x": 8,
         "y": 14
@@ -871,14 +871,14 @@
     {
       "type": "timeseries",
       "title": "Failures, DLQ, drops",
-      "description": "",
+      "description": "A failed attempt is retried with backoff; after 3 the message is parked on <topic>.dlq",
       "id": 18,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": "A failed attempt is retried with backoff; after 3 the message is parked on <topic>.dlq",
+        "h": 8,
         "w": 6,
         "x": 12,
         "y": 23
@@ -932,14 +932,14 @@
     {
       "type": "timeseries",
       "title": "Consumer lag",
-      "description": "",
+      "description": "Reported by the broker, so it keeps growing when a consumer is down",
       "id": 19,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": "Reported by the broker, so it keeps growing when a consumer is down",
+        "h": 8,
         "w": 6,
         "x": 18,
         "y": 23
@@ -984,14 +984,14 @@
     {
       "type": "timeseries",
       "title": "Outbox backlog",
-      "description": "",
+      "description": "Events committed but not yet published; grows while Redpanda is unreachable",
       "id": 20,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": "Events committed but not yet published; grows while Redpanda is unreachable",
+        "h": 8,
         "w": 12,
         "x": 0,
         "y": 31
@@ -1036,14 +1036,14 @@
     {
       "type": "timeseries",
       "title": "Oldest unpublished event",
-      "description": "",
+      "description": "OutboxStuck fires above 60s",
       "id": 21,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": "OutboxStuck fires above 60s",
+        "h": 8,
         "w": 12,
         "x": 12,
         "y": 31
