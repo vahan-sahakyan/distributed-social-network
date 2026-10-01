@@ -13,6 +13,7 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/observability"
+	"github.com/vahan-sahakyan/distributed-social-network/pkg/outbox"
 	grpcserver "github.com/vahan-sahakyan/distributed-social-network/users-service/internal/grpcserver"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/service"
@@ -36,7 +37,7 @@ func main() {
 	}
 	defer db.Close()
 
-	if err := database.MigratePostgres(ctx, db, migrations.SQL); err != nil {
+	if err := database.MigratePostgres(ctx, db, migrations.SQL+";"+outbox.Schema); err != nil {
 		log.Fatalf("failed to run migration: %v", err)
 	}
 
@@ -44,7 +45,8 @@ func main() {
 	defer producer.Close()
 
 	repo := repository.New(db)
-	svc := service.New(repo, producer)
+	svc := service.New(repo)
+	go outbox.NewRelay(db, producer, "users-service").Run(ctx)
 
 	// gRPC server
 	grpcPort := os.Getenv("GRPC_PORT")
@@ -57,7 +59,7 @@ func main() {
 	}
 	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
 	userspb.RegisterUsersServiceServer(grpcSrv, grpcserver.New(svc, func(ctx context.Context) error {
-		_, err := db.Exec(ctx, "TRUNCATE users, follows")
+		_, err := db.Exec(ctx, "TRUNCATE users, follows, outbox")
 		return err
 	}))
 	observability.InitGRPCMetrics(grpcSrv)

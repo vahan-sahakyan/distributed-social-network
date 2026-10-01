@@ -2,10 +2,8 @@ package service
 
 import (
 	"context"
-	"log/slog"
 	"time"
 
-	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 	"github.com/vahan-sahakyan/distributed-social-network/users-service/internal/model"
@@ -13,12 +11,11 @@ import (
 )
 
 type Service struct {
-	repo     *repository.Repository
-	producer *broker.Producer
+	repo *repository.Repository
 }
 
-func New(repo *repository.Repository, producer *broker.Producer) *Service {
-	return &Service{repo: repo, producer: producer}
+func New(repo *repository.Repository) *Service {
+	return &Service{repo: repo}
 }
 
 func (s *Service) CreateUser(ctx context.Context, req *model.CreateUserRequest) (*model.User, error) {
@@ -29,14 +26,15 @@ func (s *Service) CreateUser(ctx context.Context, req *model.CreateUserRequest) 
 		CreatedAt: time.Now().UTC(),
 	}
 
-	if err := s.repo.Create(ctx, user); err != nil {
+	err := s.repo.Tx(ctx, func(tx *repository.Repository) error {
+		if err := tx.Create(ctx, user); err != nil {
+			return err
+		}
+		return tx.Enqueue(ctx, events.UserCreated, user.ID, user)
+	})
+	if err != nil {
 		return nil, err
 	}
-
-	if err := s.producer.Publish(ctx, events.UserCreated, user.ID, user); err != nil {
-		slog.ErrorContext(ctx, "publishing event", "topic", events.UserCreated, "user_id", user.ID, "error", err)
-	}
-
 	return user, nil
 }
 

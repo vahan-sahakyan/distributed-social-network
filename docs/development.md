@@ -94,6 +94,7 @@ pkg/
 ├── grpc/           Generated gRPC stubs (from proto/, via make proto)
 ├── id/             Random hex IDs and deterministic IDs
 ├── observability/  Logger, tracer, instrumented gRPC server/dial options
+├── outbox/         Transactional outbox: Enqueue in the write tx, Relay publishes
 ├── retry/          Backoff until a dependency answers or ctx is done
 └── validate/       Request field checks returning InvalidArgument
 ```

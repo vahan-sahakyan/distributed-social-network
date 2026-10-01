@@ -7,6 +7,7 @@ COPY pkg/events/ ./pkg/events/
 COPY pkg/grpc/likes/ ./pkg/grpc/likes/
 COPY pkg/id/ ./pkg/id/
 COPY pkg/observability/ ./pkg/observability/
+COPY pkg/outbox/ ./pkg/outbox/
 COPY pkg/retry/ ./pkg/retry/
 COPY pkg/validate/ ./pkg/validate/
 COPY services/likes-service/ ./services/likes-service/

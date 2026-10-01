@@ -53,6 +53,7 @@ Shared code: `pkg/observability` (logger, tracer, gRPC options) and `pkg/broker`
 | `grpc_server_handled_total`, `grpc_server_handling_seconds` | `grpc_service`, `grpc_method`, `grpc_code` | every gRPC server |
 | `grpc_client_handled_total`, `grpc_client_handling_seconds` | same | gateway, feed, notification, cache-rebuilder |
 | `broker_messages_published_total` | `topic`, `result` (`ok`, `error`) | producers |
+| `outbox_backlog`, `outbox_oldest_age_seconds` | `service` | comments, likes, users |
 | `broker_messages_consumed_total` | `topic`, `group`, `result` (`ok`, `dlq`, `dropped`, `error`) | consumers, final outcome per message |
 | `broker_handler_failures_total` | `topic`, `group` | consumers, each failed attempt (3 before DLQ) |
 | `broker_handler_duration_seconds` | `topic`, `group` | consumers, per attempt |
@@ -77,6 +78,7 @@ Lag comes from the broker rather than the consumer: a dead consumer can't report
 | `GRPCServerErrors` | a method returns `Internal`, `Unavailable`, `Unknown`, `DeadlineExceeded` or `DataLoss` for 2m |
 | `EventsDeadLettered` | a consumer gave up on a message (DLQ, dropped, or failed to park) in the last 10m |
 | `ConsumerLagHigh` | a group is > 500 messages behind for 5m |
+| `OutboxStuck` | a service's oldest unpublished event is > 60s old for 2m |
 
 ## Things to try
 
@@ -105,6 +107,14 @@ curl -s -XPOST localhost:8080/api/v1/comments/ -H 'Content-Type: application/jso
 docker start infrastructure-comments-db-1
 ```
 The call is a 500, `GRPCServerErrors` fires for `comments-service CreateComment` under load, and the failed span's status carries the Postgres connection error.
+
+**6. Take the broker away.** Writes keep succeeding and their events wait in the outbox:
+```bash
+docker stop infrastructure-redpanda-1
+# like, comment and create users for a minute (UI or curl)
+docker start infrastructure-redpanda-1
+```
+"Outbox backlog" climbs per service while Redpanda is down (`OutboxStuck` fires after ~3m) and drops to 0 within seconds of the restart. In Jaeger, a like made during the outage is still one trace: the request, then `publish like.created` attempts backing off 1s, 2s, 4s, 8s until one succeeds, then the consumers. Consumers resume up to 30s after the broker returns (their reconnect backoff).
 
 ### Query cheat sheet
 

@@ -61,6 +61,77 @@ func (p *Producer) write(ctx context.Context, topic, key string, payload any) er
 	return p.getWriter(topic).WriteMessages(ctx, msg)
 }
 
+// Message is an encoded event that carries the context it was created in, whose
+// span becomes the parent of its produce span.
+type Message struct {
+	Ctx   context.Context
+	Topic string
+	Key   string
+	Value []byte
+}
+
+// PublishMessages writes msgs, keeping their order within each topic. It returns an
+// error if any topic's write failed; messages of other topics may have been written.
+func (p *Producer) PublishMessages(ctx context.Context, msgs []Message) error {
+	var errs []error
+	for _, group := range byTopic(msgs) {
+		errs = append(errs, p.writeGroup(ctx, group))
+	}
+	return errors.Join(errs...)
+}
+
+// byTopic groups msgs per topic in first-seen order, preserving order within each group.
+func byTopic(msgs []Message) [][]Message {
+	index := map[string]int{}
+	var groups [][]Message
+	for _, m := range msgs {
+		i, ok := index[m.Topic]
+		if !ok {
+			i = len(groups)
+			index[m.Topic] = i
+			groups = append(groups, nil)
+		}
+		groups[i] = append(groups[i], m)
+	}
+	return groups
+}
+
+func (p *Producer) writeGroup(ctx context.Context, group []Message) error {
+	topic := group[0].Topic
+	spans := make([]trace.Span, len(group))
+	out := make([]kafka.Message, len(group))
+	for i, m := range group {
+		parent := m.Ctx
+		if parent == nil {
+			parent = ctx
+		}
+		spanCtx, span := tracer.Start(parent, "publish "+topic,
+			trace.WithSpanKind(trace.SpanKindProducer),
+			trace.WithAttributes(
+				attribute.String("messaging.system", "kafka"),
+				attribute.String("messaging.destination.name", topic),
+			),
+		)
+		spans[i] = span
+		out[i] = kafka.Message{Key: []byte(m.Key), Value: m.Value}
+		otel.GetTextMapPropagator().Inject(spanCtx, headerCarrier{&out[i].Headers})
+	}
+
+	err := p.getWriter(topic).WriteMessages(ctx, out...)
+	published.WithLabelValues(topic, result(err)).Add(float64(len(group)))
+	for _, span := range spans {
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, err.Error())
+		}
+		span.End()
+	}
+	if err != nil {
+		return fmt.Errorf("publishing %d messages to %s: %w", len(group), topic, err)
+	}
+	return nil
+}
+
 func (p *Producer) getWriter(topic string) *kafka.Writer {
 	p.mu.Lock()
 	defer p.mu.Unlock()

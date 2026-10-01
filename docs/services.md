@@ -138,7 +138,7 @@ type Comment struct {
 }
 ```
 
-**Event published:** `comment.created` -> Comment JSON
+**Event published:** `comment.created` -> Comment JSON, via the outbox (`pkg/outbox`)
 
 **Environment:**
 | Variable | Default | Description |
@@ -165,7 +165,7 @@ type Like struct {
 }
 ```
 
-**Events published:** `like.created`, `like.deleted` -> Like JSON (keyed by entity_id)
+**Events published:** `like.created`, `like.deleted` -> Like JSON (keyed by entity_id), via the outbox (`pkg/outbox`)
 
 **Environment:**
 | Variable | Default | Description |
@@ -194,6 +194,8 @@ type User struct {
 ```
 
 **Follow graph** stored in a `follows(follower_id, followee_id)` join table.
+
+**Event published:** `user.created` -> User JSON, via the outbox (`pkg/outbox`)
 
 **Environment:**
 | Variable | Default | Description |

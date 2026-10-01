@@ -5,9 +5,18 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/retry"
 )
+
+// Querier is satisfied by both *pgxpool.Pool and pgx.Tx.
+type Querier interface {
+	Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
 
 // NewPostgres connects and pings, retrying until the database answers or ctx is done.
 func NewPostgres(ctx context.Context, connString string) (*pgxpool.Pool, error) {

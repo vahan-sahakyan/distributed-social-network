@@ -982,15 +982,119 @@
       }
     },
     {
+      "type": "timeseries",
+      "title": "Outbox backlog",
+      "description": "",
+      "id": 20,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": "Events committed but not yet published; grows while Redpanda is unreachable",
+        "w": 12,
+        "x": 0,
+        "y": 31
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (service) (outbox_backlog)",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Oldest unpublished event",
+      "description": "",
+      "id": 21,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": "OutboxStuck fires above 60s",
+        "w": 12,
+        "x": 12,
+        "y": 31
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "max by (service) (outbox_oldest_age_seconds)",
+          "legendFormat": "{{service}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
       "type": "row",
       "title": "Runtime",
-      "id": 20,
+      "id": 22,
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 39
       },
       "panels": []
     },
@@ -998,7 +1102,7 @@
       "type": "timeseries",
       "title": "Memory (RSS)",
       "description": "",
-      "id": 21,
+      "id": 23,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1007,7 +1111,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 32
+        "y": 40
       },
       "targets": [
         {
@@ -1050,7 +1154,7 @@
       "type": "timeseries",
       "title": "CPU",
       "description": "",
-      "id": 22,
+      "id": 24,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1059,7 +1163,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 32
+        "y": 40
       },
       "targets": [
         {
@@ -1102,7 +1206,7 @@
       "type": "timeseries",
       "title": "Goroutines",
       "description": "",
-      "id": 23,
+      "id": 25,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1111,7 +1215,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 32
+        "y": 40
       },
       "targets": [
         {
@@ -1153,13 +1257,13 @@
     {
       "type": "row",
       "title": "Logs",
-      "id": 24,
+      "id": 26,
       "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 40
+        "y": 48
       },
       "panels": []
     },
@@ -1167,7 +1271,7 @@
       "type": "logs",
       "title": "Warnings and errors",
       "description": "Click a line, then the TraceID link, to open its trace",
-      "id": 25,
+      "id": 27,
       "datasource": {
         "type": "loki",
         "uid": "loki"
@@ -1176,7 +1280,7 @@
         "h": 12,
         "w": 24,
         "x": 0,
-        "y": 41
+        "y": 49
       },
       "targets": [
         {

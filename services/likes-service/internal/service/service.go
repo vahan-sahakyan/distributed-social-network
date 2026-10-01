@@ -2,22 +2,19 @@ package service
 
 import (
 	"context"
-	"log/slog"
 
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/likes-service/internal/repository"
-	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/id"
 )
 
 type Service struct {
-	repo     *repository.Repository
-	producer *broker.Producer
+	repo *repository.Repository
 }
 
-func New(repo *repository.Repository, producer *broker.Producer) *Service {
-	return &Service{repo: repo, producer: producer}
+func New(repo *repository.Repository) *Service {
+	return &Service{repo: repo}
 }
 
 func (s *Service) HasLiked(ctx context.Context, userID, entityID string) (bool, error) {
@@ -25,14 +22,13 @@ func (s *Service) HasLiked(ctx context.Context, userID, entityID string) (bool, 
 }
 
 func (s *Service) Unlike(ctx context.Context, userID, entityID string) error {
-	deleted, err := s.repo.Delete(ctx, userID, entityID)
-	if err != nil || !deleted {
-		return err
-	}
-
-	s.publish(ctx, events.LikeDeleted, &model.Like{UserID: userID, EntityID: entityID})
-
-	return nil
+	return s.repo.Tx(ctx, func(tx *repository.Repository) error {
+		deleted, err := tx.Delete(ctx, userID, entityID)
+		if err != nil || !deleted {
+			return err
+		}
+		return tx.Enqueue(ctx, events.LikeDeleted, entityID, &model.Like{UserID: userID, EntityID: entityID})
+	})
 }
 
 func (s *Service) CreateLike(ctx context.Context, req *model.CreateLikeRequest) (*model.Like, error) {
@@ -42,21 +38,16 @@ func (s *Service) CreateLike(ctx context.Context, req *model.CreateLikeRequest) 
 		EntityID: req.EntityID,
 	}
 
-	created, err := s.repo.Create(ctx, like)
+	err := s.repo.Tx(ctx, func(tx *repository.Repository) error {
+		created, err := tx.Create(ctx, like)
+		// a repeated like is a no-op, so it must not emit another event
+		if err != nil || !created {
+			return err
+		}
+		return tx.Enqueue(ctx, events.LikeCreated, like.EntityID, like)
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	// a repeated like is a no-op, so it must not emit another event
-	if created {
-		s.publish(ctx, events.LikeCreated, like)
-	}
-
 	return like, nil
-}
-
-func (s *Service) publish(ctx context.Context, topic string, like *model.Like) {
-	if err := s.producer.Publish(ctx, topic, like.EntityID, like); err != nil {
-		slog.ErrorContext(ctx, "publishing event", "topic", topic, "entity_id", like.EntityID, "error", err)
-	}
 }
