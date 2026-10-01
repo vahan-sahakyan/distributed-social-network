@@ -70,6 +70,8 @@ type Message struct {
 	Value []byte
 	// ID identifies the event across republishes; sent as the event-id header
 	ID string
+	// ReplayOf is sent as the replay-of header, for replays of events without an ID
+	ReplayOf string
 }
 
 // PublishMessages writes msgs, keeping their order within each topic. It returns an
@@ -118,6 +120,9 @@ func (p *Producer) writeGroup(ctx context.Context, group []Message) error {
 		out[i] = kafka.Message{Key: []byte(m.Key), Value: m.Value}
 		if m.ID != "" {
 			out[i].Headers = append(out[i].Headers, kafka.Header{Key: EventIDHeader, Value: []byte(m.ID)})
+		}
+		if m.ReplayOf != "" {
+			out[i].Headers = append(out[i].Headers, kafka.Header{Key: ReplayOfHeader, Value: []byte(m.ReplayOf)})
 		}
 		otel.GetTextMapPropagator().Inject(spanCtx, headerCarrier{&out[i].Headers})
 	}

@@ -96,6 +96,12 @@ WORKERS ?= 4
 load:
 	@bash scripts/load.sh $(DURATION) $(WORKERS)
 
+# parked messages: make dlq; make dlq CMD="replay --topic like.created"; CMD="skip"
+CMD ?= list
+.PHONY: dlq
+dlq:
+	@cd tools/dlq && go run . $(CMD)
+
 
 # Kibana for poking at the search indices (Dev Tools), not started by make up
 .PHONY: kibana

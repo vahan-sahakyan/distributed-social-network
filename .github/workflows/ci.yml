@@ -25,6 +25,7 @@ jobs:
           - services/event-writer-service
           - services/cache-rebuilder-service
           - services/search-service
+          - tools/dlq
     defaults:
       run:
         working-directory: ${{ matrix.module }}

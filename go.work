@@ -13,4 +13,5 @@ use (
 	./services/posts-service
 	./services/search-service
 	./services/users-service
+	./tools/dlq
 )

@@ -20,3 +20,12 @@ func TestDedupeKey(t *testing.T) {
 		t.Errorf("without the header: %v, want topic/partition/offset", got)
 	}
 }
+
+func TestDedupeKeyOfReplayMatchesOriginal(t *testing.T) {
+	original := kafka.Message{Topic: "like.created", Partition: 1, Offset: 7}
+	replay := kafka.Message{Topic: "like.created", Partition: 0, Offset: 900,
+		Headers: []kafka.Header{{Key: ReplayOfHeader, Value: []byte(DeadLetter{Topic: "like.created", Partition: 1, Offset: 7}.Origin())}}}
+	if !reflect.DeepEqual(DedupeKey(original), DedupeKey(replay)) {
+		t.Errorf("replay key %v, want the original's %v", DedupeKey(replay), DedupeKey(original))
+	}
+}

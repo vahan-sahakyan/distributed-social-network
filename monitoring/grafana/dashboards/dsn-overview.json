@@ -650,14 +650,14 @@
     {
       "type": "timeseries",
       "title": "Non-OK calls by code",
-      "description": "",
+      "description": "NotFound and InvalidArgument are client errors; Internal, Unavailable, Unknown are ours",
       "id": 13,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": "NotFound and InvalidArgument are client errors; Internal, Unavailable, Unknown are ours",
+        "h": 8,
         "w": 8,
         "x": 8,
         "y": 14
@@ -871,14 +871,14 @@
     {
       "type": "timeseries",
       "title": "Failures, DLQ, drops",
-      "description": "",
+      "description": "A failed attempt is retried with backoff; after 3 the message is parked on <topic>.dlq",
       "id": 18,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": "A failed attempt is retried with backoff; after 3 the message is parked on <topic>.dlq",
+        "h": 8,
         "w": 6,
         "x": 12,
         "y": 23
@@ -932,14 +932,14 @@
     {
       "type": "timeseries",
       "title": "Consumer lag",
-      "description": "",
+      "description": "Reported by the broker, so it keeps growing when a consumer is down",
       "id": 19,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": "Reported by the broker, so it keeps growing when a consumer is down",
+        "h": 8,
         "w": 6,
         "x": 18,
         "y": 23
@@ -984,14 +984,14 @@
     {
       "type": "timeseries",
       "title": "Outbox backlog",
-      "description": "",
+      "description": "Events committed but not yet published; grows while Redpanda is unreachable",
       "id": 20,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": "Events committed but not yet published; grows while Redpanda is unreachable",
+        "h": 8,
         "w": 12,
         "x": 0,
         "y": 31
@@ -1036,15 +1036,15 @@
     {
       "type": "timeseries",
       "title": "Oldest unpublished event",
-      "description": "",
+      "description": "OutboxStuck fires above 60s",
       "id": 21,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
       "gridPos": {
-        "h": "OutboxStuck fires above 60s",
-        "w": 12,
+        "h": 8,
+        "w": 6,
         "x": 12,
         "y": 31
       },
@@ -1086,9 +1086,61 @@
       }
     },
     {
+      "type": "timeseries",
+      "title": "DLQ awaiting replay",
+      "description": "Parked messages not yet replayed or skipped: make dlq",
+      "id": 22,
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 31
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "sum by (redpanda_topic) (redpanda_kafka_max_offset{redpanda_topic=~\".+\\\\.dlq\"}) - (sum by (redpanda_topic) (redpanda_kafka_consumer_group_committed_offset{redpanda_group=\"dlq-replay\"}) or 0 * sum by (redpanda_topic) (redpanda_kafka_max_offset{redpanda_topic=~\".+\\\\.dlq\"}))",
+          "legendFormat": "{{redpanda_topic}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "fillOpacity": 10,
+            "lineWidth": 1,
+            "showPoints": "never"
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "right",
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
       "type": "row",
       "title": "Runtime",
-      "id": 22,
+      "id": 23,
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1102,7 +1154,7 @@
       "type": "timeseries",
       "title": "Memory (RSS)",
       "description": "",
-      "id": 23,
+      "id": 24,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1154,7 +1206,7 @@
       "type": "timeseries",
       "title": "CPU",
       "description": "",
-      "id": 24,
+      "id": 25,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1206,7 +1258,7 @@
       "type": "timeseries",
       "title": "Goroutines",
       "description": "",
-      "id": 25,
+      "id": 26,
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -1257,7 +1309,7 @@
     {
       "type": "row",
       "title": "Logs",
-      "id": 26,
+      "id": 27,
       "collapsed": false,
       "gridPos": {
         "h": 1,
@@ -1271,7 +1323,7 @@
       "type": "logs",
       "title": "Warnings and errors",
       "description": "Click a line, then the TraceID link, to open its trace",
-      "id": 27,
+      "id": 28,
       "datasource": {
         "type": "loki",
         "uid": "loki"

@@ -99,6 +99,8 @@ pkg/
 └── validate/       Request field checks returning InvalidArgument
 ```
 
+`tools/dlq` is a CLI for parked messages (`make dlq`): `list`, `replay` and `skip`, optionally `--topic <source topic>`. Replay progress is the `dlq-replay` consumer group's offsets on the `.dlq` topics.
+
 ## Go Workspace
 
 The project uses Go workspaces (`go.work`) to link all modules:

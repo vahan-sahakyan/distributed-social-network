@@ -193,14 +193,17 @@ func park(ctx context.Context, cfg ConsumerConfig, msg kafka.Message, cause erro
 		return nil
 	}
 
-	dead := map[string]any{
-		"topic":     cfg.Topic,
-		"partition": msg.Partition,
-		"offset":    msg.Offset,
-		"key":       string(msg.Key),
-		"payload":   string(msg.Value),
-		"error":     cause.Error(),
-		"failed_at": time.Now().UTC(),
+	dead := DeadLetter{
+		Topic:     cfg.Topic,
+		Partition: msg.Partition,
+		Offset:    msg.Offset,
+		Key:       string(msg.Key),
+		Payload:   string(msg.Value),
+		Error:     cause.Error(),
+		FailedAt:  time.Now().UTC(),
+		Group:     cfg.GroupID,
+		EventID:   header(msg, EventIDHeader),
+		ReplayOf:  header(msg, ReplayOfHeader),
 	}
 	if err := cfg.DLQ.Publish(ctx, events.DLQ(cfg.Topic), string(msg.Key), dead); err != nil {
 		consumed.WithLabelValues(cfg.Topic, cfg.GroupID, "error").Inc()
