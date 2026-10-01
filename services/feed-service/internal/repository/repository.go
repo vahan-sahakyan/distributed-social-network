@@ -93,17 +93,24 @@ func prependItem(items []model.FeedItem, item *model.FeedItem) ([]model.FeedItem
 // AdjustCounts applies the like and comment deltas to a post in the feed stored under key.
 func (r *Repository) AdjustCounts(key, postID string, likesDelta, commentsDelta int) error {
 	return r.update(key, func(items []model.FeedItem) ([]model.FeedItem, bool) {
-		for i := range items {
-			if items[i].PostID != postID {
-				continue
-			}
-			items[i].LikesCount = max(items[i].LikesCount+likesDelta, 0)
-			items[i].CommentsCount = max(items[i].CommentsCount+commentsDelta, 0)
-			return items, true
-		}
-		// Post is not in this feed - nothing to write.
-		return items, false
+		return adjustCounts(items, postID, likesDelta, commentsDelta)
 	})
+}
+
+// adjustCounts stores raw sums, never clamped: like and unlike arrive on separate
+// topics in any order, and only an unclamped sum ends at the right count. Readers
+// clamp negatives.
+func adjustCounts(items []model.FeedItem, postID string, likesDelta, commentsDelta int) ([]model.FeedItem, bool) {
+	for i := range items {
+		if items[i].PostID != postID {
+			continue
+		}
+		items[i].LikesCount += likesDelta
+		items[i].CommentsCount += commentsDelta
+		return items, true
+	}
+	// Post is not in this feed - nothing to write.
+	return items, false
 }
 
 // update applies mutate to the feed at key and writes it back atomically, using

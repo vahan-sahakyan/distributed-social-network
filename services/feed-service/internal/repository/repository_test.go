@@ -32,3 +32,22 @@ func TestPrependItemCapsFeed(t *testing.T) {
 		t.Fatalf("got len %d head %q tail %q, want 100 with oldest dropped", len(got), got[0].PostID, got[len(got)-1].PostID)
 	}
 }
+
+func TestAdjustCountsIsOrderIndependent(t *testing.T) {
+	for _, order := range [][]int{{1, -1}, {-1, 1}} {
+		feed := []model.FeedItem{{PostID: "p1"}}
+		for _, d := range order {
+			feed, _ = adjustCounts(feed, "p1", d, 0)
+		}
+		if feed[0].LikesCount != 0 {
+			t.Errorf("deltas %v ended at %d likes, want 0", order, feed[0].LikesCount)
+		}
+	}
+}
+
+func TestAdjustCountsSkipsPostsNotInFeed(t *testing.T) {
+	feed := []model.FeedItem{{PostID: "p1"}}
+	if _, changed := adjustCounts(feed, "p2", 1, 0); changed {
+		t.Error("a post outside the feed must not trigger a write")
+	}
+}
