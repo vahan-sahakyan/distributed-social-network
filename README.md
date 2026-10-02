@@ -109,6 +109,7 @@ After startup, these are available:
 | `make tidy` | Run `go mod tidy` in all modules |
 | `make cluster-up` / `make cluster-down` | Create / delete the local k3d cluster, synced by Argo CD from the gitops repo (app on :8081) |
 | `make argocd-ui` | Argo CD UI on https://localhost:8443, prints the admin password |
+| `make db-forward` | Port-forward the cluster databases to the compose ports, for DataGrip |
 
 ## Project Structure
 

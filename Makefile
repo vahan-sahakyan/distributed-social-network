@@ -165,6 +165,18 @@ argocd-ui:
 	kubectl -n argocd port-forward svc/argocd-server 8443:443
 
 
+# cluster databases on the compose ports, so the same DataGrip connections work; ctrl-c stops all
+.PHONY: db-forward
+db-forward:
+	@kubectl -n dsn port-forward svc/comments-db 5433:5432 & \
+	kubectl -n dsn port-forward svc/likes-db 5434:5432 & \
+	kubectl -n dsn port-forward svc/users-db 5436:5432 & \
+	kubectl -n dsn port-forward svc/notifications-db 5437:5432 & \
+	kubectl -n dsn port-forward svc/posts-db 9042:9042 & \
+	kubectl -n dsn port-forward svc/clickhouse 8123:8123 9009:9000 & \
+	wait
+
+
 .PHONY: tidy
 tidy:
 	@for svc in $(SERVICES); do \
