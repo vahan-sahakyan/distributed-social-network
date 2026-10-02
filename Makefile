@@ -185,9 +185,10 @@ FORWARDS = \
 	dsn/svc/grafana=3000 \
 	dsn/svc/loki=3100 \
 	dsn/deploy/alloy=12345 \
-	dsn/svc/jaeger=16686,4317,4318
+	dsn/svc/jaeger=16686,4317,4318 \
+	dsn/svc/kibana=5601
 
-# ctrl-c stops all; waits out a fresh cluster-up (argo server starting, password not yet generated)
+# skips what isn't deployed (kibana is optional); ctrl-c stops all; waits out a fresh cluster-up (argo server starting, password not yet generated)
 .PHONY: forward
 forward:
 	@kubectl -n argocd rollout status deploy/argocd-server --timeout=180s >/dev/null
@@ -201,11 +202,13 @@ forward:
 	@echo "Redpanda Console  http://localhost:8888"
 	@echo "MinIO Console     http://localhost:9001  (minioadmin / minioadmin)"
 	@echo "Elasticsearch     http://localhost:9200"
+	@echo "Kibana            http://localhost:5601  (if enabled)"
 	@echo "gRPC              localhost:9081-9091"
 	@echo "Postgres          localhost:5433 comments, 5434 likes, 5436 users, 5437 notifications  (postgres / postgres)"
 	@echo "Scylla, ClickHouse, Loki, Alloy, MinIO S3, Memcached, Redpanda admin: their compose ports, see the README"
 	@for f in $(FORWARDS); do \
 		target=$${f%%=*}; \
+		kubectl -n $${target%%/*} get $${target#*/} >/dev/null 2>&1 || continue; \
 		kubectl -n $${target%%/*} port-forward $${target#*/} $$(echo $${f#*=} | tr , ' ') >/dev/null & \
 	done; \
 	wait
