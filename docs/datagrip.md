@@ -5,7 +5,7 @@ This guide covers connecting to all project databases from JetBrains DataGrip wh
 ## Prerequisites
 
 - Infrastructure running: `make infra-up` (or `make up` for everything)
-- Or the local k3d cluster: `make db-forward` (keep it running) puts its databases on the same ports, so the connections below work unchanged. Compose must be stopped, they share the ports
+- Or the local k3d cluster: `make forward` (keep it running) puts its databases on the same ports, so the connections below work unchanged. Compose must be stopped, they share the ports
 - DataGrip installed
 
 ---

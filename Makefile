@@ -148,7 +148,7 @@ cluster-up:
 	kubectl -n argocd rollout status deploy/argocd-repo-server --timeout=180s
 	kubectl apply -f $(GITOPS_RAW)/bootstrap/root-local.yaml
 	@echo ""
-	@echo "Argo CD is syncing, the app comes up on http://localhost:8081 in a few minutes (make argocd-ui to watch)"
+	@echo "Argo CD is syncing, the app comes up on http://localhost:8081 in a few minutes (make forward for the Argo CD UI)"
 
 
 .PHONY: cluster-down
@@ -156,24 +156,58 @@ cluster-down:
 	k3d cluster delete dsn
 
 
-# waits out a fresh cluster-up: the server still starting, the password not yet generated
-.PHONY: argocd-ui
-argocd-ui:
-	@kubectl -n argocd rollout status deploy/argocd-server --timeout=180s
+# the cluster on the same localhost ports compose publishes, plus Argo CD: <namespace>/<kind>/<name>=<ports>
+FORWARDS = \
+	argocd/svc/argocd-server=8443:443 \
+	dsn/svc/gateway-service=8080 \
+	dsn/svc/posts-service=9081 \
+	dsn/svc/feed-service=9082 \
+	dsn/svc/comments-service=9083 \
+	dsn/svc/likes-service=9084 \
+	dsn/svc/users-service=9085 \
+	dsn/svc/media-service=9086 \
+	dsn/svc/notification-service=9087 \
+	dsn/svc/cache-rebuilder-service=9089 \
+	dsn/svc/search-service=9091 \
+	dsn/svc/keycloak=8180:8080 \
+	dsn/svc/comments-db=5433:5432 \
+	dsn/svc/likes-db=5434:5432 \
+	dsn/svc/users-db=5436:5432 \
+	dsn/svc/notifications-db=5437:5432 \
+	dsn/svc/posts-db=9042 \
+	dsn/svc/clickhouse=8123,9009:9000 \
+	dsn/svc/redpanda=9644 \
+	dsn/svc/redpanda-console=8888:8080 \
+	dsn/svc/elasticsearch=9200 \
+	dsn/svc/memcached=11211 \
+	dsn/svc/minio=9000,9001 \
+	dsn/svc/prometheus=9090 \
+	dsn/svc/grafana=3000 \
+	dsn/svc/loki=3100 \
+	dsn/deploy/alloy=12345 \
+	dsn/svc/jaeger=16686,4317,4318
+
+# ctrl-c stops all; waits out a fresh cluster-up (argo server starting, password not yet generated)
+.PHONY: forward
+forward:
+	@kubectl -n argocd rollout status deploy/argocd-server --timeout=180s >/dev/null
 	@kubectl -n argocd wait --for=create secret/argocd-initial-admin-secret --timeout=60s >/dev/null
-	@echo "https://localhost:8443  admin / $$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
-	kubectl -n argocd port-forward svc/argocd-server 8443:443
-
-
-# cluster databases on the compose ports, so the same DataGrip connections work; ctrl-c stops all
-.PHONY: db-forward
-db-forward:
-	@kubectl -n dsn port-forward svc/comments-db 5433:5432 & \
-	kubectl -n dsn port-forward svc/likes-db 5434:5432 & \
-	kubectl -n dsn port-forward svc/users-db 5436:5432 & \
-	kubectl -n dsn port-forward svc/notifications-db 5437:5432 & \
-	kubectl -n dsn port-forward svc/posts-db 9042:9042 & \
-	kubectl -n dsn port-forward svc/clickhouse 8123:8123 9009:9000 & \
+	@echo "Argo CD           https://localhost:8443  admin / $$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+	@echo "Gateway API       http://localhost:8080"
+	@echo "Keycloak          http://localhost:8180/auth  (admin / admin)"
+	@echo "Grafana           http://localhost:3000  (admin / admin)"
+	@echo "Prometheus        http://localhost:9090"
+	@echo "Jaeger            http://localhost:16686"
+	@echo "Redpanda Console  http://localhost:8888"
+	@echo "MinIO Console     http://localhost:9001  (minioadmin / minioadmin)"
+	@echo "Elasticsearch     http://localhost:9200"
+	@echo "gRPC              localhost:9081-9091"
+	@echo "Postgres          localhost:5433 comments, 5434 likes, 5436 users, 5437 notifications  (postgres / postgres)"
+	@echo "Scylla, ClickHouse, Loki, Alloy, MinIO S3, Memcached, Redpanda admin: their compose ports, see the README"
+	@for f in $(FORWARDS); do \
+		target=$${f%%=*}; \
+		kubectl -n $${target%%/*} port-forward $${target#*/} $$(echo $${f#*=} | tr , ' ') >/dev/null & \
+	done; \
 	wait
 
 

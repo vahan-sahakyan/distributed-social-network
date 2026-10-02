@@ -310,7 +310,7 @@ Local cluster, synced by Argo CD the same way as prod (`bootstrap/root-local.yam
 ```bash
 make stop           # free compose's memory first
 make cluster-up     # k3d + Argo CD, synced in a few minutes
-make argocd-ui      # https://localhost:8443
+make forward        # compose's localhost ports + Argo CD on https://localhost:8443
 make cluster-down
 # app on http://localhost:8081, Keycloak on http://localhost:8081/auth
 # grafana, prometheus, jaeger, redpanda, minio on http://<name>.localhost:8081
