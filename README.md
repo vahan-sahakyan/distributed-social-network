@@ -107,7 +107,8 @@ After startup, these are available:
 | `make test` | Run tests in `pkg` and all services |
 | `make lint` | Lint `pkg` and all services with golangci-lint (config: `.golangci.yml`) |
 | `make tidy` | Run `go mod tidy` in all modules |
-| `make k8s-up` / `make k8s-down` | Install / uninstall both Helm charts in the current kube context (images from GHCR, tag `main`) |
+| `make cluster-up` / `make cluster-down` | Create / delete the local k3d cluster, synced by Argo CD from the gitops repo (app on :8081) |
+| `make argocd-ui` | Argo CD UI on https://localhost:8443, prints the admin password |
 
 ## Project Structure
 

@@ -143,7 +143,7 @@ jobs:
           SHA: ${{ github.sha }}
         run: |
           yq -i '.image.tag = strenv(SHA)' envs/prod/services-values.yaml
-          for app in apps/infra.yaml apps/services.yaml; do
+          for app in apps/infra.yaml apps/services.yaml apps-local/infra.yaml apps-local/services.yaml; do
             yq -i '(.spec.sources[] | select(.repoURL == "https://github.com/${{ github.repository }}.git")).targetRevision = strenv(SHA)' "$app"
           done
           git diff --quiet && { echo "already at $SHA"; exit 0; }

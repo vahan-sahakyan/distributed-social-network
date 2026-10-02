@@ -304,11 +304,20 @@ The ingress routes `/api`, `/health` and `/images` to the gateway, `/auth` to Ke
 
 Images: `ghcr.io/vahan-sahakyan/distributed-social-network/<name>:<sha>` (linux/arm64), published on every push by `.github/workflows/publish.yml`. On `main` the workflow also commits the new sha to the gitops repo, which Argo CD syncs.
 
-Standalone install on a local cluster (plain dev secrets, `createDevSecrets: true` by default):
+Local cluster, synced by Argo CD the same way as prod (`bootstrap/root-local.yaml` in the gitops repo):
+
+```bash
+make stop           # free compose's memory first
+make cluster-up     # k3d + Argo CD, synced in a few minutes
+make argocd-ui      # https://localhost:8443
+make cluster-down
+# app on http://localhost:8081, Keycloak on http://localhost:8081/auth
+```
+
+It runs the commit prod runs, with `envs/local` values on top of prod's: plain dev secrets, no TLS. Changes reach it through git only, so to try an unpushed chart change install the charts directly instead:
 
 ```bash
 k3d cluster create dsn -p "8081:80@loadbalancer"
 helm install infra deploy/kubernetes/infra -n dsn --create-namespace --set keycloak.uiUrl=http://localhost:8081
 helm install services deploy/kubernetes/services -n dsn --set image.tag=main
-# app on http://localhost:8081, Keycloak on http://localhost:8081/auth
 ```

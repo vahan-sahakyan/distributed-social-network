@@ -134,41 +134,30 @@ dockerfiles:
 	@bash scripts/gen-dockerfiles.sh
 
 
-.PHONY: images
-images:
-	@for svc in $(SERVICES); do \
-		echo "Building image $$svc..."; \
-		docker build -t distributed-social-network/$$svc:latest -f services/$$svc/Dockerfile . ; \
-	done
+# local k3d cluster synced by Argo CD from the gitops repo (bootstrap/root-local.yaml)
+ARGOCD_VERSION ?= v3.5.3
+GITOPS_RAW = https://raw.githubusercontent.com/vahan-sahakyan/distributed-social-network-gitops/main
+
+.PHONY: cluster-up
+cluster-up:
+	k3d cluster create dsn -p "8081:80@loadbalancer"
+	kubectl create namespace argocd
+	kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/$(ARGOCD_VERSION)/manifests/install.yaml
+	kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=60s
+	kubectl apply -f $(GITOPS_RAW)/bootstrap/root-local.yaml
+	@echo ""
+	@echo "Argo CD is syncing, the app comes up on http://localhost:8081 in a few minutes (make argocd-ui to watch)"
 
 
-.PHONY: k3d-load
-k3d-load:
-	@for svc in $(SERVICES); do \
-		echo "Loading $$svc into k3d..."; \
-		k3d image import distributed-social-network/$$svc:latest -c dsn; \
-	done
+.PHONY: cluster-down
+cluster-down:
+	k3d cluster delete dsn
 
 
-.PHONY: k8s-infra-up
-k8s-infra-up:
-	helm upgrade --install dsn-infra deploy/kubernetes/infra/
-
-
-.PHONY: k8s-infra-down
-k8s-infra-down:
-	helm uninstall dsn-infra
-
-
-.PHONY: k8s-up
-k8s-up: k3d-load
-	helm upgrade --install dsn-infra deploy/kubernetes/infra/
-	helm upgrade --install dsn deploy/kubernetes/services/
-
-
-.PHONY: k8s-down
-k8s-down:
-	helm uninstall dsn dsn-infra
+.PHONY: argocd-ui
+argocd-ui:
+	@echo "https://localhost:8443  admin / $$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+	kubectl -n argocd port-forward svc/argocd-server 8443:443
 
 
 .PHONY: tidy
