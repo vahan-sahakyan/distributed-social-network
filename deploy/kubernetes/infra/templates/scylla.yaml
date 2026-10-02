@@ -31,10 +31,12 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/scylla
+          # CQL opens only once Scylla can serve queries; `nodetool status` with the
+          # default 1s timeout crashed under load and marked a healthy node unready
           readinessProbe:
-            exec:
-              command: [nodetool, status]
-            initialDelaySeconds: 30
+            tcpSocket:
+              port: 9042
+            initialDelaySeconds: 10
             periodSeconds: 10
             failureThreshold: 12
   volumeClaimTemplates:

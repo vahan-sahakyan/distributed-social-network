@@ -94,4 +94,4 @@ In Jaeger, a search request is one trace: gateway -> `search.SearchService/Searc
 
 - Users and posts created before search-service existed are only indexed if their events are still in Redpanda (7-day retention); there is no backfill from the owning services yet
 - No updates or deletes: nothing emits them. Likes and comments don't affect ranking
-- Local only: no auth or TLS on Elasticsearch, and the Helm charts don't deploy it yet
+- No auth or TLS on Elasticsearch, in compose or in the cluster (reachable only inside it). The Helm chart runs one node with a 512 MB heap and `node.store.allow_mmap: false`, so the host needs no `vm.max_map_count` change
