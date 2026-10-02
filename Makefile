@@ -135,6 +135,7 @@ dockerfiles:
 
 
 # local k3d cluster synced by Argo CD from the gitops repo (bootstrap/root-local.yaml)
+# root-local waits for the repo server, else it stalls on a comparison error until the next 3-min refresh
 ARGOCD_VERSION ?= v3.5.3
 GITOPS_RAW = https://raw.githubusercontent.com/vahan-sahakyan/distributed-social-network-gitops/main
 
@@ -144,6 +145,7 @@ cluster-up:
 	kubectl create namespace argocd
 	kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/$(ARGOCD_VERSION)/manifests/install.yaml
 	kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=60s
+	kubectl -n argocd rollout status deploy/argocd-repo-server --timeout=180s
 	kubectl apply -f $(GITOPS_RAW)/bootstrap/root-local.yaml
 	@echo ""
 	@echo "Argo CD is syncing, the app comes up on http://localhost:8081 in a few minutes (make argocd-ui to watch)"
@@ -154,8 +156,11 @@ cluster-down:
 	k3d cluster delete dsn
 
 
+# waits out a fresh cluster-up: the server still starting, the password not yet generated
 .PHONY: argocd-ui
 argocd-ui:
+	@kubectl -n argocd rollout status deploy/argocd-server --timeout=180s
+	@kubectl -n argocd wait --for=create secret/argocd-initial-admin-secret --timeout=60s >/dev/null
 	@echo "https://localhost:8443  admin / $$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
 	kubectl -n argocd port-forward svc/argocd-server 8443:443
 
