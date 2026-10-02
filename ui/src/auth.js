@@ -32,4 +32,5 @@ export async function bearer() {
 
 export const login = () => keycloak.login({ redirectUri: `${location.origin}/home` })
 export const register = () => keycloak.register({ redirectUri: `${location.origin}/home` })
-export const logout = () => keycloak.logout({ redirectUri: `${location.origin}/auth` })
+// /auth belongs to Keycloak wherever both share a host (the cluster ingress)
+export const logout = () => keycloak.logout({ redirectUri: `${location.origin}/login` })

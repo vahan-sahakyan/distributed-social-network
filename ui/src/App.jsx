@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { Zap, Home, Bell, User, RefreshCw, LogIn, LogOut, Trash2, BarChart2 } from 'lucide-react'
+import { Zap, Home, Bell, User, RefreshCw, LogIn, LogOut, Trash2, BarChart2, Search } from 'lucide-react'
 import { Avatar } from './components/Avatar'
 import { Toasts } from './components/Toast'
 import { HomePage } from './pages/HomePage'
@@ -8,14 +8,16 @@ import { ProfilePage } from './pages/ProfilePage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { AuthPage } from './pages/AuthPage'
 import { LoadTestPage } from './pages/LoadTestPage'
+import { SearchPage } from './pages/SearchPage'
+import { TrendingHashtags } from './components/TrendingHashtags'
 import { api } from './api'
 import { keycloak, logout } from './auth'
 import { useStore } from './store'
 
 function RequireUser({ children }) {
   const { currentUser, needsProfile } = useStore()
-  if (needsProfile) return <Navigate to="/auth" replace />
-  if (!currentUser) return keycloak.authenticated ? null : <Navigate to="/auth" replace />
+  if (needsProfile) return <Navigate to="/login" replace />
+  if (!currentUser) return keycloak.authenticated ? null : <Navigate to="/login" replace />
   return children
 }
 
@@ -38,7 +40,7 @@ function AppLayout() {
       .catch(err => {
         if (err.status === 404) {
           setNeedsProfile(true)
-          navigate('/auth')
+          navigate('/login')
         } else {
           toast(err.message, 'error')
         }
@@ -84,6 +86,9 @@ function AppLayout() {
             <nav className="space-y-0.5 mb-5">
               <NavLink to="/home" className={navLinkClass}>
                 {({ isActive }) => <><Home size={15} />Home</>}
+              </NavLink>
+              <NavLink to="/search" className={navLinkClass}>
+                {() => <><Search size={15} />Search</>}
               </NavLink>
               <NavLink to="/notifications" className={navLinkClass}>
                 {({ isActive }) => (
@@ -132,11 +137,12 @@ function AppLayout() {
         <main className="flex-1 min-w-0 border-r border-border">
           <Routes>
             <Route path="/" element={<Navigate to="/home" replace />} />
-            <Route path="/auth" element={<AuthPage />} />
+            <Route path="/login" element={<AuthPage />} />
             <Route path="/home" element={<RequireUser><HomePage /></RequireUser>} />
             <Route path="/profile/:userId" element={<ProfilePage />} />
             <Route path="/notifications" element={<RequireUser><NotificationsPage /></RequireUser>} />
             <Route path="/loadtest" element={<LoadTestPage />} />
+            <Route path="/search" element={<SearchPage />} />
           </Routes>
         </main>
 
@@ -163,9 +169,11 @@ function AppLayout() {
             <div className="bg-surface border border-border rounded-xl p-5 text-center">
               <LogIn size={20} className="text-muted mx-auto mb-2" />
               <p className="text-xs font-medium text-muted">Not logged in</p>
-              <NavLink to="/auth" className="block text-xs text-accent hover:underline mt-1">Sign up or log in</NavLink>
+              <NavLink to="/login" className="block text-xs text-accent hover:underline mt-1">Sign up or log in</NavLink>
             </div>
           )}
+
+          <TrendingHashtags />
 
           {otherUsers.length > 0 && (
             <div className="bg-surface border border-border rounded-xl p-4">
@@ -215,7 +223,7 @@ function AppLayout() {
                   // accounts live in Keycloak and survive; only the profile has to be recreated
                   clearUsers()
                   setNeedsProfile(keycloak.authenticated)
-                  navigate('/auth')
+                  navigate('/login')
                   toast('All data wiped.')
                 }}
                 className="w-full flex items-center justify-center gap-2 text-xs text-red-400/60 hover:text-red-400 border border-transparent hover:border-red-900/40 rounded-lg px-3 py-2 transition-colors"
