@@ -19,6 +19,8 @@ spec:
       containers:
         - name: kibana
           image: {{ .Values.kibana.image }}
+          # land on Dev Tools: the default Elasticsearch home needs the security API, which is off here
+          args: [/usr/local/bin/kibana-docker, "--uiSettings.overrides.defaultRoute=/app/dev_tools#/console"]
           env:
             - name: ELASTICSEARCH_HOSTS
               value: http://elasticsearch:9200
