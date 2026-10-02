@@ -5,12 +5,14 @@ set -euo pipefail
 # Exercises: users, follows, posts, likes, comments, media, feed, notifications,
 # event streaming (Redpanda), event store (ClickHouse), and observability (Prometheus).
 #
-# Usage: ./scripts/demo.sh
+# Usage: ./scripts/demo.sh             (CLUSTER=1 for the local k3d cluster)
 #
 # Prerequisites:
 #   make up          # start all containers (services apply migrations on startup)
+#   or make cluster-up, then make demo CLUSTER=1
 
-BASE_URL="${GATEWAY_URL:-http://localhost:8080}"
+source "$(dirname "$0")/lib/env.sh"
+BASE_URL="$GATEWAY_URL"
 API="$BASE_URL/api/v1"
 
 # Colors
@@ -229,13 +231,13 @@ section "10. EVENT STREAMING (Redpanda → ClickHouse)"
 # ─────────────────────────────────────────────────────────────────────────────
 
 step "Redpanda topics:"
-docker exec infrastructure-redpanda-1 rpk topic list 2>/dev/null
+in_infra redpanda rpk topic list 2>/dev/null
 
 step "ClickHouse event store stats:"
 echo -n "  Total events: "
-docker exec infrastructure-clickhouse-1 clickhouse-client --query "SELECT count(*) FROM feed_events"
+in_infra clickhouse clickhouse-client --query "SELECT count(*) FROM feed_events"
 echo "  Events by type:"
-docker exec infrastructure-clickhouse-1 clickhouse-client --query "SELECT event_type, count(*) as cnt FROM feed_events GROUP BY event_type ORDER BY cnt DESC"
+in_infra clickhouse clickhouse-client --query "SELECT event_type, count(*) as cnt FROM feed_events GROUP BY event_type ORDER BY cnt DESC"
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "11. SEARCH (Redpanda -> Elasticsearch)"
@@ -269,7 +271,7 @@ section "12. OBSERVABILITY"
 # ─────────────────────────────────────────────────────────────────────────────
 
 step "Prometheus targets:"
-curl -s http://localhost:9090/api/v1/targets | python3 -c "
+curl -s "$PROMETHEUS_URL/api/v1/targets" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 for t in sorted(data['data']['activeTargets'], key=lambda x: x['labels']['job']):
@@ -279,42 +281,45 @@ step "Waiting one scrape interval for the demo traffic to land..."
 sleep 16
 
 step "gRPC calls handled by service:"
-curl -s http://localhost:9090/api/v1/query --data-urlencode 'query=sum by (job)(grpc_server_handled_total) > 0' | python3 -c "
+curl -s "$PROMETHEUS_URL/api/v1/query" --data-urlencode 'query=sum by (job)(grpc_server_handled_total) > 0' | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 for r in sorted(data.get('data',{}).get('result',[]), key=lambda x: -float(x['value'][1])):
     print(f\"  {r['metric'].get('job','?'):30s} {r['value'][1]} calls\")" 2>/dev/null || echo "  (no metrics yet)"
 
 step "Traces: the create-post request, through Kafka to every consumer, is one trace in Jaeger"
-info "http://localhost:16686/search?service=gateway-service"
+info "$JAEGER_URL/search?service=gateway-service"
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "13. SYSTEM OVERVIEW"
 # ─────────────────────────────────────────────────────────────────────────────
 
-echo "
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  DISTRIBUTED SOCIAL NETWORK                                                 │
-├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│  Gateway:           $BASE_URL                                    │
-│  Prometheus:        http://localhost:9090                                    │
-│  Grafana:           http://localhost:3000  (admin/admin, DSN Overview)       │
-│  Keycloak:          http://localhost:8180/auth  (admin/admin; users: pw     │
-│                     "password")                                              │
-│  Jaeger:            http://localhost:16686                                   │
-│  Redpanda Console:  http://localhost:8888                                    │
-│  Elasticsearch:     http://localhost:9200  (make kibana for Kibana :5601)    │
-│  MinIO Console:     http://localhost:9001  (minioadmin/minioadmin)           │
-│                                                                             │
-│  Services: gateway, posts, feed, comments, likes, users, media,             │
-│            notifications, event-writer, cache-rebuilder, search              │
-│                                                                             │
-│  Infra: ScyllaDB, PostgreSQL×4, ClickHouse, Redpanda, Memcached, MinIO,     │
-│         Elasticsearch,                                                      │
-│         Prometheus, Grafana, Loki, Alloy, Jaeger                            │
-│                                                                             │
-└─────────────────────────────────────────────────────────────────────────────┘
-"
+# pads by characters, not bytes: printf would miscount the ×
+line() { printf '│  %s%*s│\n' "$1" $((75 - ${#1})) ''; }
+row()  { line "$(printf '%-18s %s' "$1" "$2")"; }
+echo
+echo "┌─────────────────────────────────────────────────────────────────────────────┐"
+line "DISTRIBUTED SOCIAL NETWORK"
+echo "├─────────────────────────────────────────────────────────────────────────────┤"
+line ""
+row "Gateway:"          "$BASE_URL"
+row "Prometheus:"       "$PROMETHEUS_URL"
+row "Grafana:"          "$GRAFANA_URL  (admin/admin)"
+row "Keycloak:"         "$KEYCLOAK_URL  (admin/admin)"
+row ""                  "demo users' password: \"password\""
+row "Jaeger:"           "$JAEGER_URL"
+row "Redpanda Console:" "$REDPANDA_CONSOLE_URL"
+[[ "${CLUSTER:-}" == 1 ]] || row "Elasticsearch:" "http://localhost:9200  (make kibana for Kibana :5601)"
+row "MinIO Console:"    "$MINIO_CONSOLE_URL  (minioadmin/minioadmin)"
+line ""
+line "Services: gateway, posts, feed, comments, likes, users, media,"
+line "          notifications, event-writer, cache-rebuilder, search"
+line ""
+line "Infra: ScyllaDB, PostgreSQL×4, ClickHouse, Redpanda, Memcached, MinIO,"
+line "       Elasticsearch,"
+line "       Prometheus, Grafana, Loki, Alloy, Jaeger"
+line ""
+echo "└─────────────────────────────────────────────────────────────────────────────┘"
+echo
 
 echo -e "${GREEN}✓ Demo complete!${NC}"

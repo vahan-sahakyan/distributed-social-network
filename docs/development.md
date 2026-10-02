@@ -314,6 +314,7 @@ make argocd-ui      # https://localhost:8443
 make cluster-down
 # app on http://localhost:8081, Keycloak on http://localhost:8081/auth
 # grafana, prometheus, jaeger, redpanda, minio on http://<name>.localhost:8081
+make demo CLUSTER=1 # demo users and data, also make load CLUSTER=1
 ```
 
 It runs the commit prod runs, with `envs/local` values on top of prod's: plain dev secrets, no TLS. Changes reach it through git only, so to try an unpushed chart change install the charts directly instead:

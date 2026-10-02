@@ -99,7 +99,7 @@ On the k3d cluster (`make cluster-up`) the app is on http://localhost:8081 and t
 | `make infra-up` / `make infra-down` | Infrastructure containers only |
 | `make fresh` | Clean slate: wipe volumes -> rebuild (services migrate on startup) |
 | `make down-clean` | Stop containers and **delete all data volumes** |
-| `make demo` | Run end-to-end demo script |
+| `make demo` | Run end-to-end demo script (`CLUSTER=1` for the k3d cluster, same for `make load`) |
 | `make load` | Mixed traffic for the dashboards (`DURATION=120 WORKERS=4`) |
 | `make dlq` | List parked (DLQ) messages; `CMD="replay --topic like.created"` replays, `CMD=skip` discards |
 | `make kibana` | Start Kibana for the search indices (not part of `make up`) |
@@ -131,6 +131,7 @@ On the k3d cluster (`make cluster-up`) the app is on http://localhost:8081 and t
 │   ├── gen-dockerfiles.sh   Regenerates Dockerfile pkg/ COPY lines
 │   ├── demo.sh              End-to-end demo script
 │   ├── lib/auth.sh          Keycloak users and tokens for the scripts
+│   ├── lib/env.sh           Compose or cluster (CLUSTER=1) URLs for the scripts
 │   └── load.sh              Traffic generator (make load)
 ├── services/
 │   ├── gateway-service/     HTTP API, translates requests to gRPC

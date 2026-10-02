@@ -7,17 +7,18 @@ set -uo pipefail
 # Keycloak user (created up front, ~2s each).
 #
 # Usage: ./scripts/load.sh [seconds] [workers]    (defaults: 120s, 4 workers)
-#   or:  make load DURATION=300 WORKERS=8
+#   or:  make load DURATION=300 WORKERS=8    (CLUSTER=1 for the local k3d cluster)
 
 DURATION="${1:-120}"
 WORKERS="${2:-4}"
-API="${GATEWAY_URL:-http://localhost:8080}/api/v1"
-RUN="$(date +%s)"
-
+source "$(dirname "$0")/lib/env.sh"
 source "$(dirname "$0")/lib/auth.sh"
 
+API="$GATEWAY_URL/api/v1"
+RUN="$(date +%s)"
+
 if ! curl -sf "${API%/api/v1}/health" >/dev/null; then
-  echo "gateway not reachable at ${API%/api/v1}, run 'make up' first" >&2
+  echo "gateway not reachable at ${API%/api/v1}, run 'make up' (or 'make cluster-up' with CLUSTER=1) first" >&2
   exit 1
 fi
 

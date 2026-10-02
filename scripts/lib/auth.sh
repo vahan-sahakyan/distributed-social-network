@@ -1,32 +1,45 @@
 #!/usr/bin/env bash
 # Keycloak helpers for local scripts: create users and get their access tokens.
-# Users are created with kcadm inside the container (admin/admin, local only);
-# tokens come from the dsn-cli password grant.
+# Users are created through the admin REST API (admin/admin, local only), so the
+# same calls work against compose and the cluster; tokens come from the dsn-cli
+# password grant.
 
 KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8180/auth}"
 KEYCLOAK_REALM="${KEYCLOAK_REALM:-dsn}"
-KEYCLOAK_CONTAINER="${KEYCLOAK_CONTAINER:-infrastructure-keycloak-1}"
 DEMO_PASSWORD="${DEMO_PASSWORD:-password}"
 
-_kcadm() { docker exec "$KEYCLOAK_CONTAINER" /opt/keycloak/bin/kcadm.sh "$@" --config /tmp/kcadm.config; }
+_access_token() { python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('access_token') or ''); sys.exit(0 if d.get('access_token') else 1)"; }
 
+# admin tokens live 60s, so every admin call takes a fresh one
 kc_login() {
-  _kcadm config credentials --server http://localhost:8080/auth --realm master \
-    --user "${KEYCLOAK_ADMIN:-admin}" --password "${KEYCLOAK_ADMIN_PASSWORD:-admin}" >/dev/null 2>&1
+  KC_ADMIN_TOKEN=$(curl -s -X POST "$KEYCLOAK_URL/realms/master/protocol/openid-connect/token" \
+    -d grant_type=password -d client_id=admin-cli \
+    -d username="${KEYCLOAK_ADMIN:-admin}" -d password="${KEYCLOAK_ADMIN_PASSWORD:-admin}" | _access_token)
 }
 
-# kc_ensure_user <username>: creates the user with DEMO_PASSWORD unless it exists; needs kc_login first
+_kc_admin() { curl -sf -H "Authorization: Bearer $KC_ADMIN_TOKEN" -H "Content-Type: application/json" "$@"; }
+
+_kc_user_id() {
+  _kc_admin "$KEYCLOAK_URL/admin/realms/$KEYCLOAK_REALM/users?username=$1&exact=true" |
+    python3 -c "import json,sys; u=json.load(sys.stdin); print(u[0]['id'] if u else '')"
+}
+
+# kc_ensure_user <username>: creates the user with DEMO_PASSWORD unless it exists
 kc_ensure_user() {
-  if [[ -z "$(_kcadm get users -r "$KEYCLOAK_REALM" -q "username=$1" -q exact=true --fields id --format csv --noquotes 2>/dev/null)" ]]; then
-    _kcadm create users -r "$KEYCLOAK_REALM" -s "username=$1" -s enabled=true >/dev/null 2>&1 || return 1
+  local users="$KEYCLOAK_URL/admin/realms/$KEYCLOAK_REALM/users" id
+  kc_login || return 1
+  id=$(_kc_user_id "$1")
+  if [[ -z "$id" ]]; then
+    _kc_admin -X POST "$users" -d "{\"username\":\"$1\",\"enabled\":true}" >/dev/null || return 1
+    id=$(_kc_user_id "$1")
   fi
-  _kcadm set-password -r "$KEYCLOAK_REALM" --username "$1" --new-password "$DEMO_PASSWORD" >/dev/null
+  _kc_admin -X PUT "$users/$id/reset-password" \
+    -d "{\"type\":\"password\",\"value\":\"$DEMO_PASSWORD\",\"temporary\":false}" >/dev/null
 }
 
 # kc_token <username>: access token for the user, via the dsn-cli password grant
 kc_token() {
   curl -s -X POST "$KEYCLOAK_URL/realms/$KEYCLOAK_REALM/protocol/openid-connect/token" \
     -d grant_type=password -d client_id=dsn-cli \
-    -d username="$1" -d password="$DEMO_PASSWORD" |
-    python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('access_token') or ''); sys.exit(0 if d.get('access_token') else 1)"
+    -d username="$1" -d password="$DEMO_PASSWORD" | _access_token
 }
