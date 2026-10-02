@@ -104,7 +104,7 @@ On the k3d cluster (`make cluster-up`) the app is on http://localhost:8081 and t
 | `make dlq` | List parked (DLQ) messages; `CMD="replay --topic like.created"` replays, `CMD=skip` discards |
 | `make kibana` | Start Kibana for the search indices (not part of `make up`) |
 | `make proto` | Regenerate gRPC stubs under `pkg/grpc/`, then `make dockerfiles` |
-| `make dockerfiles` | Regenerate the `pkg/` COPY lines in every service Dockerfile |
+| `make dockerfiles` | Regenerate every service Dockerfile from its `pkg/` imports |
 | `make build` | Compile all service binaries into `bin/` |
 | `make test` | Run tests in `pkg` and all services |
 | `make lint` | Lint `pkg` and all services with golangci-lint (config: `.golangci.yml`) |
@@ -127,7 +127,7 @@ On the k3d cluster (`make cluster-up`) the app is on http://localhost:8081 and t
 ├── pkg/                     Shared library (broker, cache keys, database, events, generated gRPC, IDs)
 ├── proto/                   gRPC service definitions
 ├── scripts/
-│   ├── gen-dockerfiles.sh   Regenerates Dockerfile pkg/ COPY lines
+│   ├── gen-dockerfiles.sh   Regenerates service Dockerfiles
 │   ├── demo.sh              End-to-end demo script
 │   ├── lib/auth.sh          Keycloak users and tokens for the scripts
 │   ├── lib/env.sh           Compose or cluster (CLUSTER=1) URLs for the scripts
