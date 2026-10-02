@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { NavLink, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
-import { Zap, Home, Bell, User, RefreshCw, LogIn, LogOut, Trash2, BarChart2 } from 'lucide-react'
+import { Zap, Home, Bell, User, RefreshCw, LogIn, LogOut, Trash2, BarChart2, Search } from 'lucide-react'
 import { Avatar } from './components/Avatar'
 import { Toasts } from './components/Toast'
 import { HomePage } from './pages/HomePage'
@@ -8,6 +8,8 @@ import { ProfilePage } from './pages/ProfilePage'
 import { NotificationsPage } from './pages/NotificationsPage'
 import { AuthPage } from './pages/AuthPage'
 import { LoadTestPage } from './pages/LoadTestPage'
+import { SearchPage } from './pages/SearchPage'
+import { TrendingHashtags } from './components/TrendingHashtags'
 import { api } from './api'
 import { keycloak, logout } from './auth'
 import { useStore } from './store'
@@ -85,6 +87,9 @@ function AppLayout() {
               <NavLink to="/home" className={navLinkClass}>
                 {({ isActive }) => <><Home size={15} />Home</>}
               </NavLink>
+              <NavLink to="/search" className={navLinkClass}>
+                {() => <><Search size={15} />Search</>}
+              </NavLink>
               <NavLink to="/notifications" className={navLinkClass}>
                 {({ isActive }) => (
                   <>
@@ -137,6 +142,7 @@ function AppLayout() {
             <Route path="/profile/:userId" element={<ProfilePage />} />
             <Route path="/notifications" element={<RequireUser><NotificationsPage /></RequireUser>} />
             <Route path="/loadtest" element={<LoadTestPage />} />
+            <Route path="/search" element={<SearchPage />} />
           </Routes>
         </main>
 
@@ -166,6 +172,8 @@ function AppLayout() {
               <NavLink to="/login" className="block text-xs text-accent hover:underline mt-1">Sign up or log in</NavLink>
             </div>
           )}
+
+          <TrendingHashtags />
 
           {otherUsers.length > 0 && (
             <div className="bg-surface border border-border rounded-xl p-4">

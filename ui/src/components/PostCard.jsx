@@ -6,6 +6,7 @@ import { CommentSection } from './CommentSection'
 import { api } from '../api'
 import { useStore } from '../store'
 import { timeAgo, shortId } from '../utils'
+import { RichText } from './RichText'
 
 export function PostCard({ post }) {
   const navigate = useNavigate()
@@ -72,7 +73,7 @@ export function PostCard({ post }) {
           </div>
 
           <p className="text-sm leading-relaxed text-text/90 whitespace-pre-wrap break-words">
-            {post.text}
+            <RichText text={post.text} />
           </p>
 
           {post.imageId && <PostImage imageId={post.imageId} />}

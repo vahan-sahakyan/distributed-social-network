@@ -66,6 +66,11 @@ export const api = {
   },
   getMedia: (id) => req('GET', `/media/${id}`),
 
+  // Search: public, eventually consistent with writes (about a second)
+  searchPosts: (q, limit = 20) => req('GET', `/search/posts?q=${encodeURIComponent(q)}&limit=${limit}`),
+  searchUsers: (q, limit = 20) => req('GET', `/search/users?q=${encodeURIComponent(q)}&limit=${limit}`),
+  trendingHashtags: (hours = 24, limit = 10) => req('GET', `/search/hashtags/trending?hours=${hours}&limit=${limit}`),
+
   // System
   rebuildCache: () => req('POST', '/rebuild'),
   rebuildUserFeed: (userId) => req('POST', `/rebuild?user_id=${userId}`),

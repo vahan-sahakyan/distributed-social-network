@@ -17,6 +17,8 @@ curl -s 'localhost:8080/api/v1/search/hashtags/trending?hours=24'
 make kibana   # optional: Dev Tools at http://localhost:5601/app/dev_tools#/console
 ```
 
+In the UI: **Search** in the sidebar (`/search?q=`, Posts and People tabs, matches highlighted), every `#hashtag` in a post links to its search, and the right column lists trending hashtags. Highlights come back from Elasticsearch with the post text unescaped, so the UI renders them as text with marked spans, never as HTML.
+
 ## How it works
 
 ```mermaid
