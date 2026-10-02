@@ -4,7 +4,7 @@
 
 ---
 
-Metrics, logs and traces for all 11 services, correlated by trace id. Local compose only; the Helm charts don't ship this stack.
+Metrics, logs and traces for all 11 services, correlated by trace id. Compose runs the stack below; on the local k3d cluster the `observability` chart runs the same configs from `monitoring/` (see [Kubernetes](#kubernetes)).
 
 ## Quick start
 
@@ -22,6 +22,21 @@ open http://localhost:3000 # admin / admin, lands on "DSN Overview"
 | Loki | http://localhost:3100 | API only; query through Grafana |
 | Alloy | http://localhost:12345 | Log pipeline debug UI |
 | Redpanda Console | http://localhost:8888 | Topics, messages, `.dlq` topics, consumer groups |
+
+### Kubernetes
+
+`make cluster-up` deploys the `deploy/kubernetes/observability` chart through Argo CD. Its `files/` is a symlink to `monitoring/`, so the scrape config, alerts, datasources and dashboard are the ones compose uses; only log collection differs (`monitoring/alloy/kubernetes.alloy` reads pod logs through the API and labels them by the pod's `app` label, which matches the compose service names). Every UI gets a host on the cluster ingress:
+
+| Tool | URL |
+|------|-----|
+| Grafana | http://grafana.localhost:8081 (admin / admin) |
+| Prometheus | http://prometheus.localhost:8081 |
+| Jaeger | http://jaeger.localhost:8081 |
+| Redpanda Console | http://redpanda.localhost:8081 |
+| MinIO Console | http://minio.localhost:8081 |
+| Kibana (`kibana.enabled`) | http://kibana.localhost:8081 |
+
+The dashboard's links to Jaeger and Prometheus point at the compose ports.
 
 ## How it is wired
 

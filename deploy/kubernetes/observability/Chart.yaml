@@ -1,0 +1,5 @@
+apiVersion: v2
+name: distributed-social-network-observability
+description: Metrics, logs, traces and admin UIs for the distributed social network
+version: 0.1.0
+appVersion: "1.0.0"

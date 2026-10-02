@@ -87,6 +87,8 @@ After startup, these are available:
 | Kibana (`make kibana`) | http://localhost:5601 | - |
 | MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
 
+On the k3d cluster (`make cluster-up`) the app is on http://localhost:8081 and the tools on `http://<name>.localhost:8081`: grafana, prometheus, jaeger, redpanda, minio.
+
 ## Make Commands
 
 | Command | Description |
@@ -117,7 +119,7 @@ After startup, these are available:
 ├── .github/workflows/       CI (vet, lint, test, gofmt, UI lint/build) and image publish + deploy
 ├── deploy/
 │   ├── images/minio/        MinIO built from source (upstream images discontinued)
-│   └── kubernetes/          Helm charts (infra, services), deployed via GitOps
+│   └── kubernetes/          Helm charts (infra, services, observability), deployed via GitOps
 ├── docs/                    Architecture, services, API, infrastructure, development
 ├── infrastructure/          Docker Compose files
 │   ├── docker-compose.yml           Infrastructure (DBs, broker, monitoring)

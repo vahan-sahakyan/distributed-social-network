@@ -293,12 +293,13 @@ This happens when running `go build ./...` inside a service that has a `cmd/` di
 
 ## Kubernetes Deployment
 
-Two Helm charts, deployed by Argo CD from [distributed-social-network-gitops](https://github.com/vahan-sahakyan/distributed-social-network-gitops):
+Three Helm charts, deployed by Argo CD from [distributed-social-network-gitops](https://github.com/vahan-sahakyan/distributed-social-network-gitops):
 
 | Chart | Contents |
 |---|---|
 | `deploy/kubernetes/infra` | Postgres x5 (one for Keycloak), Scylla, Redpanda, ClickHouse, MinIO, Memcached, Elasticsearch, Keycloak |
 | `deploy/kubernetes/services` | the 11 services, UI, ingress |
+| `deploy/kubernetes/observability` | Prometheus, Grafana, Loki, Alloy, Jaeger, Redpanda Console, optional Kibana; configs from `monitoring/` |
 
 The ingress routes `/api`, `/health` and `/images` to the gateway, `/auth` to Keycloak and everything else to the UI.
 
@@ -312,6 +313,7 @@ make cluster-up     # k3d + Argo CD, synced in a few minutes
 make argocd-ui      # https://localhost:8443
 make cluster-down
 # app on http://localhost:8081, Keycloak on http://localhost:8081/auth
+# grafana, prometheus, jaeger, redpanda, minio on http://<name>.localhost:8081
 ```
 
 It runs the commit prod runs, with `envs/local` values on top of prod's: plain dev secrets, no TLS. Changes reach it through git only, so to try an unpushed chart change install the charts directly instead:

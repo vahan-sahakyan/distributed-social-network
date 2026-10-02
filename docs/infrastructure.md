@@ -247,5 +247,8 @@ Created on startup by `pkg/broker.EnsureTopics`, replication factor 1.
 | `monitoring/grafana/provisioning/` | Datasources (Prometheus, Loki, Jaeger, cross-linked) and dashboard provider |
 | `monitoring/grafana/dashboards/dsn-overview.json` | DSN Overview dashboard, also Grafana's home |
 | `monitoring/alloy/config.alloy` | Docker log discovery -> Loki, labelled `service` and `project` |
+| `monitoring/alloy/kubernetes.alloy` | The k8s equivalent: pod logs of the namespace -> Loki, labelled `service`, `namespace` and `pod` |
+
+The `deploy/kubernetes/observability` chart reads these through its `files/` symlink, so compose and the cluster share them.
 
 Services export traces to `OTEL_EXPORTER_OTLP_ENDPOINT` (`http://jaeger:4318` in compose); unset, tracing is off.

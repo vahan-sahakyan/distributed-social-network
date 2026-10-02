@@ -1,0 +1,25 @@
+{{- if .Values.ingress.enabled }}
+{{- $routes := .Values.ingress.routes }}
+{{- if .Values.kibana.enabled }}
+{{- $routes = merge (dict "kibana" (dict "service" "kibana" "port" 5601)) $routes }}
+{{- end }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: observability
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  rules:
+    {{- range $name, $route := $routes }}
+    - host: {{ printf "%s.%s" $name $.Values.ingress.domain | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $route.service }}
+                port:
+                  number: {{ $route.port }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,71 @@
+# configs and the dashboard come from monitoring/ (files/ is a symlink), shared with compose
+
+prometheus:
+  image: prom/prometheus:v3.12.0
+  storage: 5Gi
+  resources:
+    requests: {cpu: 50m, memory: 256Mi}
+    limits: {memory: 1Gi}
+
+grafana:
+  image: grafana/grafana:13.0.2
+  # admin user/password come from the grafana-admin secret
+  storage: 1Gi
+  resources:
+    requests: {cpu: 20m, memory: 128Mi}
+    limits: {memory: 512Mi}
+
+loki:
+  image: grafana/loki:3.7.2
+  storage: 5Gi
+  resources:
+    requests: {cpu: 20m, memory: 128Mi}
+    limits: {memory: 512Mi}
+
+# tails the pods of this namespace into loki
+alloy:
+  image: grafana/alloy:v1.20.1
+  resources:
+    requests: {cpu: 10m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
+# all-in-one, in-memory: traces are lost on restart.
+# 2.21 dropped the /api/services|traces endpoints the grafana jaeger datasource uses
+jaeger:
+  image: jaegertracing/jaeger:2.20.0
+  resources:
+    requests: {cpu: 20m, memory: 128Mi}
+    limits: {memory: 1Gi}
+
+redpandaConsole:
+  image: redpandadata/console:v3.12.0
+  resources:
+    requests: {cpu: 10m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
+# ~1GB, for poking at the search indices in Dev Tools
+kibana:
+  enabled: false
+  image: kibana:9.5.3
+  resources:
+    requests: {cpu: 50m, memory: 768Mi}
+    limits: {memory: 1536Mi}
+
+# every UI on <name>.<domain>; browsers resolve *.localhost to loopback
+ingress:
+  enabled: true
+  className: traefik
+  domain: localhost
+  routes:
+    grafana: {service: grafana, port: 3000}
+    prometheus: {service: prometheus, port: 9090}
+    jaeger: {service: jaeger, port: 16686}
+    redpanda: {service: redpanda-console, port: 8080}
+    minio: {service: minio, port: 9001}
+
+# plain secrets for local clusters; set false where secrets come from elsewhere
+createDevSecrets: true
+devSecrets:
+  grafana-admin:
+    GF_SECURITY_ADMIN_USER: admin
+    GF_SECURITY_ADMIN_PASSWORD: admin
