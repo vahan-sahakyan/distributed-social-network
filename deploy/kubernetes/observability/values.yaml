@@ -7,6 +7,8 @@ stack:
 
 prometheus:
   image: prom/prometheus:v3.12.0
+  # image uids; Pod Security "restricted", see templates/_helpers.tpl
+  security: {user: 65534, readOnly: true}
   storage: 5Gi
   resources:
     requests: {cpu: 50m, memory: 256Mi}
@@ -14,6 +16,7 @@ prometheus:
 
 grafana:
   image: grafana/grafana:13.0.2
+  security: {user: 472, readOnly: true}
   # admin user/password come from the grafana-admin secret
   storage: 1Gi
   resources:
@@ -22,6 +25,7 @@ grafana:
 
 loki:
   image: grafana/loki:3.7.2
+  security: {user: 10001, readOnly: true}
   storage: 5Gi
   resources:
     requests: {cpu: 20m, memory: 128Mi}
@@ -30,6 +34,7 @@ loki:
 # tails the pods of this namespace into loki
 alloy:
   image: grafana/alloy:v1.20.1
+  security: {user: 473, readOnly: true}
   resources:
     requests: {cpu: 10m, memory: 64Mi}
     limits: {memory: 256Mi}
@@ -38,6 +43,7 @@ alloy:
 # 2.21 dropped the /api/services|traces endpoints the grafana jaeger datasource uses
 jaeger:
   image: jaegertracing/jaeger:2.20.0
+  security: {user: 10001, readOnly: true}
   resources:
     requests: {cpu: 20m, memory: 128Mi}
     limits: {memory: 1Gi}
@@ -45,6 +51,7 @@ jaeger:
 redpandaConsole:
   enabled: true
   image: redpandadata/console:v3.12.0
+  security: {user: 100, fsGroup: 101, readOnly: true}
   resources:
     requests: {cpu: 10m, memory: 64Mi}
     limits: {memory: 256Mi}
@@ -53,6 +60,8 @@ redpandaConsole:
 kibana:
   enabled: false
   image: kibana:9.5.3
+  # writes its data dir and optimizer cache under /usr/share/kibana
+  security: {user: 1000}
   resources:
     requests: {cpu: 50m, memory: 768Mi}
     limits: {memory: 1536Mi}
@@ -84,3 +93,35 @@ secrets:
     data:
       GF_SECURITY_ADMIN_USER: "{{ .user }}"
       GF_SECURITY_ADMIN_PASSWORD: "{{ .password }}"
+
+# NetworkPolicies, one per UI and backend: only what reads it gets in (the services chart
+# denies the rest). A rule is {from: [app labels], gateway: the Gateway's proxy pods,
+# namespace: any pod here, ports: [...]}
+networkPolicy:
+  enabled: true
+  # the pods behind the Gateway (k3s's Traefik)
+  gateway:
+    namespace: kube-system
+    podLabels:
+      app.kubernetes.io/name: traefik
+  ingress:
+    grafana:
+      - gateway: true
+    prometheus:
+      - from: [grafana]
+        gateway: true
+    loki:
+      - from: [alloy, grafana]
+    jaeger:
+      - from: [grafana]
+        gateway: true
+        ports: [16686]
+      # OTLP from every service
+      - namespace: true
+        ports: [4317, 4318]
+    # nothing reads it
+    alloy: []
+    redpanda-console:
+      - gateway: true
+    kibana:
+      - gateway: true

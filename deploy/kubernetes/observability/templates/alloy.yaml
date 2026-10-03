@@ -55,9 +55,13 @@ spec:
         checksum/config: {{ .Files.Get "files/alloy/kubernetes.alloy" | sha256sum }}
     spec:
       serviceAccountName: alloy
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.alloy.security | nindent 8 }}
       containers:
         - name: alloy
           image: {{ .Values.alloy.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.alloy.security | nindent 12 }}
           args:
             - run
             - --server.http.listen-addr=0.0.0.0:12345
@@ -77,6 +81,8 @@ spec:
               mountPath: /etc/alloy
             - name: data
               mountPath: /var/lib/alloy/data
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /-/ready
@@ -87,5 +93,7 @@ spec:
           configMap:
             name: alloy-config
         - name: data
+          emptyDir: {}
+        - name: tmp
           emptyDir: {}
 {{- end }}

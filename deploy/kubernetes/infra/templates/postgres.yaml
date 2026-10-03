@@ -21,12 +21,19 @@ spec:
       labels:
         app: {{ $name }}
     spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" $.Values.postgres.security | nindent 8 }}
       containers:
         - name: {{ $name }}
           image: {{ $.Values.postgres.image }}
+          securityContext:
+            {{- include "dsn.securityContext" $.Values.postgres.security | nindent 12 }}
           resources:
             {{- toYaml $.Values.postgres.resources | nindent 12 }}
           env:
+            # a subdirectory: initdb must own the data dir, and a volume's root may not be its own
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
             - name: POSTGRES_DB
               value: {{ $db.database }}
             - name: POSTGRES_USER
@@ -41,11 +48,20 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data
+            - name: run
+              mountPath: /var/run/postgresql
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             exec:
               command: [pg_isready, -U, {{ $.Values.postgres.user }}]
             initialDelaySeconds: 5
             periodSeconds: 5
+      volumes:
+        - name: run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
   volumeClaimTemplates:
     - metadata:
         name: data

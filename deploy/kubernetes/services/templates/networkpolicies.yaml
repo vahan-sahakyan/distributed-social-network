@@ -1,0 +1,57 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- $np := .Values.networkPolicy }}
+---
+# the namespace's baseline: nothing gets in unless a policy (here or in the other charts) allows it
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+{{- range $name, $svc := .Values.services }}
+{{- if ne $svc.enabled false }}
+{{- $app := printf "%s-service" $name }}
+{{- /* callers = the services whose env addresses this one */}}
+{{- $callers := list }}
+{{- range $caller, $c := $.Values.services }}
+{{- range $_, $addr := $c.env }}
+{{- if hasPrefix (printf "%s:" $app) (toString $addr) }}
+{{- $callers = append $callers (printf "%s-service" $caller) }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- $rules := list }}
+{{- with $callers }}
+{{- $rules = append $rules (dict "from" (uniq .)) }}
+{{- end }}
+{{- with $np.scrapers }}
+{{- $rules = append $rules (dict "from" . "ports" (list $svc.port)) }}
+{{- end }}
+{{- $rules = concat $rules (index $np.ingress $name | default list) }}
+---
+{{ include "dsn.networkPolicy" (dict "app" $app "rules" $rules "gateway" $np.gateway) }}
+{{- end }}
+{{- end }}
+{{- if and .Values.route.enabled .Values.route.tls }}
+---
+# cert-manager's http01 solver pods answer ACME challenges through the Gateway
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: acme-http01-solver
+spec:
+  podSelector:
+    matchLabels:
+      acme.cert-manager.io/http01-solver: "true"
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $np.gateway.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $np.gateway.podLabels | nindent 14 }}
+{{- end }}
+{{- end }}

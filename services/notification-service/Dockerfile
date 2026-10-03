@@ -22,4 +22,5 @@ RUN --mount=type=cache,target=/go/pkg/mod --mount=type=cache,target=/root/.cache
 FROM alpine:3.24
 RUN apk --no-cache add ca-certificates
 COPY --from=builder /bin/service /service
+USER 65532:65532
 ENTRYPOINT ["/service"]

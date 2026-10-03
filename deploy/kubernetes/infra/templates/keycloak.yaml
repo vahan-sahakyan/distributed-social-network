@@ -26,14 +26,23 @@ spec:
         # a realm change restarts Keycloak; it only imports into an empty database
         checksum/realm: {{ .Files.Get "files/dsn-realm.json" | sha256sum }}
     spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.keycloak.security | nindent 8 }}
       # Keycloak exits when its database isn't up yet; wait instead of crash-looping
       initContainers:
         - name: wait-for-db
           image: {{ .Values.postgres.image }}
           command: [sh, -c, "until pg_isready -h keycloak-db -U {{ .Values.postgres.user }}; do sleep 2; done"]
+          securityContext:
+            {{- include "dsn.securityContext" (dict "readOnly" true) | nindent 12 }}
+          resources:
+            requests: {cpu: 5m, memory: 16Mi}
+            limits: {memory: 32Mi}
       containers:
         - name: keycloak
           image: {{ .Values.keycloak.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.keycloak.security | nindent 12 }}
           args: [start, --import-realm]
           resources:
             {{- toYaml .Values.keycloak.resources | nindent 12 }}

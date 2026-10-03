@@ -180,7 +180,7 @@ Docker builds and CI run with `GOWORK=off`, so each module's own `go.mod`/`go.su
 
 10. Add a Prometheus scrape target in `monitoring/prometheus/prometheus.yml`
 
-11. Add it to `SERVICES` in the `Makefile`, the module matrix in `.github/workflows/ci.yml`, the image matrix in `.github/workflows/publish.yml`, and `services:` in `deploy/kubernetes/services/values.yaml`
+11. Add it to `SERVICES` in the `Makefile`, the module matrix in `.github/workflows/ci.yml`, the image matrix in `.github/workflows/publish.yml`, and `services:` in `deploy/kubernetes/services/values.yaml`; if it uses a store, add `<name>-service` to that store's `networkPolicy.ingress` in `deploy/kubernetes/infra/values.yaml`
 
 ## Running Tests
 
@@ -303,6 +303,13 @@ Three Helm charts, deployed by Argo CD from [distributed-social-network-gitops](
 | `deploy/kubernetes/observability` | Prometheus, Grafana, Loki, Alloy, Jaeger, Redpanda Console, optional Kibana; configs from `monitoring/` |
 
 Traffic enters through Gateway API: the services chart creates the `dsn` Gateway (class `traefik`, k3s's bundled Traefik with its Gateway provider turned on by `platform-k3s/traefik.yaml` in the gitops repo) and an HTTPRoute for `route.host` that sends `/api`, `/health` and `/images` to the gateway, `/auth` to Keycloak and everything else to the UI. The observability chart adds one HTTPRoute per UI on `<name>.<domain>`. With `route.tls`, the chart requests one cert-manager certificate (`route.clusterIssuer`) for `route.host` plus `route.extraHosts`, serves it on one HTTPS listener, and redirects the app's HTTP to it (`route.httpsPort` when HTTPS isn't on 443). Locally `extraHosts` lists the UI hosts (`grafana.localhost`, ...) so they get HTTPS as well; a `*.localhost` wildcard doesn't work, TLS clients reject wildcards under single-label names. For another controller, set `route.gateway.className` and its listener ports, or `route.gateway.create: false` with `route.parentRefs` to attach to a shared Gateway.
+
+Workload security (all charts, `templates/_helpers.tpl`):
+- The `dsn` namespace enforces Pod Security `restricted` (labels set by the gitops `infra` app). Every pod runs as its image's non-root uid (`security.user`, numeric so `runAsNonRoot` can verify it), drops all capabilities, no privilege escalation, `RuntimeDefault` seccomp
+- Read-only root filesystem (`security.readOnly`, writable paths as emptyDirs) everywhere except Scylla, Redpanda, ClickHouse, Elasticsearch, Keycloak and Kibana, whose entrypoints write config or build output into the image on start
+- Postgres keeps its data in `pgdata/` under the volume: `initdb` must own the data dir, and a fresh volume's root isn't owned by uid 70
+- NetworkPolicies, ingress only: the services chart denies all in the namespace, then each pod admits its clients. A service admits the services whose env addresses it (derived), Prometheus on its HTTP port, and `networkPolicy.ingress` extras (the Gateway's Traefik pods for the gateway and UI); stores and UIs list theirs in `networkPolicy.ingress` of the infra and observability charts. A new client of a store needs an entry there
+- `replicaCount` above 1 adds a PodDisruptionBudget (`maxUnavailable: 1`) per service; requests and limits are set on every container
 
 Images: `ghcr.io/vahan-sahakyan/distributed-social-network/<name>:<sha>` (linux/arm64), published on every push by `.github/workflows/publish.yml`. On `main` the workflow also commits the new sha to the gitops repo, which Argo CD syncs.
 

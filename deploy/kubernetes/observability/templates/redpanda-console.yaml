@@ -16,9 +16,13 @@ spec:
       labels:
         app: redpanda-console
     spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.redpandaConsole.security | nindent 8 }}
       containers:
         - name: redpanda-console
           image: {{ .Values.redpandaConsole.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.redpandaConsole.security | nindent 12 }}
           env:
             - name: KAFKA_BROKERS
               value: redpanda:9092
@@ -30,6 +34,12 @@ spec:
             tcpSocket:
               port: 8080
             periodSeconds: 5
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

@@ -1,0 +1,6 @@
+{{- if .Values.networkPolicy.enabled }}
+{{- range $app, $rules := .Values.networkPolicy.ingress }}
+---
+{{ include "dsn.networkPolicy" (dict "app" $app "rules" $rules "gateway" $.Values.networkPolicy.gateway) }}
+{{- end }}
+{{- end }}

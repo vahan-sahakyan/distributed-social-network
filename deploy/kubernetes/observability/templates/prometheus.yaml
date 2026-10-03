@@ -27,9 +27,13 @@ spec:
       labels:
         app: prometheus
     spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.prometheus.security | nindent 8 }}
       containers:
         - name: prometheus
           image: {{ .Values.prometheus.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.prometheus.security | nindent 12 }}
           # configmap edits reach the mount within a minute and are reloaded, no restart
           args:
             - --config.file=/etc/prometheus/prometheus.yml
