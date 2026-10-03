@@ -1,5 +1,25 @@
 SERVICES = gateway-service posts-service comments-service likes-service feed-service users-service media-service notification-service event-writer-service cache-rebuilder-service search-service
 
+# optional groups, off unless asked for: make up OBS=1 SEARCH=1 EVENTS=1 TOOLS=1, or ALL=1.
+# compose runs them as profiles; cluster-up and cluster-profile hand them to the root-local app
+ifeq ($(ALL),1)
+OBS := 1
+SEARCH := 1
+EVENTS := 1
+TOOLS := 1
+endif
+on = $(filter 1,$($(1)))
+
+COMPOSE = docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml
+# kibana needs elasticsearch, so it runs only with both
+PROFILES = $(if $(call on,OBS),--profile obs) $(if $(call on,SEARCH),--profile search) \
+	$(if $(call on,EVENTS),--profile events) $(if $(call on,TOOLS),--profile tools) \
+	$(if $(and $(call on,TOOLS),$(call on,SEARCH)),--profile kibana)
+# addresses of switched-off services stay empty, which the services read as "off"
+GROUP_ENV = OTEL_EXPORTER_OTLP_ENDPOINT=$(if $(call on,OBS),http://jaeger:4318) \
+	SEARCH_SERVICE_GRPC_ADDR=$(if $(call on,SEARCH),search-service:9091) \
+	CACHE_REBUILDER_SERVICE_GRPC_ADDR=$(if $(call on,EVENTS),cache-rebuilder-service:9089)
+
 .PHONY: proto
 proto:
 	@export PATH="$${PATH}:/opt/homebrew/bin:$$(go env GOPATH)/bin" && \
@@ -50,38 +70,39 @@ lint:
 
 .PHONY: infra-up
 infra-up:
-	docker compose -f infrastructure/docker-compose.yml up -d
+	docker compose -f infrastructure/docker-compose.yml $(PROFILES) up -d
 
 
 .PHONY: infra-down
 infra-down:
-	docker compose -f infrastructure/docker-compose.yml down
+	COMPOSE_PROFILES='*' docker compose -f infrastructure/docker-compose.yml down
 
 
-.PHONY: up
-up:
-	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml up -d --build
+# core + the chosen groups, and stops groups left running from an earlier run;
+# start is the same without building images (containers keep their data either way)
+.PHONY: up start
+up: BUILD = --build
+up start:
+	$(GROUP_ENV) $(COMPOSE) $(PROFILES) up -d $(BUILD)
+	@on=$$($(COMPOSE) $(PROFILES) config --services); \
+	off=$$(COMPOSE_PROFILES='*' $(COMPOSE) config --services | grep -vxF "$$on"); \
+	if [ -n "$$off" ]; then COMPOSE_PROFILES='*' $(COMPOSE) stop $$off; fi
+
+
+# stop, down and down-clean act on every group, whatever ran
+.PHONY: stop
+stop:
+	COMPOSE_PROFILES='*' $(COMPOSE) stop
 
 
 .PHONY: down
 down:
-	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml down
-
-
-# stop/start keep containers, so start is instant and nothing is rebuilt
-.PHONY: stop
-stop:
-	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml stop
-
-
-.PHONY: start
-start:
-	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml start
+	COMPOSE_PROFILES='*' $(COMPOSE) down
 
 
 .PHONY: down-clean
 down-clean:
-	docker compose -f infrastructure/docker-compose.yml -f infrastructure/docker-compose.services.yml down -v
+	COMPOSE_PROFILES='*' $(COMPOSE) down -v
 
 
 .PHONY: demo
@@ -101,13 +122,6 @@ CMD ?= list
 .PHONY: dlq
 dlq:
 	@cd tools/dlq && go run . $(CMD)
-
-
-# Kibana for poking at the search indices (Dev Tools), not started by make up
-.PHONY: kibana
-kibana:
-	docker compose -f infrastructure/docker-compose.yml --profile kibana up -d kibana
-	@echo "Kibana: http://localhost:5601/app/dev_tools#/console"
 
 
 .PHONY: ui
@@ -155,9 +169,18 @@ cluster-up: local-ca
 	kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=60s
 	kubectl -n argocd rollout status deploy/argocd-repo-server --timeout=180s
 	kubectl apply -f $(GITOPS_RAW)/bootstrap/root-local.yaml
+	@$(MAKE) --no-print-directory cluster-profile
 	@echo ""
 	@echo "Argo CD is syncing, the app comes up on https://localhost:8443 in a few minutes (make forward for the Argo CD UI)"
 	@echo "Browsers trust it after make trust-ca (once per machine)"
+
+# switches the optional groups of the cluster: make cluster-profile OBS=1 SEARCH=1 (unset = off).
+# They live on the hand-applied root-local app, so no commit; Argo adds and prunes the
+# groups, and the volumes of stateful ones are kept for when they come back
+bool = $(if $(call on,$(1)),true,false)
+.PHONY: cluster-profile
+cluster-profile:
+	kubectl -n argocd patch application root-local --type merge -p '{"spec":{"source":{"helm":{"valuesObject":{"obs":$(call bool,OBS),"tools":$(call bool,TOOLS),"search":$(call bool,SEARCH),"events":$(call bool,EVENTS)}}}}}'
 
 .PHONY: local-ca
 local-ca: $(LOCAL_CA).crt

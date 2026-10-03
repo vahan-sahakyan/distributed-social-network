@@ -38,7 +38,9 @@ memcached:
     requests: {cpu: 10m, memory: 32Mi}
     limits: {memory: 128Mi}
 
+# event store for event-writer and cache-rebuilder; local clusters may switch it off
 clickhouse:
+  enabled: true
   image: clickhouse/clickhouse-server:26.5.1.882
   storage: 2Gi
   resources:
@@ -54,7 +56,9 @@ minio:
     requests: {cpu: 20m, memory: 128Mi}
     limits: {memory: 512Mi}
 
+# search-service's index; local clusters may switch it off
 elasticsearch:
+  enabled: true
   image: elasticsearch:9.5.3
   storage: 2Gi
   javaOpts: -Xms512m -Xmx512m

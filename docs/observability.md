@@ -9,7 +9,7 @@ Metrics, logs and traces for all 11 services, correlated by trace id. Compose ru
 ## Quick start
 
 ```bash
-make up
+make up OBS=1              # the stack is opt-in; on k3d: make cluster-profile OBS=1
 make load                  # 120s of mixed traffic, 4 workers; or: make load DURATION=600 WORKERS=8
 open http://localhost:3000 # admin / admin, lands on "DSN Overview"
 ```

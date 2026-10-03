@@ -1,9 +1,10 @@
 {{- if .Values.route.enabled }}
 {{- $routes := .Values.route.routes }}
 {{- if .Values.kibana.enabled }}
-{{- $routes = merge (dict "kibana" (dict "service" "kibana" "port" 5601)) $routes }}
+{{- $routes = merge (dict "kibana" (dict "group" "kibana" "service" "kibana" "port" 5601)) $routes }}
 {{- end }}
 {{- range $name, $route := $routes }}
+{{- if or (not $route.group) (index $.Values $route.group).enabled }}
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -17,5 +18,6 @@ spec:
     - backendRefs:
         - name: {{ $route.service }}
           port: {{ $route.port }}
+{{- end }}
 {{- end }}
 {{- end }}

@@ -1,3 +1,4 @@
+{{- if .Values.stack.enabled }}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -87,3 +88,4 @@ spec:
             name: alloy-config
         - name: data
           emptyDir: {}
+{{- end }}

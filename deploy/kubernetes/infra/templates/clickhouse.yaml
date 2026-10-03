@@ -1,3 +1,4 @@
+{{- if .Values.clickhouse.enabled }}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -84,3 +85,4 @@ spec:
     - name: native
       port: 9000
       targetPort: 9000
+{{- end }}

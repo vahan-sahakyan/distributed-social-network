@@ -230,14 +230,25 @@ get_json "$API/notifications" "$ALICE" | pretty
 section "10. EVENT STREAMING (Redpanda → ClickHouse)"
 # ─────────────────────────────────────────────────────────────────────────────
 
+# optional groups (make up OBS=1 TOOLS=1 SEARCH=1 EVENTS=1): sections of switched-off ones are skipped
+on_events=0; in_infra clickhouse true >/dev/null 2>&1 && on_events=1
+on_search=0; curl -s "$API/search/hashtags/trending" | grep -q 'search is disabled' || on_search=1
+on_obs=0;    curl -sf -m3 -o /dev/null "$PROMETHEUS_URL/-/ready" && on_obs=1
+on_tools=0;  curl -sf -m3 -o /dev/null "$REDPANDA_CONSOLE_URL" && on_tools=1
+off() { info "$1 is off; rerun with $2=1 (make up $2=1, or make cluster-profile $2=1)"; }
+
 step "Redpanda topics:"
 in_infra redpanda rpk topic list 2>/dev/null
 
-step "ClickHouse event store stats:"
-echo -n "  Total events: "
-in_infra clickhouse clickhouse-client --query "SELECT count(*) FROM feed_events"
-echo "  Events by type:"
-in_infra clickhouse clickhouse-client --query "SELECT event_type, count(*) as cnt FROM feed_events GROUP BY event_type ORDER BY cnt DESC"
+if ((on_events)); then
+  step "ClickHouse event store stats:"
+  echo -n "  Total events: "
+  in_infra clickhouse clickhouse-client --query "SELECT count(*) FROM feed_events"
+  echo "  Events by type:"
+  in_infra clickhouse clickhouse-client --query "SELECT event_type, count(*) as cnt FROM feed_events GROUP BY event_type ORDER BY cnt DESC"
+else
+  off "The event store" EVENTS
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "11. SEARCH (Redpanda -> Elasticsearch)"
@@ -255,21 +266,26 @@ for h in d.get('hashtags') or []:
     print('   #' + h['hashtag'], h['posts'])"
 }
 
-info "Indexing is asynchronous; giving it a moment..."
-sleep 3
-step "Posts matching \"deploying\" (stemmed to deployed):"
-search "posts?q=deploying"
-step "Posts tagged #golang:"
-search "posts?q=%23golang"
-step "Users starting with \"ch\":"
-search "users?q=ch"
-step "Trending hashtags, last 24h:"
-search "hashtags/trending"
+if ((on_search)); then
+  info "Indexing is asynchronous; giving it a moment..."
+  sleep 3
+  step "Posts matching \"deploying\" (stemmed to deployed):"
+  search "posts?q=deploying"
+  step "Posts tagged #golang:"
+  search "posts?q=%23golang"
+  step "Users starting with \"ch\":"
+  search "users?q=ch"
+  step "Trending hashtags, last 24h:"
+  search "hashtags/trending"
+else
+  off "Search" SEARCH
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "12. OBSERVABILITY"
 # ─────────────────────────────────────────────────────────────────────────────
 
+if ((on_obs)); then
 step "Prometheus targets:"
 curl -s "$PROMETHEUS_URL/api/v1/targets" | python3 -c "
 import json, sys
@@ -289,6 +305,9 @@ for r in sorted(data.get('data',{}).get('result',[]), key=lambda x: -float(x['va
 
 step "Traces: the create-post request, through Kafka to every consumer, is one trace in Jaeger"
 info "$JAEGER_URL/search?service=gateway-service"
+else
+  off "Observability" OBS
+fi
 
 # ─────────────────────────────────────────────────────────────────────────────
 section "13. SYSTEM OVERVIEW"
@@ -303,14 +322,18 @@ line "DISTRIBUTED SOCIAL NETWORK"
 echo "├─────────────────────────────────────────────────────────────────────────────┤"
 line ""
 row "Gateway:"          "$BASE_URL"
-row "Prometheus:"       "$PROMETHEUS_URL"
-row "Grafana:"          "$GRAFANA_URL  (admin/admin)"
 row "Keycloak:"         "$KEYCLOAK_URL  (admin/admin)"
 row ""                  "demo users' password: \"password\""
-row "Jaeger:"           "$JAEGER_URL"
-row "Redpanda Console:" "$REDPANDA_CONSOLE_URL"
-[[ "${CLUSTER:-}" == 1 ]] || row "Elasticsearch:" "http://localhost:9200  (make kibana for Kibana :5601)"
 row "MinIO Console:"    "$MINIO_CONSOLE_URL  (minioadmin/minioadmin)"
+if ((on_obs)); then
+  row "Prometheus:"     "$PROMETHEUS_URL"
+  row "Grafana:"        "$GRAFANA_URL  (admin/admin)"
+  row "Jaeger:"         "$JAEGER_URL"
+fi
+((on_tools)) && row "Redpanda Console:" "$REDPANDA_CONSOLE_URL"
+((on_search)) && [[ "${CLUSTER:-}" != 1 ]] && row "Elasticsearch:" "http://localhost:9200"
+off_groups="$( ((on_obs)) || printf 'OBS '; ((on_tools)) || printf 'TOOLS '; ((on_search)) || printf 'SEARCH '; ((on_events)) || printf 'EVENTS ')"
+[[ -n "$off_groups" ]] && { line ""; line "Off (opt in with <GROUP>=1): $off_groups"; }
 line ""
 line "Services: gateway, posts, feed, comments, likes, users, media,"
 line "          notifications, event-writer, cache-rebuilder, search"

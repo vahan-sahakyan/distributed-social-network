@@ -76,6 +76,24 @@ func serverError(c *fiber.Ctx, code int, msg string, err error) error {
 	return c.Status(code).JSON(body)
 }
 
+// optionalDial returns nil when key is set but empty: that service is switched off here
+func optionalDial(key, fallback string) *grpc.ClientConn {
+	if addr, ok := os.LookupEnv(key); ok && addr == "" {
+		return nil
+	}
+	return mustDial(envOrDefault(key, fallback))
+}
+
+// enabled answers 503 on routes whose service is switched off
+func enabled(on bool, name string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		if !on {
+			return c.Status(fiber.StatusServiceUnavailable).JSON(fiber.Map{"error": name + " is disabled"})
+		}
+		return c.Next()
+	}
+}
+
 func mustDial(addr string) *grpc.ClientConn {
 	conn, err := grpc.NewClient(addr, observability.GRPCDialOptions()...)
 	if err != nil {
@@ -142,15 +160,19 @@ func main() {
 	app.Use(accessLog)
 
 	cl := &clients{
-		users:          userspb.NewUsersServiceClient(mustDial(envOrDefault("USERS_SERVICE_GRPC_ADDR", "localhost:9085"))),
-		posts:          postspb.NewPostsServiceClient(mustDial(envOrDefault("POSTS_SERVICE_GRPC_ADDR", "localhost:9081"))),
-		comments:       commentspb.NewCommentsServiceClient(mustDial(envOrDefault("COMMENTS_SERVICE_GRPC_ADDR", "localhost:9083"))),
-		likes:          likespb.NewLikesServiceClient(mustDial(envOrDefault("LIKES_SERVICE_GRPC_ADDR", "localhost:9084"))),
-		feed:           feedpb.NewFeedServiceClient(mustDial(envOrDefault("FEED_SERVICE_GRPC_ADDR", "localhost:9082"))),
-		media:          mediapb.NewMediaServiceClient(mustDial(envOrDefault("MEDIA_SERVICE_GRPC_ADDR", "localhost:9086"))),
-		notifications:  notificationspb.NewNotificationServiceClient(mustDial(envOrDefault("NOTIFICATIONS_SERVICE_GRPC_ADDR", "localhost:9087"))),
-		cacheRebuilder: cacherebpb.NewCacheRebuilderServiceClient(mustDial(envOrDefault("CACHE_REBUILDER_SERVICE_GRPC_ADDR", "localhost:9089"))),
-		search:         searchpb.NewSearchServiceClient(mustDial(envOrDefault("SEARCH_SERVICE_GRPC_ADDR", "localhost:9091"))),
+		users:         userspb.NewUsersServiceClient(mustDial(envOrDefault("USERS_SERVICE_GRPC_ADDR", "localhost:9085"))),
+		posts:         postspb.NewPostsServiceClient(mustDial(envOrDefault("POSTS_SERVICE_GRPC_ADDR", "localhost:9081"))),
+		comments:      commentspb.NewCommentsServiceClient(mustDial(envOrDefault("COMMENTS_SERVICE_GRPC_ADDR", "localhost:9083"))),
+		likes:         likespb.NewLikesServiceClient(mustDial(envOrDefault("LIKES_SERVICE_GRPC_ADDR", "localhost:9084"))),
+		feed:          feedpb.NewFeedServiceClient(mustDial(envOrDefault("FEED_SERVICE_GRPC_ADDR", "localhost:9082"))),
+		media:         mediapb.NewMediaServiceClient(mustDial(envOrDefault("MEDIA_SERVICE_GRPC_ADDR", "localhost:9086"))),
+		notifications: notificationspb.NewNotificationServiceClient(mustDial(envOrDefault("NOTIFICATIONS_SERVICE_GRPC_ADDR", "localhost:9087"))),
+	}
+	if conn := optionalDial("CACHE_REBUILDER_SERVICE_GRPC_ADDR", "localhost:9089"); conn != nil {
+		cl.cacheRebuilder = cacherebpb.NewCacheRebuilderServiceClient(conn)
+	}
+	if conn := optionalDial("SEARCH_SERVICE_GRPC_ADDR", "localhost:9091"); conn != nil {
+		cl.search = searchpb.NewSearchServiceClient(conn)
 	}
 
 	registerRoutes(app, cl, requireUser(newVerifier(context.Background())))
@@ -400,7 +422,8 @@ func registerRoutes(app *fiber.App, cl *clients, auth fiber.Handler) {
 	})
 
 	// --- search ---
-	app.Get("/api/v1/search/posts", func(c *fiber.Ctx) error {
+	searchOn := enabled(cl.search != nil, "search")
+	app.Get("/api/v1/search/posts", searchOn, func(c *fiber.Ctx) error {
 		resp, err := cl.search.SearchPosts(c.UserContext(), &searchpb.SearchPostsRequest{
 			Query: c.Query("q"),
 			Limit: int32(c.QueryInt("limit")),
@@ -410,7 +433,7 @@ func registerRoutes(app *fiber.App, cl *clients, auth fiber.Handler) {
 		}
 		return c.JSON(fiber.Map{"total": resp.Total, "posts": resp.Posts})
 	})
-	app.Get("/api/v1/search/users", func(c *fiber.Ctx) error {
+	app.Get("/api/v1/search/users", searchOn, func(c *fiber.Ctx) error {
 		resp, err := cl.search.SearchUsers(c.UserContext(), &searchpb.SearchUsersRequest{
 			Query: c.Query("q"),
 			Limit: int32(c.QueryInt("limit")),
@@ -420,7 +443,7 @@ func registerRoutes(app *fiber.App, cl *clients, auth fiber.Handler) {
 		}
 		return c.JSON(fiber.Map{"total": resp.Total, "users": resp.Users})
 	})
-	app.Get("/api/v1/search/hashtags/trending", func(c *fiber.Ctx) error {
+	app.Get("/api/v1/search/hashtags/trending", searchOn, func(c *fiber.Ctx) error {
 		resp, err := cl.search.TrendingHashtags(c.UserContext(), &searchpb.TrendingHashtagsRequest{
 			Hours: int32(c.QueryInt("hours")),
 			Limit: int32(c.QueryInt("limit")),
@@ -432,7 +455,7 @@ func registerRoutes(app *fiber.App, cl *clients, auth fiber.Handler) {
 	})
 
 	// --- cache rebuild ---
-	app.Post("/api/v1/rebuild", auth, func(c *fiber.Ctx) error {
+	app.Post("/api/v1/rebuild", auth, enabled(cl.cacheRebuilder != nil, "event store"), func(c *fiber.Ctx) error {
 		// a full rebuild replays up to 1000 events, well past the default call timeout
 		ctx, cancel := context.WithTimeout(c.UserContext(), 2*time.Minute)
 		defer cancel()
@@ -456,14 +479,19 @@ func registerRoutes(app *fiber.App, cl *clients, auth fiber.Handler) {
 	app.Post("/api/v1/reset", func(c *fiber.Ctx) error {
 		ctx := c.UserContext()
 		results := map[string]error{
-			"users":           errOnly(cl.users.Reset(ctx, &userspb.ResetRequest{})),
-			"posts":           errOnly(cl.posts.Reset(ctx, &postspb.ResetRequest{})),
-			"comments":        errOnly(cl.comments.Reset(ctx, &commentspb.ResetRequest{})),
-			"likes":           errOnly(cl.likes.Reset(ctx, &likespb.ResetRequest{})),
-			"notifications":   errOnly(cl.notifications.Reset(ctx, &notificationspb.ResetRequest{})),
-			"feed":            errOnly(cl.feed.Reset(ctx, &feedpb.ResetRequest{})),
-			"cache-rebuilder": errOnly(cl.cacheRebuilder.Reset(ctx, &cacherebpb.ResetRequest{})),
-			"search":          errOnly(cl.search.Reset(ctx, &searchpb.ResetRequest{})),
+			"users":         errOnly(cl.users.Reset(ctx, &userspb.ResetRequest{})),
+			"posts":         errOnly(cl.posts.Reset(ctx, &postspb.ResetRequest{})),
+			"comments":      errOnly(cl.comments.Reset(ctx, &commentspb.ResetRequest{})),
+			"likes":         errOnly(cl.likes.Reset(ctx, &likespb.ResetRequest{})),
+			"notifications": errOnly(cl.notifications.Reset(ctx, &notificationspb.ResetRequest{})),
+			"feed":          errOnly(cl.feed.Reset(ctx, &feedpb.ResetRequest{})),
+		}
+		// switched-off services have nothing to reset
+		if cl.cacheRebuilder != nil {
+			results["cache-rebuilder"] = errOnly(cl.cacheRebuilder.Reset(ctx, &cacherebpb.ResetRequest{}))
+		}
+		if cl.search != nil {
+			results["search"] = errOnly(cl.search.Reset(ctx, &searchpb.ResetRequest{}))
 		}
 		var failed []string
 		var errs []error

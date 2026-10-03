@@ -35,10 +35,11 @@ make demo
 ## Daily Workflow
 
 ```bash
-# Start the system (rebuilds changed services)
+# Start the core (rebuilds changed services); add groups as needed: OBS=1 TOOLS=1 SEARCH=1 EVENTS=1, ALL=1
 make up
+make up OBS=1       # the same plus observability; groups left out are stopped
 
-# Pause / resume without removing or rebuilding containers
+# Pause / resume without removing or rebuilding containers (start takes the same flags)
 make stop
 make start
 
@@ -309,16 +310,17 @@ Local cluster, synced by Argo CD the same way as prod (`bootstrap/root-local.yam
 
 ```bash
 make stop           # free compose's memory first
-make cluster-up     # k3d + Argo CD, synced in a few minutes
+make cluster-up     # k3d + Argo CD, synced in a few minutes; takes the group flags, e.g. OBS=1
+make cluster-profile SEARCH=1   # switch groups on a running cluster; unset flags turn groups off
 make trust-ca       # once per machine: browsers accept the cluster's certificates
 make forward        # compose's localhost ports + Argo CD on https://localhost:9443
 make cluster-down
 # app on https://localhost:8443 (http://localhost:8081 redirects), Keycloak on https://localhost:8443/auth
-# grafana, prometheus, jaeger, redpanda, minio on https://<name>.localhost:8443
+# minio, and grafana, prometheus, jaeger, redpanda, kibana with their groups, on https://<name>.localhost:8443
 make demo CLUSTER=1 # demo users and data, also make load CLUSTER=1
 ```
 
-It runs the commit prod runs, with `envs/local` values on top of prod's; only the bootstrap inputs differ. `make cluster-up` loads:
+It runs the commit prod runs, with `envs/local` values on top of prod's; only the bootstrap inputs differ, and the optional groups are off unless switched on. `apps-local` in the gitops repo is a Helm chart whose switches (`obs`, `tools`, `search`, `events`) sit on the hand-applied `root-local` app: `cluster-up` and `cluster-profile` patch them, so toggling needs no commit, and Argo CD adds or prunes the groups (stateful ones keep their volumes). `make cluster-up` loads:
 - `dsn-local-ca`: the machine's CA (generated once in `~/.config/dsn/local-ca.{crt,key}`, kept across clusters so it is trusted once) for the `local-ca` ClusterIssuer, instead of Let's Encrypt
 - `openbao-unseal`: a fresh static seal key for OpenBao
 - `openbao-seed`: the public dev values from the gitops repo's `envs/local/openbao-seed.env`, which OpenBao writes into its kv store on first start

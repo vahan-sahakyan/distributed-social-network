@@ -1,3 +1,4 @@
+{{- if .Values.elasticsearch.enabled }}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -93,3 +94,4 @@ spec:
   ports:
     - name: http
       port: 9200
+{{- end }}
