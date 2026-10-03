@@ -51,11 +51,14 @@ kibana:
     requests: {cpu: 50m, memory: 768Mi}
     limits: {memory: 1536Mi}
 
-# every UI on <name>.<domain>; browsers resolve *.localhost to loopback
-ingress:
+# every UI on <name>.<domain> as an HTTPRoute; browsers resolve *.localhost to loopback
+route:
   enabled: true
-  className: traefik
   domain: localhost
+  # the services chart's Gateway; point elsewhere for a shared one
+  parentRefs:
+    - name: dsn
+      sectionName: http
   routes:
     grafana: {service: grafana, port: 3000}
     prometheus: {service: prometheus, port: 9090}

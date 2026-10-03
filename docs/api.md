@@ -4,7 +4,7 @@
 
 ---
 
-All endpoints are served by the gateway at `http://localhost:8080` (compose) or the cluster ingress, which routes `/api`, `/health` and `/images` to the gateway and everything else to the UI.
+All endpoints are served by the gateway at `http://localhost:8080` (compose) or the cluster's `dsn` Gateway, whose HTTPRoute sends `/api`, `/health` and `/images` to the gateway and everything else to the UI.
 
 ## Base URL
 

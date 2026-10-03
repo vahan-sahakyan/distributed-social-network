@@ -1,0 +1,21 @@
+{{- if .Values.route.enabled }}
+{{- $routes := .Values.route.routes }}
+{{- if .Values.kibana.enabled }}
+{{- $routes = merge (dict "kibana" (dict "service" "kibana" "port" 5601)) $routes }}
+{{- end }}
+{{- range $name, $route := $routes }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: {{ $name }}
+spec:
+  parentRefs:
+    {{- toYaml $.Values.route.parentRefs | nindent 4 }}
+  hostnames: [{{ printf "%s.%s" $name $.Values.route.domain | quote }}]
+  rules:
+    - backendRefs:
+        - name: {{ $route.service }}
+          port: {{ $route.port }}
+{{- end }}
+{{- end }}

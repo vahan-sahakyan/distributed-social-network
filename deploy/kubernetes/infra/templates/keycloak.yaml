@@ -42,7 +42,7 @@ spec:
               value: "true"
             - name: KC_HTTP_RELATIVE_PATH
               value: /auth
-            # behind the ingress: the public address comes from X-Forwarded-*
+            # behind the gateway: the public address comes from X-Forwarded-*
             - name: KC_PROXY_HEADERS
               value: xforwarded
             {{- if .Values.keycloak.hostname }}
