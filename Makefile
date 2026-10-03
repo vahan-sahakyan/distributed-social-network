@@ -146,6 +146,10 @@ cluster-up: local-ca
 	k3d cluster create dsn -p "8081:80@loadbalancer" -p "8443:443@loadbalancer"
 	kubectl create namespace cert-manager
 	kubectl -n cert-manager create secret tls dsn-local-ca --cert=$(LOCAL_CA).crt --key=$(LOCAL_CA).key
+	# openbao: a fresh unseal key per cluster, and the public dev values its first start seeds from
+	kubectl create namespace openbao
+	openssl rand 32 | kubectl -n openbao create secret generic openbao-unseal --from-file=key=/dev/stdin
+	curl -fsSL $(GITOPS_RAW)/envs/local/openbao-seed.env | kubectl -n openbao create secret generic openbao-seed --from-env-file=/dev/stdin
 	kubectl create namespace argocd
 	kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/$(ARGOCD_VERSION)/manifests/install.yaml
 	kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=60s

@@ -78,15 +78,24 @@ keycloak:
     requests: {cpu: 100m, memory: 512Mi}
     limits: {memory: 1Gi}
 
-# plain secrets for local clusters; set false where secrets come from elsewhere
-# (helm merges maps, so emptying devSecrets would not remove them)
-createDevSecrets: true
-devSecrets:
+# Secrets come from the secret store (OpenBao) through External Secrets:
+# <secret>: {from: <store entry>, data: {<key>: <template over the entry's fields>}}
+secretStore:
+  kind: ClusterSecretStore
+  name: openbao
+  refreshInterval: 1h
+secrets:
   postgres-credentials:
-    POSTGRES_PASSWORD: postgres
+    from: postgres
+    data:
+      POSTGRES_PASSWORD: "{{ .password }}"
   minio-credentials:
-    MINIO_ROOT_USER: minioadmin
-    MINIO_ROOT_PASSWORD: minioadmin
+    from: minio
+    data:
+      MINIO_ROOT_USER: "{{ .user }}"
+      MINIO_ROOT_PASSWORD: "{{ .password }}"
   keycloak-admin:
-    KEYCLOAK_ADMIN: admin
-    KEYCLOAK_ADMIN_PASSWORD: admin
+    from: keycloak-admin
+    data:
+      KEYCLOAK_ADMIN: "{{ .user }}"
+      KEYCLOAK_ADMIN_PASSWORD: "{{ .password }}"
