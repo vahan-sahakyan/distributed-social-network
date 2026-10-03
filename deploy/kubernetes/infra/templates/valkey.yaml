@@ -15,9 +15,13 @@ spec:
       labels:
         app: valkey
     spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.valkey.security | nindent 8 }}
       containers:
         - name: valkey
           image: {{ .Values.valkey.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.valkey.security | nindent 12 }}
           # a pure cache: nothing persisted, so no volume; the services refill it
           args: [valkey-server, --save, "", --appendonly, "no",
                  --maxmemory, {{ .Values.valkey.maxmemory | quote }}, --maxmemory-policy, allkeys-lru]
@@ -30,6 +34,13 @@ spec:
               command: [valkey-cli, ping]
             initialDelaySeconds: 3
             periodSeconds: 5
+          # the working dir; nothing is written to it
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

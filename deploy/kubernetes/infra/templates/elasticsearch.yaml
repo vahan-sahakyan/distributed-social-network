@@ -22,11 +22,12 @@ spec:
         app: elasticsearch
     spec:
       securityContext:
-        # the image runs as uid 1000; the volume must be writable by it
-        fsGroup: 1000
+        {{- include "dsn.podSecurityContext" .Values.elasticsearch.security | nindent 8 }}
       containers:
         - name: elasticsearch
           image: {{ .Values.elasticsearch.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.elasticsearch.security | nindent 12 }}
           resources:
             {{- toYaml .Values.elasticsearch.resources | nindent 12 }}
           env:

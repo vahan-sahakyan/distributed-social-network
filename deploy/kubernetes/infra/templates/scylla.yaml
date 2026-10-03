@@ -20,9 +20,13 @@ spec:
       labels:
         app: posts-db
     spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.scylla.security | nindent 8 }}
       containers:
         - name: posts-db
           image: {{ .Values.scylla.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.scylla.security | nindent 12 }}
           resources:
             {{- toYaml .Values.scylla.resources | nindent 12 }}
           env:

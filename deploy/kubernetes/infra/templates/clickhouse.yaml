@@ -21,9 +21,13 @@ spec:
       labels:
         app: clickhouse
     spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.clickhouse.security | nindent 8 }}
       containers:
         - name: clickhouse
           image: {{ .Values.clickhouse.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.clickhouse.security | nindent 12 }}
           resources:
             {{- toYaml .Values.clickhouse.resources | nindent 12 }}
           env:

@@ -17,10 +17,15 @@ spec:
       labels:
         app: {{ $name }}-service
     spec:
+      {{- $security := $svc.security | default $.Values.security }}
+      securityContext:
+        {{- include "dsn.podSecurityContext" $security | nindent 8 }}
       containers:
         - name: {{ $name }}-service
           image: "{{ $.Values.image.repository }}/{{ $svc.image | default (printf "%s-service" $name) }}:{{ $.Values.image.tag }}"
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          securityContext:
+            {{- include "dsn.securityContext" $security | nindent 12 }}
           ports:
             - name: http
               containerPort: {{ $svc.port }}
@@ -74,5 +79,23 @@ spec:
               path: /health
               port: {{ $svc.port }}
             periodSeconds: 5
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- if gt (int $.Values.replicaCount) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $name }}-service
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: {{ $name }}-service
+{{- end }}
 {{- end }}
 {{- end }}

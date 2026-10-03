@@ -1,3 +1,4 @@
+# above 1, each service also gets a PodDisruptionBudget (maxUnavailable 1)
 replicaCount: 1
 
 image:
@@ -13,6 +14,29 @@ resources:
     memory: 32Mi
   limits:
     memory: 128Mi
+
+# Pod Security "restricted" for every service: the service images run as 65532, read-only
+# root filesystem (/tmp is an emptyDir). Overridable per service as `security`
+security:
+  user: 65532
+  readOnly: true
+
+# NetworkPolicies: a default deny for the namespace, then per service the services whose
+# env addresses it, the scrapers (on the http port) and the extra rules below. A rule is
+# {from: [app labels], gateway: the Gateway's proxy pods, namespace: any pod here, ports: [...]}
+networkPolicy:
+  enabled: true
+  # the pods behind the Gateway (k3s's Traefik)
+  gateway:
+    namespace: kube-system
+    podLabels:
+      app.kubernetes.io/name: traefik
+  scrapers: [prometheus]
+  ingress:
+    gateway:
+      - gateway: true
+    ui:
+      - gateway: true
 
 # public base URL, e.g. https://dsn.example.com; sets the gateway's OIDC_ISSUER
 # (keycloak's frontend URL + /auth/realms/dsn). Empty leaves the issuer unchecked
@@ -174,3 +198,7 @@ services:
   ui:
     image: ui
     port: 8080
+    # nginx-unprivileged's user
+    security:
+      user: 101
+      readOnly: true

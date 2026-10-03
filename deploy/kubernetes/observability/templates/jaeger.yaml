@@ -16,9 +16,13 @@ spec:
       labels:
         app: jaeger
     spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.jaeger.security | nindent 8 }}
       containers:
         - name: jaeger
           image: {{ .Values.jaeger.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.jaeger.security | nindent 12 }}
           resources:
             {{- toYaml .Values.jaeger.resources | nindent 12 }}
           ports:
@@ -32,6 +36,12 @@ spec:
             tcpSocket:
               port: 16686
             periodSeconds: 5
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

@@ -16,9 +16,13 @@ spec:
       labels:
         app: kibana
     spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.kibana.security | nindent 8 }}
       containers:
         - name: kibana
           image: {{ .Values.kibana.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.kibana.security | nindent 12 }}
           # land on Dev Tools: the default Elasticsearch home needs the security API, which is off here
           args: [/usr/local/bin/kibana-docker, "--uiSettings.overrides.defaultRoute=/app/dev_tools#/console"]
           env:

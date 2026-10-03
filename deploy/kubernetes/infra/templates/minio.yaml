@@ -20,12 +20,20 @@ spec:
       labels:
         app: minio
     spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.minio.security | nindent 8 }}
       containers:
         - name: minio
           image: {{ .Values.minio.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.minio.security | nindent 12 }}
           resources:
             {{- toYaml .Values.minio.resources | nindent 12 }}
           args: [server, /data, --console-address, ":9001"]
+          env:
+            # minio keeps its config dir under HOME
+            - name: HOME
+              value: /tmp
           envFrom:
             - secretRef:
                 name: minio-credentials
@@ -37,12 +45,17 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /minio/health/ready
               port: 9000
             initialDelaySeconds: 10
             periodSeconds: 5
+      volumes:
+        - name: tmp
+          emptyDir: {}
   volumeClaimTemplates:
     - metadata:
         name: data

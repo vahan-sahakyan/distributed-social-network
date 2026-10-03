@@ -1,6 +1,8 @@
 postgres:
   image: postgres:16.14-alpine
   user: postgres
+  # image uids; Pod Security "restricted", see templates/_helpers.tpl
+  security: {user: 70, readOnly: true}
   # password comes from the postgres-credentials secret (POSTGRES_PASSWORD)
   storage: 1Gi
   resources:
@@ -20,6 +22,8 @@ postgres:
 
 scylla:
   image: scylladb/scylla:2026.1.5
+  # the entrypoint writes /etc/scylla on start
+  security: {user: 999, fsGroup: 1000}
   storage: 2Gi
   resources:
     requests: {cpu: 100m, memory: 768Mi}
@@ -27,6 +31,8 @@ scylla:
 
 redpanda:
   image: redpandadata/redpanda:v26.1.10
+  # writes /etc/redpanda/redpanda.yaml on start
+  security: {user: 101}
   storage: 1Gi
   resources:
     requests: {cpu: 100m, memory: 640Mi}
@@ -35,6 +41,7 @@ redpanda:
 # feed cache, pure: nothing persisted, least recently used keys evicted at maxmemory
 valkey:
   image: valkey/valkey:9.1.2-alpine
+  security: {user: 999, fsGroup: 1000, readOnly: true}
   maxmemory: 64mb
   resources:
     requests: {cpu: 10m, memory: 32Mi}
@@ -44,6 +51,8 @@ valkey:
 clickhouse:
   enabled: true
   image: clickhouse/clickhouse-server:26.5.1.882
+  # writes users.d and logs under / on start
+  security: {user: 101}
   storage: 2Gi
   resources:
     requests: {cpu: 100m, memory: 1Gi}
@@ -52,6 +61,7 @@ clickhouse:
 minio:
   # built from source by CI, see deploy/images/minio
   image: ghcr.io/vahan-sahakyan/distributed-social-network/minio:RELEASE.2025-09-07T16-13-09Z
+  security: {user: 1000, readOnly: true}
   # root user/password come from the minio-credentials secret
   storage: 5Gi
   resources:
@@ -62,6 +72,8 @@ minio:
 elasticsearch:
   enabled: true
   image: elasticsearch:9.5.3
+  # writes its keystore under config/ on start
+  security: {user: 1000}
   storage: 2Gi
   javaOpts: -Xms512m -Xmx512m
   # extra node settings as env vars; disk watermarks off so a nearly full local
@@ -74,6 +86,8 @@ elasticsearch:
 
 keycloak:
   image: quay.io/keycloak/keycloak:26.7.5
+  # builds into /opt/keycloak on start
+  security: {user: 1000}
   # public origin of the UI, for login redirects, e.g. https://dsn.example.com
   uiUrl: ""
   # public URL of Keycloak, e.g. https://dsn.example.com/auth; empty takes it from
@@ -105,3 +119,47 @@ secrets:
     data:
       KEYCLOAK_ADMIN: "{{ .user }}"
       KEYCLOAK_ADMIN_PASSWORD: "{{ .password }}"
+
+# NetworkPolicies, one per store: only its clients get in (the services chart denies the
+# rest). A rule is {from: [app labels], gateway: the Gateway's proxy pods, namespace: any pod
+# here, ports: [...]}
+networkPolicy:
+  enabled: true
+  # the pods behind the Gateway (k3s's Traefik)
+  gateway:
+    namespace: kube-system
+    podLabels:
+      app.kubernetes.io/name: traefik
+  ingress:
+    comments-db:
+      - from: [comments-service]
+    likes-db:
+      - from: [likes-service]
+    users-db:
+      - from: [users-service]
+    notifications-db:
+      - from: [notification-service]
+    keycloak-db:
+      - from: [keycloak]
+    posts-db:
+      - from: [posts-service]
+    redpanda:
+      - from: [posts-service, feed-service, comments-service, likes-service, users-service,
+               notification-service, event-writer-service, search-service, redpanda-console]
+      - from: [prometheus]
+        ports: [9644]
+    valkey:
+      - from: [feed-service, cache-rebuilder-service]
+    clickhouse:
+      - from: [event-writer-service, cache-rebuilder-service]
+    minio:
+      - from: [media-service, gateway-service]
+      # the console route
+      - gateway: true
+        ports: [9001]
+    elasticsearch:
+      - from: [search-service, kibana]
+    keycloak:
+      # jwks for token checks
+      - from: [gateway-service]
+      - gateway: true

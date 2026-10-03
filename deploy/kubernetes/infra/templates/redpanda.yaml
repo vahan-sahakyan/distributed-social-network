@@ -20,9 +20,13 @@ spec:
       labels:
         app: redpanda
     spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.redpanda.security | nindent 8 }}
       containers:
         - name: redpanda
           image: {{ .Values.redpanda.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.redpanda.security | nindent 12 }}
           resources:
             {{- toYaml .Values.redpanda.resources | nindent 12 }}
           args:
