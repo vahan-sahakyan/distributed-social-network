@@ -1,14 +1,14 @@
 {{- if .Values.route.enabled }}
 {{- $gw := .Values.route.gateway }}
+{{- $tls := .Values.route.tls }}
+{{- if $tls }}
+{{- $_ := required "route.host is required with route.tls" .Values.route.host }}
+{{- end }}
 {{- if $gw.create }}
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
   name: dsn
-  {{- if .Values.route.tls }}
-  annotations:
-    cert-manager.io/cluster-issuer: {{ .Values.route.clusterIssuer }}
-  {{- end }}
 spec:
   gatewayClassName: {{ $gw.className }}
   listeners:
@@ -18,11 +18,11 @@ spec:
       allowedRoutes:
         namespaces:
           from: Same
-    {{- if .Values.route.tls }}
+    {{- if $tls }}
+    # no hostname: the routes' hostnames pick, the certificate covers them
     - name: https
       protocol: HTTPS
       port: {{ $gw.httpsPort }}
-      hostname: {{ required "route.host is required with route.tls" .Values.route.host | quote }}
       tls:
         mode: Terminate
         certificateRefs:
@@ -31,6 +31,21 @@ spec:
         namespaces:
           from: Same
     {{- end }}
+{{- if $tls }}
+---
+# one certificate for host and extraHosts
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: dsn-tls
+spec:
+  secretName: dsn-tls
+  dnsNames:
+    {{- toYaml (prepend .Values.route.extraHosts .Values.route.host) | nindent 4 }}
+  issuerRef:
+    kind: ClusterIssuer
+    name: {{ .Values.route.clusterIssuer }}
+{{- end }}
 ---
 {{- end }}
 {{- $parents := .Values.route.parentRefs }}
@@ -79,6 +94,9 @@ spec:
         - type: RequestRedirect
           requestRedirect:
             scheme: https
+            {{- with .Values.route.httpsPort }}
+            port: {{ . }}
+            {{- end }}
             statusCode: 301
 {{- end }}
 {{- end }}

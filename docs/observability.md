@@ -25,16 +25,16 @@ open http://localhost:3000 # admin / admin, lands on "DSN Overview"
 
 ### Kubernetes
 
-`make cluster-up` deploys the `deploy/kubernetes/observability` chart through Argo CD. Its `files/` is a symlink to `monitoring/`, so the scrape config, alerts, datasources and dashboard are the ones compose uses; only log collection differs (`monitoring/alloy/kubernetes.alloy` reads pod logs through the API and labels them by the pod's `app` label, which matches the compose service names). Every UI gets an HTTPRoute on the `dsn` Gateway:
+`make cluster-up` deploys the `deploy/kubernetes/observability` chart through Argo CD. Its `files/` is a symlink to `monitoring/`, so the scrape config, alerts, datasources and dashboard are the ones compose uses; only log collection differs (`monitoring/alloy/kubernetes.alloy` reads pod logs through the API and labels them by the pod's `app` label, which matches the compose service names). Every UI gets an HTTPRoute on the `dsn` Gateway, on https://<name>.localhost:8443 and http://<name>.localhost:8081:
 
 | Tool | URL |
 |------|-----|
-| Grafana | http://grafana.localhost:8081 (admin / admin) |
-| Prometheus | http://prometheus.localhost:8081 |
-| Jaeger | http://jaeger.localhost:8081 |
-| Redpanda Console | http://redpanda.localhost:8081 |
-| MinIO Console | http://minio.localhost:8081 |
-| Kibana (`kibana.enabled`) | http://kibana.localhost:8081 |
+| Grafana | https://grafana.localhost:8443 (admin / admin) |
+| Prometheus | https://prometheus.localhost:8443 |
+| Jaeger | https://jaeger.localhost:8443 |
+| Redpanda Console | https://redpanda.localhost:8443 |
+| MinIO Console | https://minio.localhost:8443 |
+| Kibana (`kibana.enabled`) | https://kibana.localhost:8443 |
 
 The dashboard's links to Jaeger and Prometheus point at the compose ports.
 

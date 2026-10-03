@@ -3,13 +3,15 @@
 # (make demo CLUSTER=1). Any URL can still be overridden on its own.
 
 if [[ "${CLUSTER:-}" == 1 ]]; then
-  : "${GATEWAY_URL:=http://localhost:8081}"
-  : "${KEYCLOAK_URL:=http://localhost:8081/auth}"
-  : "${PROMETHEUS_URL:=http://prometheus.localhost:8081}"
-  : "${GRAFANA_URL:=http://grafana.localhost:8081}"
-  : "${JAEGER_URL:=http://jaeger.localhost:8081}"
-  : "${REDPANDA_CONSOLE_URL:=http://redpanda.localhost:8081}"
-  : "${MINIO_CONSOLE_URL:=http://minio.localhost:8081}"
+  : "${GATEWAY_URL:=https://localhost:8443}"
+  : "${KEYCLOAK_URL:=https://localhost:8443/auth}"
+  : "${PROMETHEUS_URL:=https://prometheus.localhost:8443}"
+  : "${GRAFANA_URL:=https://grafana.localhost:8443}"
+  : "${JAEGER_URL:=https://jaeger.localhost:8443}"
+  : "${REDPANDA_CONSOLE_URL:=https://redpanda.localhost:8443}"
+  : "${MINIO_CONSOLE_URL:=https://minio.localhost:8443}"
+  # the cluster's certificates come from the machine's local CA (make cluster-up)
+  [[ -f "$HOME/.config/dsn/local-ca.crt" ]] && export CURL_CA_BUNDLE="$HOME/.config/dsn/local-ca.crt"
   # in_infra <service> <cmd...>: runs a command in an infra container
   in_infra() { local svc=$1; shift; kubectl -n dsn exec "sts/$svc" -- "$@"; }
 else
