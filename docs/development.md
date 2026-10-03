@@ -313,7 +313,7 @@ make stop           # free compose's memory first
 make cluster-up     # k3d + Argo CD, synced in a few minutes; takes the group flags, e.g. OBS=1
 make cluster-profile SEARCH=1   # switch groups on a running cluster; unset flags turn groups off
 make trust-ca       # once per machine: browsers accept the cluster's certificates
-make forward        # compose's localhost ports + Argo CD on https://localhost:9443
+make forward        # compose's localhost ports + Argo CD on https://localhost:9443; not while compose is up
 make cluster-down
 # app on https://localhost:8443 (http://localhost:8081 redirects), Keycloak on https://localhost:8443/auth
 # minio, and grafana, prometheus, jaeger, redpanda, kibana with their groups, on https://<name>.localhost:8443

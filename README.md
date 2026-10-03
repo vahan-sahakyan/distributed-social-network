@@ -126,7 +126,7 @@ On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (htt
 | `make cluster-up` / `make cluster-down` | Create / delete the local k3d cluster, synced by Argo CD from the gitops repo (app on https://localhost:8443); takes the group flags |
 | `make cluster-profile` | Switch the cluster's optional groups, e.g. `make cluster-profile OBS=1`; unset flags turn groups off, volumes are kept |
 | `make trust-ca` | Trust the local cluster's CA in the macOS keychain (once per machine) |
-| `make forward` | Port-forward the cluster to the same localhost ports as compose (all URLs above work), plus Argo CD on https://localhost:9443; prints the admin password |
+| `make forward` | Port-forward the cluster to the same localhost ports as compose (all URLs above work), plus Argo CD on https://localhost:9443; prints the admin password. It refuses while compose is up, and `make up`/`start` refuse while it runs: both would claim the same localhost ports |
 
 ## Project Structure
 
