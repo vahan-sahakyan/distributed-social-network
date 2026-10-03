@@ -26,9 +26,14 @@ route:
   enabled: true
   # hostname the app answers on; keeps <name>.localhost routes of other charts apart
   host: localhost
-  # https listener with a cert-manager certificate for host, http redirects to it
+  # https listeners with a cert-manager certificate for host, http redirects to it
   tls: false
   clusterIssuer: letsencrypt
+  # more names on the certificate, so other charts' routes get https too. No wildcards
+  # under single-label names: TLS clients reject *.localhost
+  extraHosts: []
+  # public https port when it isn't 443, for the redirect (k3d maps 8443)
+  httpsPort: null
   gateway:
     create: true
     className: traefik

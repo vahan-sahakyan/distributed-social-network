@@ -87,7 +87,7 @@ After startup, these are available:
 | Kibana (`make kibana`) | http://localhost:5601 | - |
 | MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
 
-On the k3d cluster (`make cluster-up`) the app is on http://localhost:8081 and the tools on `http://<name>.localhost:8081`: grafana, prometheus, jaeger, redpanda, minio. `make forward` also puts everything on the URLs above, Kafka's 19092 aside.
+On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (http://localhost:8081 redirects) and the tools on `https://<name>.localhost:8443`: grafana, prometheus, jaeger, redpanda, minio. Certificates come from a CA generated once per machine in `~/.config/dsn/`; `make trust-ca` adds it to the macOS keychain. `make forward` also puts everything on the URLs above, Kafka's 19092 aside.
 
 ## Make Commands
 
@@ -109,8 +109,9 @@ On the k3d cluster (`make cluster-up`) the app is on http://localhost:8081 and t
 | `make test` | Run tests in `pkg` and all services |
 | `make lint` | Lint `pkg` and all services with golangci-lint (config: `.golangci.yml`) |
 | `make tidy` | Run `go mod tidy` in all modules |
-| `make cluster-up` / `make cluster-down` | Create / delete the local k3d cluster, synced by Argo CD from the gitops repo (app on :8081) |
-| `make forward` | Port-forward the cluster to the same localhost ports as compose (all URLs above work), plus Argo CD on https://localhost:8443; prints the admin password |
+| `make cluster-up` / `make cluster-down` | Create / delete the local k3d cluster, synced by Argo CD from the gitops repo (app on https://localhost:8443) |
+| `make trust-ca` | Trust the local cluster's CA in the macOS keychain (once per machine) |
+| `make forward` | Port-forward the cluster to the same localhost ports as compose (all URLs above work), plus Argo CD on https://localhost:9443; prints the admin password |
 
 ## Project Structure
 

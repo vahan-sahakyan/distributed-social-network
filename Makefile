@@ -138,17 +138,37 @@ dockerfiles:
 # root-local waits for the repo server, else it stalls on a comparison error until the next 3-min refresh
 ARGOCD_VERSION ?= v3.5.3
 GITOPS_RAW = https://raw.githubusercontent.com/vahan-sahakyan/distributed-social-network-gitops/main
+# the machine's CA for https on the local cluster; it outlives clusters, so it is trusted once
+LOCAL_CA = $(HOME)/.config/dsn/local-ca
 
 .PHONY: cluster-up
-cluster-up:
-	k3d cluster create dsn -p "8081:80@loadbalancer"
+cluster-up: local-ca
+	k3d cluster create dsn -p "8081:80@loadbalancer" -p "8443:443@loadbalancer"
+	kubectl create namespace cert-manager
+	kubectl -n cert-manager create secret tls dsn-local-ca --cert=$(LOCAL_CA).crt --key=$(LOCAL_CA).key
 	kubectl create namespace argocd
 	kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/$(ARGOCD_VERSION)/manifests/install.yaml
 	kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=60s
 	kubectl -n argocd rollout status deploy/argocd-repo-server --timeout=180s
 	kubectl apply -f $(GITOPS_RAW)/bootstrap/root-local.yaml
 	@echo ""
-	@echo "Argo CD is syncing, the app comes up on http://localhost:8081 in a few minutes (make forward for the Argo CD UI)"
+	@echo "Argo CD is syncing, the app comes up on https://localhost:8443 in a few minutes (make forward for the Argo CD UI)"
+	@echo "Browsers trust it after make trust-ca (once per machine)"
+
+.PHONY: local-ca
+local-ca: $(LOCAL_CA).crt
+
+$(LOCAL_CA).crt:
+	@mkdir -p $(dir $(LOCAL_CA))
+	openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj "/CN=DSN local CA" \
+		-addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" \
+		-keyout $(LOCAL_CA).key -out $(LOCAL_CA).crt
+	@chmod 600 $(LOCAL_CA).key
+
+# macOS: adds the local CA to the system keychain (asks for your password)
+.PHONY: trust-ca
+trust-ca: local-ca
+	sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain $(LOCAL_CA).crt
 
 
 .PHONY: cluster-down
@@ -158,7 +178,7 @@ cluster-down:
 
 # the cluster on the same localhost ports compose publishes, plus Argo CD: <namespace>/<kind>/<name>=<ports>
 FORWARDS = \
-	argocd/svc/argocd-server=8443:443 \
+	argocd/svc/argocd-server=9443:443 \
 	dsn/svc/gateway-service=8080 \
 	dsn/svc/posts-service=9081 \
 	dsn/svc/feed-service=9082 \
@@ -193,7 +213,7 @@ FORWARDS = \
 forward:
 	@kubectl -n argocd rollout status deploy/argocd-server --timeout=180s >/dev/null
 	@kubectl -n argocd wait --for=create secret/argocd-initial-admin-secret --timeout=60s >/dev/null
-	@echo "Argo CD           https://localhost:8443  admin / $$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
+	@echo "Argo CD           https://localhost:9443  admin / $$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
 	@echo "Gateway API       http://localhost:8080"
 	@echo "Keycloak          http://localhost:8180/auth  (admin / admin)"
 	@echo "Grafana           http://localhost:3000  (admin / admin)"

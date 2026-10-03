@@ -301,7 +301,7 @@ Three Helm charts, deployed by Argo CD from [distributed-social-network-gitops](
 | `deploy/kubernetes/services` | the 11 services, UI, the `dsn` Gateway and its HTTPRoute |
 | `deploy/kubernetes/observability` | Prometheus, Grafana, Loki, Alloy, Jaeger, Redpanda Console, optional Kibana; configs from `monitoring/` |
 
-Traffic enters through Gateway API: the services chart creates the `dsn` Gateway (class `traefik`, k3s's bundled Traefik with its Gateway provider turned on by `platform-k3s/traefik.yaml` in the gitops repo) and an HTTPRoute for `route.host` that sends `/api`, `/health` and `/images` to the gateway, `/auth` to Keycloak and everything else to the UI. The observability chart adds one HTTPRoute per UI on `<name>.<domain>`. With `route.tls`, an HTTPS listener gets a cert-manager certificate and HTTP redirects to it. For another controller, set `route.gateway.className` and its listener ports, or `route.gateway.create: false` with `route.parentRefs` to attach to a shared Gateway.
+Traffic enters through Gateway API: the services chart creates the `dsn` Gateway (class `traefik`, k3s's bundled Traefik with its Gateway provider turned on by `platform-k3s/traefik.yaml` in the gitops repo) and an HTTPRoute for `route.host` that sends `/api`, `/health` and `/images` to the gateway, `/auth` to Keycloak and everything else to the UI. The observability chart adds one HTTPRoute per UI on `<name>.<domain>`. With `route.tls`, the chart requests one cert-manager certificate (`route.clusterIssuer`) for `route.host` plus `route.extraHosts`, serves it on one HTTPS listener, and redirects the app's HTTP to it (`route.httpsPort` when HTTPS isn't on 443). Locally `extraHosts` lists the UI hosts (`grafana.localhost`, ...) so they get HTTPS as well; a `*.localhost` wildcard doesn't work, TLS clients reject wildcards under single-label names. For another controller, set `route.gateway.className` and its listener ports, or `route.gateway.create: false` with `route.parentRefs` to attach to a shared Gateway.
 
 Images: `ghcr.io/vahan-sahakyan/distributed-social-network/<name>:<sha>` (linux/arm64), published on every push by `.github/workflows/publish.yml`. On `main` the workflow also commits the new sha to the gitops repo, which Argo CD syncs.
 
@@ -310,14 +310,15 @@ Local cluster, synced by Argo CD the same way as prod (`bootstrap/root-local.yam
 ```bash
 make stop           # free compose's memory first
 make cluster-up     # k3d + Argo CD, synced in a few minutes
-make forward        # compose's localhost ports + Argo CD on https://localhost:8443
+make trust-ca       # once per machine: browsers accept the cluster's certificates
+make forward        # compose's localhost ports + Argo CD on https://localhost:9443
 make cluster-down
-# app on http://localhost:8081, Keycloak on http://localhost:8081/auth
-# grafana, prometheus, jaeger, redpanda, minio on http://<name>.localhost:8081
+# app on https://localhost:8443 (http://localhost:8081 redirects), Keycloak on https://localhost:8443/auth
+# grafana, prometheus, jaeger, redpanda, minio on https://<name>.localhost:8443
 make demo CLUSTER=1 # demo users and data, also make load CLUSTER=1
 ```
 
-It runs the commit prod runs, with `envs/local` values on top of prod's: plain dev secrets, no TLS. Changes reach it through git only, so to try an unpushed chart change install the charts directly instead:
+It runs the commit prod runs, with `envs/local` values on top of prod's: plain dev secrets, and TLS from the `local-ca` ClusterIssuer instead of Let's Encrypt. `make cluster-up` generates that CA once in `~/.config/dsn/local-ca.{crt,key}` (kept across clusters, so it is trusted once) and loads it as the `dsn-local-ca` secret, like the sealing key in prod. Changes reach it through git only, so to try an unpushed chart change install the charts directly instead:
 
 ```bash
 k3d cluster create dsn -p "8081:80@loadbalancer"
