@@ -65,9 +65,15 @@ route:
     redpanda: {service: redpanda-console, port: 8080}
     minio: {service: minio, port: 9001}
 
-# plain secrets for local clusters; set false where secrets come from elsewhere
-createDevSecrets: true
-devSecrets:
+# Secrets come from the secret store (OpenBao) through External Secrets:
+# <secret>: {from: <store entry>, data: {<key>: <template over the entry's fields>}}
+secretStore:
+  kind: ClusterSecretStore
+  name: openbao
+  refreshInterval: 1h
+secrets:
   grafana-admin:
-    GF_SECURITY_ADMIN_USER: admin
-    GF_SECURITY_ADMIN_PASSWORD: admin
+    from: grafana-admin
+    data:
+      GF_SECURITY_ADMIN_USER: "{{ .user }}"
+      GF_SECURITY_ADMIN_PASSWORD: "{{ .password }}"

@@ -43,21 +43,34 @@ route:
   # a shared Gateway to attach to instead, when gateway.create is false
   parentRefs: []
 
-# plain secrets for local clusters; set false where secrets come from elsewhere
-# (helm merges maps, so emptying devSecrets would not remove them)
-createDevSecrets: true
-devSecrets:
+# Secrets come from the secret store (OpenBao) through External Secrets:
+# <secret>: {from: <store entry>, data: {<key>: <template over the entry's fields>}}
+secretStore:
+  kind: ClusterSecretStore
+  name: openbao
+  refreshInterval: 1h
+secrets:
   comments-service:
-    DATABASE_URL: postgres://postgres:postgres@comments-db:5432/comments?sslmode=disable
+    from: postgres
+    data:
+      DATABASE_URL: "postgres://postgres:{{ .password }}@comments-db:5432/comments?sslmode=disable"
   likes-service:
-    DATABASE_URL: postgres://postgres:postgres@likes-db:5432/likes?sslmode=disable
+    from: postgres
+    data:
+      DATABASE_URL: "postgres://postgres:{{ .password }}@likes-db:5432/likes?sslmode=disable"
   users-service:
-    DATABASE_URL: postgres://postgres:postgres@users-db:5432/users?sslmode=disable
+    from: postgres
+    data:
+      DATABASE_URL: "postgres://postgres:{{ .password }}@users-db:5432/users?sslmode=disable"
   notification-service:
-    DATABASE_URL: postgres://postgres:postgres@notifications-db:5432/notifications?sslmode=disable
+    from: postgres
+    data:
+      DATABASE_URL: "postgres://postgres:{{ .password }}@notifications-db:5432/notifications?sslmode=disable"
   media-service:
-    MINIO_ACCESS_KEY: minioadmin
-    MINIO_SECRET_KEY: minioadmin
+    from: minio
+    data:
+      MINIO_ACCESS_KEY: "{{ .user }}"
+      MINIO_SECRET_KEY: "{{ .password }}"
 
 services:
   gateway:

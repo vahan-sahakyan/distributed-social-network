@@ -318,12 +318,21 @@ make cluster-down
 make demo CLUSTER=1 # demo users and data, also make load CLUSTER=1
 ```
 
-It runs the commit prod runs, with `envs/local` values on top of prod's: plain dev secrets, and TLS from the `local-ca` ClusterIssuer instead of Let's Encrypt. `make cluster-up` generates that CA once in `~/.config/dsn/local-ca.{crt,key}` (kept across clusters, so it is trusted once) and loads it as the `dsn-local-ca` secret, like the sealing key in prod. Changes reach it through git only, so to try an unpushed chart change install the charts directly instead:
+It runs the commit prod runs, with `envs/local` values on top of prod's; only the bootstrap inputs differ. `make cluster-up` loads:
+- `dsn-local-ca`: the machine's CA (generated once in `~/.config/dsn/local-ca.{crt,key}`, kept across clusters so it is trusted once) for the `local-ca` ClusterIssuer, instead of Let's Encrypt
+- `openbao-unseal`: a fresh static seal key for OpenBao
+- `openbao-seed`: the public dev values from the gitops repo's `envs/local/openbao-seed.env`, which OpenBao writes into its kv store on first start
+
+Secrets then flow as in prod: OpenBao -> External Secrets (`openbao` ClusterSecretStore) -> the charts' `ExternalSecret`s (`secrets` in each chart's values) -> the Secrets the pods read. Nothing secret is rendered from chart values.
+
+Changes reach the cluster through git only. To try an unpushed chart change, stop Argo CD from reverting it and apply the working tree's chart with the local values:
 
 ```bash
-k3d cluster create dsn -p "8081:80@loadbalancer"
-kubectl apply -f https://raw.githubusercontent.com/vahan-sahakyan/distributed-social-network-gitops/main/platform-k3s/traefik.yaml
-kubectl wait --for=create gatewayclass/traefik --timeout=180s
-helm install infra deploy/kubernetes/infra -n dsn --create-namespace --set keycloak.uiUrl=http://localhost:8081
-helm install services deploy/kubernetes/services -n dsn --set image.tag=main --set publicUrl=http://localhost:8081
+kubectl -n argocd patch app root-local --type merge -p '{"spec":{"syncPolicy":null}}'
+kubectl -n argocd patch app services --type merge -p '{"spec":{"syncPolicy":null}}'
+E=../distributed-social-network-gitops/envs
+helm template services deploy/kubernetes/services -n dsn -f $E/prod/services-values.yaml -f $E/local/services-values.yaml \
+  | kubectl -n dsn apply --server-side --force-conflicts -f -
+# back to git
+kubectl apply -f https://raw.githubusercontent.com/vahan-sahakyan/distributed-social-network-gitops/main/bootstrap/root-local.yaml
 ```
