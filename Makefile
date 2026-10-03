@@ -235,7 +235,7 @@ FORWARDS = \
 	dsn/svc/redpanda=9644 \
 	dsn/svc/redpanda-console=8888:8080 \
 	dsn/svc/elasticsearch=9200 \
-	dsn/svc/memcached=11211 \
+	dsn/svc/valkey=6379 \
 	dsn/svc/minio=9000,9001 \
 	dsn/svc/prometheus=9090 \
 	dsn/svc/grafana=3000 \
@@ -262,7 +262,7 @@ forward:
 	@echo "Kibana            http://localhost:5601  (if enabled)"
 	@echo "gRPC              localhost:9081-9091"
 	@echo "Postgres          localhost:5433 comments, 5434 likes, 5436 users, 5437 notifications  (postgres / postgres)"
-	@echo "Scylla, ClickHouse, Loki, Alloy, MinIO S3, Memcached, Redpanda admin: their compose ports, see the README"
+	@echo "Scylla, ClickHouse, Loki, Alloy, MinIO S3, Valkey, Redpanda admin: their compose ports, see the README"
 	@for f in $(FORWARDS); do \
 		target=$${f%%=*}; \
 		kubectl -n $${target%%/*} get $${target#*/} >/dev/null 2>&1 || continue; \

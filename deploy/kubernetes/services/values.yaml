@@ -105,9 +105,8 @@ services:
     grpcPort: 9082
     env:
       KAFKA_BROKERS: redpanda:9092
-      MEMCACHED_ADDR: memcached:11211
+      VALKEY_ADDR: valkey:6379
       USERS_SERVICE_GRPC_ADDR: users-service:9085
-      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
 
   comments:
     port: 8083
@@ -161,7 +160,7 @@ services:
     env:
       CLICKHOUSE_ADDR: clickhouse:9000
       CLICKHOUSE_DB: default
-      MEMCACHED_ADDR: memcached:11211
+      VALKEY_ADDR: valkey:6379
       USERS_SERVICE_GRPC_ADDR: users-service:9085
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081
 

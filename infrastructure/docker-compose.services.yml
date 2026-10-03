@@ -107,14 +107,12 @@ services:
       PORT: "8082"
       GRPC_PORT: "9082"
       KAFKA_BROKERS: redpanda:9092
-      MEMCACHED_ADDR: memcached:11211
+      VALKEY_ADDR: valkey:6379
       USERS_SERVICE_GRPC_ADDR: users-service:9085
-      POSTS_SERVICE_GRPC_ADDR: posts-service:9081
     depends_on:
       - redpanda
-      - memcached
+      - valkey
       - users-service
-      - posts-service
 
   users-service:
     build:
@@ -200,12 +198,12 @@ services:
       GRPC_PORT: "9089"
       CLICKHOUSE_ADDR: clickhouse:9000
       CLICKHOUSE_DB: default
-      MEMCACHED_ADDR: memcached:11211
+      VALKEY_ADDR: valkey:6379
       USERS_SERVICE_GRPC_ADDR: users-service:9085
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081
     depends_on:
       - clickhouse
-      - memcached
+      - valkey
       - users-service
       - posts-service
 

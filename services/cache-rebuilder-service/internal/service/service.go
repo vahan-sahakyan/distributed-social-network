@@ -2,38 +2,27 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/vahan-sahakyan/distributed-social-network/cache-rebuilder-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/cache-rebuilder-service/internal/repository"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/cache"
 	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
+	"github.com/valkey-io/valkey-go"
 )
 
 type Service struct {
 	repo        *repository.Repository
-	mc          *memcache.Client
+	vk          valkey.Client
 	usersClient userspb.UsersServiceClient
 	postsClient postspb.PostsServiceClient
 }
 
-func New(repo *repository.Repository, mc *memcache.Client, usersClient userspb.UsersServiceClient, postsClient postspb.PostsServiceClient) *Service {
-	return &Service{repo: repo, mc: mc, usersClient: usersClient, postsClient: postsClient}
-}
-
-type feedItem struct {
-	PostID        string    `json:"post_id"`
-	AuthorID      string    `json:"author_id"`
-	Text          string    `json:"text"`
-	ImageURL      string    `json:"image_url"`
-	LikesCount    int       `json:"likes_count"`
-	CommentsCount int       `json:"comments_count"`
-	CreatedAt     time.Time `json:"created_at"`
+func New(repo *repository.Repository, vk valkey.Client, usersClient userspb.UsersServiceClient, postsClient postspb.PostsServiceClient) *Service {
+	return &Service{repo: repo, vk: vk, usersClient: usersClient, postsClient: postsClient}
 }
 
 func (s *Service) loadPostStates(ctx context.Context) map[string]model.PostState {
@@ -59,8 +48,8 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 
 	postStates := s.loadPostStates(ctx)
 
-	// Build feed map: cache key -> []feedItem
-	feeds := map[string][]feedItem{}
+	// Build feed map: cache key -> posts
+	feeds := map[string][]cache.Post{}
 
 	for _, event := range events {
 		post, err := s.fetchPost(ctx, event.PostID)
@@ -82,9 +71,9 @@ func (s *Service) RebuildCache(ctx context.Context) error {
 		}
 	}
 
-	// Write all feeds to Memcached
+	// Write all feeds to Valkey
 	for key, items := range feeds {
-		if err := s.setFeed(key, items); err != nil {
+		if err := cache.ReplaceFeed(ctx, s.vk, key, items); err != nil {
 			slog.ErrorContext(ctx, "writing feed", "key", key, "error", err)
 		}
 	}
@@ -116,8 +105,8 @@ func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
 	// feed-service serves two caches per user: the home feed and the profile's
 	// own posts. Rebuilding only the first left profiles empty once the second
 	// expired, with nothing able to repopulate it short of a full rebuild.
-	homeItems := []feedItem{}
-	ownItems := []feedItem{}
+	homeItems := []cache.Post{}
+	ownItems := []cache.Post{}
 	for _, event := range events {
 		if !authorSet[event.UserID] {
 			continue
@@ -133,30 +122,22 @@ func (s *Service) RebuildUserFeed(ctx context.Context, userID string) error {
 		}
 	}
 
-	if err := s.setFeed(cache.HomeFeedKey(userID), homeItems); err != nil {
+	if err := cache.ReplaceFeed(ctx, s.vk, cache.HomeFeedKey(userID), homeItems); err != nil {
 		return err
 	}
-	if err := s.setFeed(cache.UserPostsKey(userID), ownItems); err != nil {
+	if err := cache.ReplaceFeed(ctx, s.vk, cache.UserPostsKey(userID), ownItems); err != nil {
 		return err
 	}
 	slog.InfoContext(ctx, "user feed rebuilt", "user_id", userID, "feed_posts", len(homeItems), "own_posts", len(ownItems))
 	return nil
 }
 
-func (s *Service) setFeed(key string, items []feedItem) error {
-	data, err := json.Marshal(items)
-	if err != nil {
-		return err
-	}
-	return s.mc.Set(&memcache.Item{Key: key, Value: data, Expiration: 3600})
-}
-
 // newFeedItem builds a cached feed entry. Counts are clamped at zero: summed
 // deltas go negative when an unlike outlives its like (e.g. after feed_events
 // was truncated), and the UI would otherwise render "-1 likes".
-func newFeedItem(post *postResponse, st model.PostState) feedItem {
-	return feedItem{
-		PostID:        post.ID,
+func newFeedItem(post *postResponse, st model.PostState) cache.Post {
+	return cache.Post{
+		ID:            post.ID,
 		AuthorID:      post.AuthorID,
 		Text:          post.Text,
 		ImageURL:      post.ImageID,

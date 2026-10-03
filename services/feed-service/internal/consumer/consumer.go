@@ -12,11 +12,8 @@ import (
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/service"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/broker"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/events"
-	postspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/posts"
 	userspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/users"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type Consumer struct {
@@ -24,16 +21,14 @@ type Consumer struct {
 	brokers     string
 	dlq         *broker.Producer
 	usersClient userspb.UsersServiceClient
-	postsClient postspb.PostsServiceClient
 }
 
-func New(svc *service.Service, brokers string, dlq *broker.Producer, usersConn, postsConn *grpc.ClientConn) *Consumer {
+func New(svc *service.Service, brokers string, dlq *broker.Producer, usersConn *grpc.ClientConn) *Consumer {
 	return &Consumer{
 		svc:         svc,
 		brokers:     brokers,
 		dlq:         dlq,
 		usersClient: userspb.NewUsersServiceClient(usersConn),
-		postsClient: postspb.NewPostsServiceClient(postsConn),
 	}
 }
 
@@ -80,39 +75,24 @@ func (c *Consumer) handlePostCreated(ctx context.Context, msg kafka.Message) err
 	}
 	followerIDs = append(followerIDs, post.AuthorID)
 
-	return c.svc.FanoutPost(item, followerIDs)
+	return c.svc.FanoutPost(ctx, item, followerIDs)
 }
 
-// countsHandler returns a handler for like/comment events that applies the given deltas to cached feeds.
+// countsHandler returns a handler for like/comment events that applies the given
+// deltas to the cached post, which every feed showing it reads.
 func (c *Consumer) countsHandler(likesDelta, commentsDelta int) broker.Handler {
 	return func(ctx context.Context, msg kafka.Message) error {
 		var event struct {
-			UserID   string `json:"user_id"`
 			EntityID string `json:"entity_id"`
 		}
 		if err := json.Unmarshal(msg.Value, &event); err != nil {
 			return fmt.Errorf("unmarshaling event: %w", err)
 		}
-
-		authorID, err := c.fetchPostAuthor(ctx, event.EntityID)
-		if status.Code(err) == codes.NotFound {
-			// gone for good (deleted, or wiped by a reset): retrying can't help
-			slog.InfoContext(ctx, "skipping event for a post that doesn't exist", "topic", msg.Topic, "post_id", event.EntityID)
-			return nil
+		// Not retried: a write that failed after landing would count twice. The
+		// cache rebuild corrects what is lost, and an uncached post is left alone.
+		if err := c.svc.AdjustCounts(ctx, event.EntityID, likesDelta, commentsDelta); err != nil {
+			slog.WarnContext(ctx, "adjusting counts", "topic", msg.Topic, "post_id", event.EntityID, "error", err)
 		}
-		if err != nil {
-			return err
-		}
-
-		followers, err := c.fetchFollowers(ctx, authorID)
-		if err != nil {
-			return err
-		}
-
-		// Lookup failures above are retried, but once deltas start landing a retry
-		// would apply them twice to the feeds that already took them. A partial
-		// failure is logged by AdjustCounts and left for the cache rebuild.
-		_ = c.svc.AdjustCounts(event.EntityID, authorID, append(followers, authorID), likesDelta, commentsDelta)
 		return nil
 	}
 }
@@ -123,15 +103,4 @@ func (c *Consumer) fetchFollowers(ctx context.Context, userID string) ([]string,
 		return nil, fmt.Errorf("fetching followers for %s: %w", userID, err)
 	}
 	return resp.Followers, nil
-}
-
-func (c *Consumer) fetchPostAuthor(ctx context.Context, postID string) (string, error) {
-	resp, err := c.postsClient.GetPost(ctx, &postspb.GetPostRequest{Id: postID})
-	if err != nil {
-		return "", fmt.Errorf("fetching post %s: %w", postID, err)
-	}
-	if resp.Post == nil || resp.Post.AuthorId == "" {
-		return "", fmt.Errorf("post %s has no author", postID)
-	}
-	return resp.Post.AuthorId, nil
 }

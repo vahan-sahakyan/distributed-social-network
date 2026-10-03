@@ -163,10 +163,12 @@ services:
       - elasticsearch
 
   # --- Cache ---
-  memcached:
-    image: memcached:1.6.45-alpine
+  # pure cache: nothing persisted, least recently used keys evicted at the memory cap
+  valkey:
+    image: valkey/valkey:9.1.2-alpine
+    command: [valkey-server, --save, "", --appendonly, "no", --maxmemory, 64mb, --maxmemory-policy, allkeys-lru]
     ports:
-      - "11211:11211"
+      - "6379:6379"
 
   # --- Object Storage ---
   minio:

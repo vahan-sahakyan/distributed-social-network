@@ -68,7 +68,7 @@ See [Search](search.md).
 
 | Container | Image | Host Ports | Purpose |
 |-----------|-------|-------|---------|
-| memcached | `memcached:1.6.45-alpine` | 11211 | Feed cache |
+| valkey | `valkey/valkey:9.1.2-alpine` | 6379 | Feed cache; pure cache (no persistence, LRU at 64 MB) |
 | minio | `ghcr.io/vahan-sahakyan/distributed-social-network/minio:RELEASE.2025-09-07T16-13-09Z` | 9000 (API), 9001 (console) | Object storage for media |
 
 MinIO's upstream images and binaries are no longer published, so the image is built from source (`deploy/images/minio`) by the publish workflow, once per release, for amd64 and arm64.
@@ -96,14 +96,14 @@ All app services are built from multi-stage Dockerfiles (`golang:1.27-alpine3.24
 |-----------|-------------|-------------|------------|
 | gateway-service | 8080 (host-mapped) | - | all services except event-writer |
 | posts-service | 8081 | 9081 | posts-db, redpanda |
-| feed-service | 8082 | 9082 | redpanda, memcached, users-service, posts-service |
+| feed-service | 8082 | 9082 | redpanda, valkey, users-service |
 | comments-service | 8083 | 9083 | comments-db, redpanda |
 | likes-service | 8084 | 9084 | likes-db, redpanda |
 | users-service | 8085 | 9085 | users-db |
 | media-service | 8086 | 9086 | minio |
 | notification-service | 8087 | 9087 | notifications-db, redpanda, posts-service |
 | event-writer-service | 8088 | - | redpanda, clickhouse |
-| cache-rebuilder-service | 8089 | 9089 | clickhouse, memcached, users-service, posts-service |
+| cache-rebuilder-service | 8089 | 9089 | clickhouse, valkey, users-service, posts-service |
 | search-service | 8091 | 9091 | elasticsearch, redpanda |
 
 ## Networking

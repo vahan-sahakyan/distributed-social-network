@@ -99,6 +99,25 @@ Alternatively, update the ClickHouse JDBC driver via **Drivers** tab → ClickHo
 
 ---
 
+## Valkey (feed cache)
+
+| Field     | Value         |
+|-----------|---------------|
+| Host      | localhost     |
+| Port      | 6379          |
+| Auth      | none          |
+
+### Steps
+
+1. **File → New → Data Source → Redis**
+   - Valkey speaks the Redis protocol, so DataGrip's Redis driver works
+2. Set **Host** to `localhost`, **Port** to `6379`, no authentication
+3. Click **Test Connection**, then **OK**
+
+Keys: `feed:<user_id>` and `userposts:<user_id>` are sorted sets of post ids (score = created_at); `post:<post_id>` is a hash with the post and its counts. Everything expires after an hour and refills from the events.
+
+---
+
 ## Tips
 
 - **Name your data sources** clearly (e.g., `[DSN] comments-db`, `[DSN] posts-scylla`) to avoid confusion between similar Postgres instances.

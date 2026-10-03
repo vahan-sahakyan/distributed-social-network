@@ -216,7 +216,7 @@ get_json "$API/users/$BOB_ID" | pretty
 section "8. FEED SERVICE"
 # ─────────────────────────────────────────────────────────────────────────────
 
-step "Bob's home feed (Memcached-backed, populated via event fanout)..."
+step "Bob's home feed (Valkey-backed, populated via event fanout)..."
 get_json "$API/feed/home" "$BOB" | pretty
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -338,7 +338,7 @@ line ""
 line "Services: gateway, posts, feed, comments, likes, users, media,"
 line "          notifications, event-writer, cache-rebuilder, search"
 line ""
-line "Infra: ScyllaDB, PostgreSQL×4, ClickHouse, Redpanda, Memcached, MinIO,"
+line "Infra: ScyllaDB, PostgreSQL×4, ClickHouse, Redpanda, Valkey, MinIO,"
 line "       Elasticsearch,"
 line "       Prometheus, Grafana, Loki, Alloy, Jaeger"
 line ""

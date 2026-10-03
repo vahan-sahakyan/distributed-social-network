@@ -1,3 +1,3 @@
--- Feed service uses Memcached for caching.
+-- Feed service uses Valkey for caching.
 -- Cache is rebuilt from ClickHouse event store by cache-rebuilder-service.
 -- No persistent database required.

@@ -1,9 +1,7 @@
 package service
 
 import (
-	"errors"
-	"fmt"
-	"log/slog"
+	"context"
 
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/repository"
@@ -17,50 +15,29 @@ func New(repo *repository.Repository) *Service {
 	return &Service{repo: repo}
 }
 
-func (s *Service) GetHomeFeed(userID string) ([]model.FeedItem, error) {
-	return s.repo.GetFeed(repository.HomeFeedKey(userID))
+func (s *Service) GetHomeFeed(ctx context.Context, userID string) ([]model.FeedItem, error) {
+	return s.repo.GetFeed(ctx, repository.HomeFeedKey(userID))
 }
 
-func (s *Service) GetUserFeed(userID string) ([]model.FeedItem, error) {
-	return s.repo.GetFeed(repository.UserPostsKey(userID))
+func (s *Service) GetUserFeed(ctx context.Context, userID string) ([]model.FeedItem, error) {
+	return s.repo.GetFeed(ctx, repository.UserPostsKey(userID))
 }
 
-// FanoutPost distributes a new post to the author's own posts and to follower
-// feed caches. One failing feed must not cancel the rest: the caller retries the
-// whole message, so stopping early would leave every later follower unwritten.
-func (s *Service) FanoutPost(item *model.FeedItem, followerIDs []string) error {
-	var errs []error
-
-	if err := s.repo.AppendToFeed(repository.UserPostsKey(item.AuthorID), item); err != nil {
-		errs = append(errs, fmt.Errorf("author posts %s: %w", item.AuthorID, err))
+// FanoutPost puts a new post in its author's posts and in the given users' home
+// feeds, in one pipeline. Redelivery is safe: each feed holds a post once.
+func (s *Service) FanoutPost(ctx context.Context, item *model.FeedItem, followerIDs []string) error {
+	keys := []string{repository.UserPostsKey(item.AuthorID)}
+	for _, id := range followerIDs {
+		keys = append(keys, repository.HomeFeedKey(id))
 	}
-
-	for _, followerID := range followerIDs {
-		if err := s.repo.AppendToFeed(repository.HomeFeedKey(followerID), item); err != nil {
-			errs = append(errs, fmt.Errorf("follower feed %s: %w", followerID, err))
-		}
-	}
-
-	return errors.Join(errs...)
+	return s.repo.AddPost(ctx, item, keys...)
 }
 
-// AdjustCounts applies like and comment deltas to a post in its author's posts and the given users' feed caches.
-func (s *Service) AdjustCounts(postID, authorID string, userIDs []string, likesDelta, commentsDelta int) error {
-	var errs []error
+// AdjustCounts applies like and comment deltas to a post; every feed showing it reads the same counts.
+func (s *Service) AdjustCounts(ctx context.Context, postID string, likesDelta, commentsDelta int) error {
+	return s.repo.AdjustCounts(ctx, postID, likesDelta, commentsDelta)
+}
 
-	if err := s.repo.AdjustCounts(repository.UserPostsKey(authorID), postID, likesDelta, commentsDelta); err != nil {
-		errs = append(errs, fmt.Errorf("author posts %s: %w", authorID, err))
-	}
-
-	for _, userID := range userIDs {
-		if err := s.repo.AdjustCounts(repository.HomeFeedKey(userID), postID, likesDelta, commentsDelta); err != nil {
-			errs = append(errs, fmt.Errorf("home feed %s: %w", userID, err))
-		}
-	}
-
-	if err := errors.Join(errs...); err != nil {
-		slog.Warn("adjusting counts", "post_id", postID, "error", err)
-		return err
-	}
-	return nil
+func (s *Service) Reset(ctx context.Context) error {
+	return s.repo.Flush(ctx)
 }
