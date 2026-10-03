@@ -87,7 +87,7 @@ See [Observability](observability.md).
 
 ## Application Containers
 
-All app services are built from multi-stage Dockerfiles (`golang:1.27-alpine3.24` -> `alpine:3.24`). Each Dockerfile copies only the `pkg/` directories its service imports; `make dockerfiles` regenerates those lines and CI fails if they drift.
+All app services are built from multi-stage Dockerfiles (`golang:1.27-alpine3.24` -> `alpine:3.24`). Each Dockerfile copies only the `pkg/` directories its service imports and downloads modules from `go.mod`/`go.sum` before copying sources, so code changes reuse the download layer; BuildKit cache mounts keep modules and the Go build cache across `go.mod` changes. The Dockerfiles are generated (`make dockerfiles`) and CI fails if they drift.
 
 - services wait for their dependencies in-process (`pkg/retry`); `restart: on-failure` only covers real crashes
 - All containers share the default compose network

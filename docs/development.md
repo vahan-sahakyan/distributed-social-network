@@ -158,7 +158,7 @@ Docker builds and CI run with `GOWORK=off`, so each module's own `go.mod`/`go.su
 
 6. Add migration SQL under `migrations/`, embed it via `migrations/sql.go`, and apply it on startup with the matching `pkg/database.Migrate*` helper
 
-7. Create a `Dockerfile` from an existing service, then run `make dockerfiles` to generate its `pkg/` COPY lines
+7. Copy any service's `Dockerfile`, then run `make dockerfiles` to regenerate it for the new service
 
 8. Add to `infrastructure/docker-compose.services.yml`:
    ```yaml
