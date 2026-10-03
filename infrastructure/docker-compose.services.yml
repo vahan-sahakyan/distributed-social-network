@@ -1,5 +1,7 @@
+# optional groups are compose profiles, picked by make up OBS=1 SEARCH=1 EVENTS=1 TOOLS=1;
+# make sets these addresses only for the groups that run, empty = switched off
 x-otel: &otel
-  OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT-}
 
 services:
   gateway-service:
@@ -19,8 +21,8 @@ services:
       USERS_SERVICE_GRPC_ADDR: users-service:9085
       MEDIA_SERVICE_GRPC_ADDR: media-service:9086
       NOTIFICATIONS_SERVICE_GRPC_ADDR: notification-service:9087
-      CACHE_REBUILDER_SERVICE_GRPC_ADDR: cache-rebuilder-service:9089
-      SEARCH_SERVICE_GRPC_ADDR: search-service:9091
+      CACHE_REBUILDER_SERVICE_GRPC_ADDR: ${CACHE_REBUILDER_SERVICE_GRPC_ADDR-}
+      SEARCH_SERVICE_GRPC_ADDR: ${SEARCH_SERVICE_GRPC_ADDR-}
       MINIO_ENDPOINT: minio:9000
       # tokens name the public issuer; keys are fetched over the compose network
       OIDC_ISSUER: http://localhost:8180/auth/realms/dsn
@@ -35,8 +37,6 @@ services:
       - users-service
       - media-service
       - notification-service
-      - cache-rebuilder-service
-      - search-service
       - keycloak
 
   posts-service:
@@ -171,6 +171,7 @@ services:
       - posts-service
 
   event-writer-service:
+    profiles: ["events"]
     build:
       context: ../
       dockerfile: services/event-writer-service/Dockerfile
@@ -186,6 +187,7 @@ services:
       - clickhouse
 
   cache-rebuilder-service:
+    profiles: ["events"]
     build:
       context: ../
       dockerfile: services/cache-rebuilder-service/Dockerfile
@@ -208,6 +210,7 @@ services:
       - posts-service
 
   search-service:
+    profiles: ["search"]
     build:
       context: ../
       dockerfile: services/search-service/Dockerfile

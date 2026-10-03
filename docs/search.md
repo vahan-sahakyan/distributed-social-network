@@ -9,12 +9,12 @@ Full-text search over posts and users, and trending hashtags, served by `search-
 ## Quick start
 
 ```bash
-make up && make demo
+make up SEARCH=1 && make demo   # search is opt-in; on k3d: make cluster-profile SEARCH=1
 curl -s 'localhost:8080/api/v1/search/posts?q=deploying'          # stemming: matches "deployed"
 curl -s 'localhost:8080/api/v1/search/posts?q=%23golang'          # hashtag (%23 is #)
 curl -s 'localhost:8080/api/v1/search/users?q=ali'                # username prefix
 curl -s 'localhost:8080/api/v1/search/hashtags/trending?hours=24'
-make kibana   # optional: Dev Tools at http://localhost:5601/app/dev_tools#/console
+make up SEARCH=1 TOOLS=1        # adds Kibana: Dev Tools at http://localhost:5601/app/dev_tools#/console
 ```
 
 In the UI: **Search** in the sidebar (`/search?q=`, Posts and People tabs, matches highlighted), every `#hashtag` in a post links to its search, and the right column lists trending hashtags. Highlights come back from Elasticsearch with the post text unescaped, so the UI renders them as text with marked spans, never as HTML.

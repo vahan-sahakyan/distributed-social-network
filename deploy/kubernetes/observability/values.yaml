@@ -1,5 +1,10 @@
 # configs and the dashboard come from monitoring/ (files/ is a symlink), shared with compose
 
+# switches: stack = prometheus, grafana, loki, alloy, jaeger; redpandaConsole and kibana
+# on their own. Routes and secrets name the switch they belong to in `group`
+stack:
+  enabled: true
+
 prometheus:
   image: prom/prometheus:v3.12.0
   storage: 5Gi
@@ -38,6 +43,7 @@ jaeger:
     limits: {memory: 1Gi}
 
 redpandaConsole:
+  enabled: true
   image: redpandadata/console:v3.12.0
   resources:
     requests: {cpu: 10m, memory: 64Mi}
@@ -59,10 +65,10 @@ route:
   parentRefs:
     - name: dsn
   routes:
-    grafana: {service: grafana, port: 3000}
-    prometheus: {service: prometheus, port: 9090}
-    jaeger: {service: jaeger, port: 16686}
-    redpanda: {service: redpanda-console, port: 8080}
+    grafana: {group: stack, service: grafana, port: 3000}
+    prometheus: {group: stack, service: prometheus, port: 9090}
+    jaeger: {group: stack, service: jaeger, port: 16686}
+    redpanda: {group: redpandaConsole, service: redpanda-console, port: 8080}
     minio: {service: minio, port: 9001}
 
 # Secrets come from the secret store (OpenBao) through External Secrets:
@@ -73,6 +79,7 @@ secretStore:
   refreshInterval: 1h
 secrets:
   grafana-admin:
+    group: stack
     from: grafana-admin
     data:
       GF_SECURITY_ADMIN_USER: "{{ .user }}"

@@ -363,7 +363,7 @@ GET /api/v1/notifications
 
 ## Search
 
-Served by search-service from Elasticsearch; see [Search](search.md) for how results are ranked. Results are eventually consistent: a new post or user is searchable about a second after it is created.
+Served by search-service from Elasticsearch; see [Search](search.md) for how results are ranked. Results are eventually consistent: a new post or user is searchable about a second after it is created. Search is an optional group (`SEARCH=1`); while it is off, every route here answers 503 `{"error": "search is disabled"}`.
 
 ### Search Posts
 
@@ -443,7 +443,7 @@ POST /api/v1/rebuild?user_id=:user_id
 }
 ```
 
-> Without `user_id`, rebuilds feed caches from recent ClickHouse events. With `user_id`, rebuilds that user's home feed and own posts, and returns `"user feed rebuilt"`.
+> Without `user_id`, rebuilds feed caches from recent ClickHouse events. With `user_id`, rebuilds that user's home feed and own posts, and returns `"user feed rebuilt"`. Needs the event store group (`EVENTS=1`); while it is off this answers 503 `{"error": "event store is disabled"}`.
 
 ---
 
@@ -455,7 +455,7 @@ POST /api/v1/reset
 
 **Response** `200 OK`: `{"status": "reset complete"}`
 
-> Only registered when the gateway runs with `ALLOW_RESET=true` (compose, and the local k3d cluster via `envs/local` in the gitops repo); `404` elsewhere. Calls `Reset` on every service: truncates all tables and the ClickHouse event store, flushes Memcached and empties the search indices. Uploaded files in MinIO and Keycloak accounts are kept, so users recreate their profile on the next login. Every service is attempted; if any fail it answers 500 `reset failed for <services>` with a `trace_id`.
+> Only registered when the gateway runs with `ALLOW_RESET=true` (compose, and the local k3d cluster via `envs/local` in the gitops repo); `404` elsewhere. Calls `Reset` on every service: truncates all tables and the ClickHouse event store, flushes Memcached and empties the search indices. Uploaded files in MinIO and Keycloak accounts are kept, so users recreate their profile on the next login. Every running service is attempted (switched-off groups are skipped); if any fail it answers 500 `reset failed for <services>` with a `trace_id`.
 
 ---
 

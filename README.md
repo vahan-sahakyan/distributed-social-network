@@ -60,14 +60,15 @@ graph LR
 ```bash
 # Prerequisites: Docker, Docker Compose, Go 1.27+, Node 22 (UI)
 
-# Build and start all 30 containers (services apply their own migrations on startup)
+# Build and start the core: the app and its stores, ~1 GB (services apply their own migrations on startup).
+# Optional groups opt in, see below: make up OBS=1 SEARCH=1, or make up ALL=1 for everything
 make up
 
 # Run the end-to-end demo (creates alice, bob, charlie - password "password" - posts, likes, comments)
 make demo
 
 # Generate traffic, then open Grafana's DSN Overview dashboard
-make load
+make up OBS=1 && make load
 
 # UI dev server, proxies /api and /images to the gateway on :8080
 cd ui && npm install && npm run dev
@@ -79,22 +80,36 @@ After startup, these are available:
 |---------|-----|-------------|
 | Gateway API | http://localhost:8080 | - |
 | Keycloak | http://localhost:8180/auth | admin / admin (console); demo users: password |
-| Prometheus | http://localhost:9090 | - |
-| Grafana | http://localhost:3000 | admin / admin |
-| Jaeger | http://localhost:16686 | - |
-| Redpanda Console | http://localhost:8888 | - |
-| Elasticsearch | http://localhost:9200 | - |
-| Kibana (`make kibana`) | http://localhost:5601 | - |
 | MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
+| Prometheus (`OBS=1`) | http://localhost:9090 | - |
+| Grafana (`OBS=1`) | http://localhost:3000 | admin / admin |
+| Jaeger (`OBS=1`) | http://localhost:16686 | - |
+| Redpanda Console (`TOOLS=1`) | http://localhost:8888 | - |
+| Elasticsearch (`SEARCH=1`) | http://localhost:9200 | - |
+| Kibana (`TOOLS=1 SEARCH=1`) | http://localhost:5601 | - |
 
-On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (http://localhost:8081 redirects) and the tools on `https://<name>.localhost:8443`: grafana, prometheus, jaeger, redpanda, minio. Certificates come from a CA generated once per machine in `~/.config/dsn/`; `make trust-ca` adds it to the macOS keychain. `make forward` also puts everything on the URLs above, Kafka's 19092 aside.
+### Optional groups
+
+The core runs by default; each group is opt-in with its flag, the same on compose (`make up`, `make start`) and the k3d cluster (`make cluster-up`, `make cluster-profile`). `ALL=1` switches on all four.
+
+| Flag | Adds | RAM | When off |
+|------|------|-----|----------|
+| `OBS=1` | Prometheus, Grafana, Loki, Alloy, Jaeger; services export traces | ~0.55 GB | no metrics, logs or traces |
+| `TOOLS=1` | Redpanda Console, Kibana (with `SEARCH=1`) | ~1.2 GB | - |
+| `SEARCH=1` | Elasticsearch, search-service | ~1.2 GB | search answers 503 `search is disabled`, trending is hidden |
+| `EVENTS=1` | ClickHouse, event-writer, cache-rebuilder | ~0.7 GB | no event store; `/api/v1/rebuild` answers 503 |
+
+Core alone is ~1 GB on compose; with `ALL=1`, ~5.4 GB.
+
+On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (http://localhost:8081 redirects) and the tools on `https://<name>.localhost:8443`: minio, plus grafana, prometheus, jaeger, redpanda and kibana when their group is on. Certificates come from a CA generated once per machine in `~/.config/dsn/`; `make trust-ca` adds it to the macOS keychain. `make forward` also puts everything on the URLs above, Kafka's 19092 aside.
 
 ## Make Commands
 
 | Command | Description |
 |---------|-------------|
-| `make up` | Build and start all containers |
-| `make stop` / `make start` | Stop / start existing containers without removing or rebuilding them |
+| `make up` | Build and start the core plus the groups passed (`OBS=1 TOOLS=1 SEARCH=1 EVENTS=1`, `ALL=1`); stops groups left out |
+| `make start` | `make up` without building images |
+| `make stop` | Stop every container, whatever groups ran |
 | `make down` | Stop and remove containers (keeps data volumes) |
 | `make infra-up` / `make infra-down` | Infrastructure containers only |
 | `make fresh` | Clean slate: wipe volumes -> rebuild (services migrate on startup) |
@@ -102,14 +117,14 @@ On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (htt
 | `make demo` | Run end-to-end demo script (`CLUSTER=1` for the k3d cluster, same for `make load`) |
 | `make load` | Mixed traffic for the dashboards (`DURATION=120 WORKERS=4`) |
 | `make dlq` | List parked (DLQ) messages; `CMD="replay --topic like.created"` replays, `CMD=skip` discards |
-| `make kibana` | Start Kibana for the search indices (not part of `make up`) |
 | `make proto` | Regenerate gRPC stubs under `pkg/grpc/`, then `make dockerfiles` |
 | `make dockerfiles` | Regenerate every service Dockerfile from its `pkg/` imports |
 | `make build` | Compile all service binaries into `bin/` |
 | `make test` | Run tests in `pkg` and all services |
 | `make lint` | Lint `pkg` and all services with golangci-lint (config: `.golangci.yml`) |
 | `make tidy` | Run `go mod tidy` in all modules |
-| `make cluster-up` / `make cluster-down` | Create / delete the local k3d cluster, synced by Argo CD from the gitops repo (app on https://localhost:8443) |
+| `make cluster-up` / `make cluster-down` | Create / delete the local k3d cluster, synced by Argo CD from the gitops repo (app on https://localhost:8443); takes the group flags |
+| `make cluster-profile` | Switch the cluster's optional groups, e.g. `make cluster-profile OBS=1`; unset flags turn groups off, volumes are kept |
 | `make trust-ca` | Trust the local cluster's CA in the macOS keychain (once per machine) |
 | `make forward` | Port-forward the cluster to the same localhost ports as compose (all URLs above work), plus Argo CD on https://localhost:9443; prints the admin password |
 

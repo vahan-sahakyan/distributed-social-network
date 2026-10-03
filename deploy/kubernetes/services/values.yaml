@@ -72,6 +72,8 @@ secrets:
       MINIO_ACCESS_KEY: "{{ .user }}"
       MINIO_SECRET_KEY: "{{ .password }}"
 
+# every service runs unless it sets enabled: false (local clusters switch off
+# search, event-writer and cache-rebuilder that way)
 services:
   gateway:
     port: 8080

@@ -54,6 +54,7 @@ services:
 
   # --- Event Store ---
   clickhouse:
+    profiles: ["events"]
     image: clickhouse/clickhouse-server:26.5.1.882
     environment:
       CLICKHOUSE_USER: default
@@ -90,6 +91,7 @@ services:
       - redpanda
 
   redpanda-console:
+    profiles: ["tools"]
     image: redpandadata/console:latest
     environment:
       KAFKA_BROKERS: redpanda:9092
@@ -135,6 +137,7 @@ services:
 
   # --- Search ---
   elasticsearch:
+    profiles: ["search"]
     image: elasticsearch:9.5.3
     environment:
       discovery.type: single-node
@@ -146,7 +149,7 @@ services:
     volumes:
       - elasticsearch-data:/usr/share/elasticsearch/data
 
-  # optional, ~1GB: make kibana, then Dev Tools at http://localhost:5601
+  # ~1GB, Dev Tools at http://localhost:5601: make up TOOLS=1 SEARCH=1 (its own profile, it needs elasticsearch)
   kibana:
     image: kibana:9.5.3
     profiles: ["kibana"]
@@ -180,6 +183,7 @@ services:
 
   # --- Observability ---
   prometheus:
+    profiles: ["obs"]
     image: prom/prometheus:v3.12.0
     # picks up edits to the mounted config and rules without a restart
     command:
@@ -195,6 +199,7 @@ services:
       - prometheus-data:/prometheus
 
   grafana:
+    profiles: ["obs"]
     image: grafana/grafana:13.0.2
     ports:
       - "3000:3000"
@@ -211,6 +216,7 @@ services:
       - jaeger
 
   loki:
+    profiles: ["obs"]
     image: grafana/loki:3.7.2
     ports:
       - "3100:3100"
@@ -219,6 +225,7 @@ services:
 
   # tails every compose container's stdout into loki
   alloy:
+    profiles: ["obs"]
     image: grafana/alloy:v1.20.1
     command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
     ports:
@@ -232,6 +239,7 @@ services:
   # all-in-one, in-memory: traces are lost on restart.
   # 2.21 dropped the /api/services|traces endpoints the grafana jaeger datasource uses
   jaeger:
+    profiles: ["obs"]
     image: jaegertracing/jaeger:2.20.0
     ports:
       - "16686:16686"

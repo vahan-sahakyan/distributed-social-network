@@ -6,7 +6,7 @@
 
 ## Container Overview
 
-Locally the system runs **30 containers** (plus optional Kibana) via two Docker Compose files:
+Locally `make up` runs the **19 core containers**; the optional groups (`OBS=1 TOOLS=1 SEARCH=1 EVENTS=1`, compose profiles `obs`, `tools`, `search`, `events`, plus `kibana` for Kibana) bring it to 31 with `ALL=1`. Two Docker Compose files:
 
 ```
 infrastructure/
@@ -60,7 +60,7 @@ Inside the network, services reach Redpanda at `redpanda:9092` and ClickHouse at
 | Container | Image | Host Ports | Purpose |
 |-----------|-------|-------|---------|
 | elasticsearch | `elasticsearch:9.5.3` | 9200 | Search indices (single node, 1 GB heap, security off) |
-| kibana | `kibana:9.5.3` | 5601 | Optional (`make kibana`, compose profile `kibana`): Dev Tools console for the indices |
+| kibana | `kibana:9.5.3` | 5601 | Optional (`make up TOOLS=1 SEARCH=1`, compose profile `kibana`): Dev Tools console for the indices |
 
 See [Search](search.md).
 
