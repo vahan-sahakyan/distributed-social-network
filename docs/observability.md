@@ -164,5 +164,5 @@ sum by (service) (count_over_time({service=~".+-service"} | json | level=~"WARN|
 - Jaeger is in-memory: traces are gone after a restart. Pinned to 2.20.0 because 2.21 removed the HTTP API Grafana's Jaeger datasource uses.
 - 100% of traces are sampled; fine locally, not for production.
 - No database, cache or object-storage spans: a DB call is inside its gRPC server span, not a span of its own.
-- No infra exporters for PostgreSQL, ScyllaDB, ClickHouse, Memcached or MinIO; only Redpanda is scraped.
+- No infra exporters for PostgreSQL, ScyllaDB, ClickHouse, Valkey or MinIO; only Redpanda is scraped.
 - Alloy reads the Docker socket, so it ships every compose container's logs, including the data stores' plain-text ones.

@@ -3,7 +3,6 @@ package grpcserver
 import (
 	"context"
 
-	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/service"
 	feedpb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/feed"
@@ -15,31 +14,30 @@ import (
 type Server struct {
 	feedpb.UnimplementedFeedServiceServer
 	svc *service.Service
-	mc  *memcache.Client
 }
 
-func New(svc *service.Service, mc *memcache.Client) *Server {
-	return &Server{svc: svc, mc: mc}
+func New(svc *service.Service) *Server {
+	return &Server{svc: svc}
 }
 
-func (s *Server) GetHomeFeed(_ context.Context, req *feedpb.GetHomeFeedRequest) (*feedpb.GetFeedResponse, error) {
-	items, err := s.svc.GetHomeFeed(req.UserId)
+func (s *Server) GetHomeFeed(ctx context.Context, req *feedpb.GetHomeFeedRequest) (*feedpb.GetFeedResponse, error) {
+	items, err := s.svc.GetHomeFeed(ctx, req.UserId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get feed: %v", err)
 	}
 	return &feedpb.GetFeedResponse{Items: toProtoItems(items)}, nil
 }
 
-func (s *Server) GetUserFeed(_ context.Context, req *feedpb.GetUserFeedRequest) (*feedpb.GetFeedResponse, error) {
-	items, err := s.svc.GetUserFeed(req.UserId)
+func (s *Server) GetUserFeed(ctx context.Context, req *feedpb.GetUserFeedRequest) (*feedpb.GetFeedResponse, error) {
+	items, err := s.svc.GetUserFeed(ctx, req.UserId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to get feed: %v", err)
 	}
 	return &feedpb.GetFeedResponse{Items: toProtoItems(items)}, nil
 }
 
-func (s *Server) Reset(_ context.Context, _ *feedpb.ResetRequest) (*feedpb.ResetResponse, error) {
-	if err := s.mc.FlushAll(); err != nil {
+func (s *Server) Reset(ctx context.Context, _ *feedpb.ResetRequest) (*feedpb.ResetResponse, error) {
+	if err := s.svc.Reset(ctx); err != nil {
 		return nil, status.Errorf(codes.Internal, "reset failed: %v", err)
 	}
 	return &feedpb.ResetResponse{Status: "reset"}, nil

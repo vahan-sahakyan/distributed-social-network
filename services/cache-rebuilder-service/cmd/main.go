@@ -46,11 +46,12 @@ func main() {
 	}
 	defer conn.Close()
 
-	memcachedAddr := os.Getenv("MEMCACHED_ADDR")
-	if memcachedAddr == "" {
-		memcachedAddr = "localhost:11211"
+	valkeyAddr := os.Getenv("VALKEY_ADDR")
+	if valkeyAddr == "" {
+		valkeyAddr = "localhost:6379"
 	}
-	mc := cache.NewMemcached(ctx, memcachedAddr)
+	vk := cache.NewValkey(ctx, valkeyAddr)
+	defer vk.Close()
 
 	// gRPC clients for upstream services
 	usersAddr := os.Getenv("USERS_SERVICE_GRPC_ADDR")
@@ -75,7 +76,7 @@ func main() {
 	defer postsConn.Close()
 
 	repo := repository.New(conn)
-	svc := service.New(repo, mc, userspb.NewUsersServiceClient(usersConn), postspb.NewPostsServiceClient(postsConn))
+	svc := service.New(repo, vk, userspb.NewUsersServiceClient(usersConn), postspb.NewPostsServiceClient(postsConn))
 
 	// gRPC server
 	grpcPort := os.Getenv("GRPC_PORT")
@@ -88,7 +89,7 @@ func main() {
 	}
 	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
 	cacherebpb.RegisterCacheRebuilderServiceServer(grpcSrv, grpcserver.New(svc, func(ctx context.Context) error {
-		return errors.Join(conn.Exec(ctx, "TRUNCATE TABLE IF EXISTS feed_events"), mc.FlushAll())
+		return errors.Join(conn.Exec(ctx, "TRUNCATE TABLE IF EXISTS feed_events"), cache.Flush(ctx, vk))
 	}))
 	observability.InitGRPCMetrics(grpcSrv)
 	go func() {

@@ -10,14 +10,14 @@
 |---------|-----------|-----------|------------|------|
 | gateway-service | 8080 | - | - | Public HTTP API, calls services over gRPC |
 | posts-service | 8081 | 9081 | ScyllaDB | Posts + event publishing |
-| feed-service | 8082 | 9082 | Memcached | Home and user feeds (event consumer) |
+| feed-service | 8082 | 9082 | Valkey | Home and user feeds (event consumer) |
 | comments-service | 8083 | 9083 | PostgreSQL | Comments + event publishing |
 | likes-service | 8084 | 9084 | PostgreSQL | Likes + event publishing |
 | users-service | 8085 | 9085 | PostgreSQL | User profiles + follow graph |
 | media-service | 8086 | 9086 | MinIO | File uploads |
 | notification-service | 8087 | 9087 | PostgreSQL | Notifications (event consumer) |
 | event-writer-service | 8088 | - | ClickHouse | Event store writer (event consumer) |
-| cache-rebuilder-service | 8089 | 9089 | ClickHouse -> Memcached | Feed cache reconstruction |
+| cache-rebuilder-service | 8089 | 9089 | ClickHouse -> Valkey | Feed cache reconstruction |
 | search-service | 8091 | 9091 | Elasticsearch | Post and user search, trending hashtags (event consumer) |
 
 Backend services serve their API over gRPC (`GRPC_PORT`, definitions in `proto/`). The HTTP port (`PORT`) serves only `/health` and `/metrics`, except on the gateway.
@@ -106,16 +106,16 @@ Like and comment counts are not stored on the post; feed-service keeps them in t
 
 ## feed-service
 
-**Role:** Serves home and user feeds from Memcached. Consumes events to keep them current.
+**Role:** Serves home and user feeds from Valkey. Consumes events to keep them current.
 
-**Stack:** gRPC + Memcached + Redpanda consumer
+**Stack:** gRPC + Valkey + Redpanda consumer
 
-**Pattern:** Fanout-on-write. On `post.created` it fetches the author's followers from users-service and appends the post to `userposts:<author>` and to `feed:<id>` for each follower and the author. Like/comment events adjust the counts on that post in the same caches. Cache writes use memcache CAS so concurrent consumers do not overwrite each other.
+**Pattern:** Fanout-on-write. On `post.created` it fetches the author's followers from users-service and in one pipeline caches the post in `post:<id>` and adds its id to the sorted sets `userposts:<author>` and `feed:<id>` for each follower and the author (score = created_at, capped at 100). Like/comment events increment the counts in `post:<id>` alone, through a script that leaves uncached posts alone: no followers lookup, and every feed reads the same counts.
 
 **Consumer groups:** `feed-service-posts`, `feed-service-likes`, `feed-service-unlikes`, `feed-service-comments`
 **Topics consumed:** `post.created`, `like.created`, `like.deleted`, `comment.created`
 
-**Cache keys** (built only via `pkg/cache`): `feed:<user_id>` (home feed), `userposts:<user_id>` (user's own posts)
+**Cache keys** (built only via `pkg/cache`, which also holds the read/write helpers cache-rebuilder shares): `feed:<user_id>` (home feed), `userposts:<user_id>` (user's own posts), sorted sets of post ids; `post:<post_id>`, a hash with the post and its counts. All expire after 1h
 
 **Environment:**
 | Variable | Default | Description |
@@ -123,9 +123,8 @@ Like and comment counts are not stored on the post; feed-service keeps them in t
 | `PORT` | 8082 | Health/metrics port |
 | `GRPC_PORT` | 9082 | gRPC port |
 | `KAFKA_BROKERS` | - | Redpanda brokers |
-| `MEMCACHED_ADDR` | localhost:11211 | Memcached address |
+| `VALKEY_ADDR` | localhost:6379 | Valkey address |
 | `USERS_SERVICE_GRPC_ADDR` | localhost:9085 | users-service (followers) |
-| `POSTS_SERVICE_GRPC_ADDR` | localhost:9081 | posts-service (post author) |
 
 ---
 
@@ -296,9 +295,9 @@ INSERT INTO feed_events (event_id, event_type, post_id, user_id, likes_delta, co
 
 ## cache-rebuilder-service
 
-**Role:** Rebuilds Memcached feed caches from the ClickHouse event store. Triggered on demand via `POST /api/v1/rebuild` (all feeds, or one user's with `user_id`).
+**Role:** Rebuilds the Valkey feed caches from the ClickHouse event store. Triggered on demand via `POST /api/v1/rebuild` (all feeds, or one user's with `user_id`).
 
-**Stack:** gRPC + ClickHouse (read) + Memcached (write)
+**Stack:** gRPC + ClickHouse (read) + Valkey (write; each feed is built aside and renamed into place)
 
 **Environment:**
 | Variable | Default | Description |
@@ -307,7 +306,7 @@ INSERT INTO feed_events (event_id, event_type, post_id, user_id, likes_delta, co
 | `GRPC_PORT` | 9089 | gRPC port |
 | `CLICKHOUSE_ADDR` | localhost:9000 | ClickHouse native port |
 | `CLICKHOUSE_DB` | default | Database name |
-| `MEMCACHED_ADDR` | localhost:11211 | Memcached address |
+| `VALKEY_ADDR` | localhost:6379 | Valkey address |
 | `USERS_SERVICE_GRPC_ADDR` | localhost:9085 | users-service (followers, following) |
 | `POSTS_SERVICE_GRPC_ADDR` | localhost:9081 | posts-service (post details) |
 

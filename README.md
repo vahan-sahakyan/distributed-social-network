@@ -30,8 +30,8 @@ graph LR
 
     EventWriter --> ClickHouse
     ClickHouse --> CacheRebuilder
-    CacheRebuilder --> Memcached
-    Feed --> Memcached
+    CacheRebuilder --> Valkey
+    Feed --> Valkey
 
     Posts --> ScyllaDB
     Comments --> PG1[(PostgreSQL)]
@@ -51,7 +51,7 @@ graph LR
 | Event Streaming | Redpanda (Kafka-compatible) |
 | Event Store | ClickHouse |
 | Search | Elasticsearch |
-| Caching | Memcached |
+| Caching | Valkey (feed timelines as sorted sets, one hash per post) |
 | Object Storage | MinIO |
 | Observability | OpenTelemetry -> Jaeger, JSON logs -> Alloy -> Loki, Prometheus, Grafana |
 
@@ -151,7 +151,7 @@ On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (htt
 ├── services/
 │   ├── gateway-service/     HTTP API, translates requests to gRPC
 │   ├── posts-service/       Posts (ScyllaDB)
-│   ├── feed-service/        Home and user feeds (Memcached)
+│   ├── feed-service/        Home and user feeds (Valkey)
 │   ├── comments-service/    Comments (PostgreSQL)
 │   ├── likes-service/       Likes (PostgreSQL)
 │   ├── users-service/       Users + follows (PostgreSQL)
@@ -192,7 +192,7 @@ On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (htt
 - **Message Broker:** Redpanda (Kafka API compatible)
 - **Event Store:** ClickHouse
 - **Search:** Elasticsearch
-- **Cache:** Memcached
+- **Cache:** Valkey
 - **Object Storage:** MinIO (S3 compatible)
 - **UI:** React, Vite, Tailwind
 - **Observability:** OpenTelemetry, Jaeger, Prometheus, Loki + Alloy, Grafana

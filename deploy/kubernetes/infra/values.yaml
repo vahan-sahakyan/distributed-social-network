@@ -32,8 +32,10 @@ redpanda:
     requests: {cpu: 100m, memory: 640Mi}
     limits: {memory: 1Gi}
 
-memcached:
-  image: memcached:1.6.45-alpine
+# feed cache, pure: nothing persisted, least recently used keys evicted at maxmemory
+valkey:
+  image: valkey/valkey:9.1.2-alpine
+  maxmemory: 64mb
   resources:
     requests: {cpu: 10m, memory: 32Mi}
     limits: {memory: 128Mi}

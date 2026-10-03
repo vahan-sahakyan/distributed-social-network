@@ -89,7 +89,7 @@ Shared code lives in `pkg/`:
 ```
 pkg/
 ├── broker/         Producer, at-least-once Consume/ConsumeBatch with retries + DLQ, EnsureTopics
-├── cache/          Memcached client, feed cache key builders
+├── cache/          Valkey client, feed cache keys and the read/write helpers both feed services share
 ├── database/       Postgres, ScyllaDB, ClickHouse connections (retried) + Migrate* helpers
 ├── events/         Topic names
 ├── grpc/           Generated gRPC stubs (from proto/, via make proto)
@@ -298,7 +298,7 @@ Three Helm charts, deployed by Argo CD from [distributed-social-network-gitops](
 
 | Chart | Contents |
 |---|---|
-| `deploy/kubernetes/infra` | Postgres x5 (one for Keycloak), Scylla, Redpanda, ClickHouse, MinIO, Memcached, Elasticsearch, Keycloak |
+| `deploy/kubernetes/infra` | Postgres x5 (one for Keycloak), Scylla, Redpanda, ClickHouse, MinIO, Valkey, Elasticsearch, Keycloak |
 | `deploy/kubernetes/services` | the 11 services, UI, the `dsn` Gateway and its HTTPRoute |
 | `deploy/kubernetes/observability` | Prometheus, Grafana, Loki, Alloy, Jaeger, Redpanda Console, optional Kibana; configs from `monitoring/` |
 

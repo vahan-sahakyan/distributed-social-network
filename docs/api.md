@@ -329,7 +329,7 @@ GET /api/v1/feed/home
 
 Same response format. Returns posts from the users the given user follows, plus their own.
 
-> Feeds are served from Memcached. If the cache is cold, `POST /api/v1/rebuild` repopulates it from the event store.
+> Feeds are served from Valkey. If the cache is cold, `POST /api/v1/rebuild` repopulates it from the event store.
 
 ---
 
@@ -455,7 +455,7 @@ POST /api/v1/reset
 
 **Response** `200 OK`: `{"status": "reset complete"}`
 
-> Only registered when the gateway runs with `ALLOW_RESET=true` (compose, and the local k3d cluster via `envs/local` in the gitops repo); `404` elsewhere. Calls `Reset` on every service: truncates all tables and the ClickHouse event store, flushes Memcached and empties the search indices. Uploaded files in MinIO and Keycloak accounts are kept, so users recreate their profile on the next login. Every running service is attempted (switched-off groups are skipped); if any fail it answers 500 `reset failed for <services>` with a `trace_id`.
+> Only registered when the gateway runs with `ALLOW_RESET=true` (compose, and the local k3d cluster via `envs/local` in the gitops repo); `404` elsewhere. Calls `Reset` on every service: truncates all tables and the ClickHouse event store, flushes Valkey and empties the search indices. Uploaded files in MinIO and Keycloak accounts are kept, so users recreate their profile on the next login. Every running service is attempted (switched-off groups are skipped); if any fail it answers 500 `reset failed for <services>` with a `trace_id`.
 
 ---
 

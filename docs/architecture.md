@@ -6,7 +6,7 @@
 
 ## Overview
 
-The system follows an **event-driven microservices** architecture. Clients talk HTTP/JSON to the gateway, the gateway and services talk gRPC, and state changes propagate as events on Redpanda. The feed uses CQRS: writes go through events, reads come from Memcached.
+The system follows an **event-driven microservices** architecture. Clients talk HTTP/JSON to the gateway, the gateway and services talk gRPC, and state changes propagate as events on Redpanda. The feed uses CQRS: writes go through events, reads come from Valkey.
 
 ```mermaid
 graph TB
@@ -43,7 +43,7 @@ graph TB
         ScyllaDB[(ScyllaDB)]
         PG[(PostgreSQL x4)]
         CH[(ClickHouse)]
-        MC[Memcached]
+        MC[Valkey]
         MIO[MinIO]
         ES[(Elasticsearch)]
     end
@@ -105,9 +105,9 @@ Topics are created on startup by `pkg/broker.EnsureTopics` (3 partitions each). 
 Every producing service publishes through a **transactional outbox** (`pkg/outbox`, [ADR 0002](adr/0002-transactional-outbox.md)): the event row is committed with the data (a Postgres transaction, or a LOGGED BATCH in posts-service's ScyllaDB), and a relay publishes it once Redpanda acks, so a broker outage delays events instead of losing them. Producers wait for the broker's ack (`RequireAll`).
 
 Delivery is **at-least-once** (`pkg/broker.Consume`): the offset is committed only after the handler succeeds. A failing message is retried 3 times with backoff, then published to `<topic>.dlq` and skipped. The parked message records the consumer group, the error and the event's id; `make dlq` lists parked messages and replays them to their source topic, once per event however many groups parked it. `pkg/broker.ConsumeBatch` (event-writer, search-service) does the same per batch of up to 500 messages or 200ms, and retries a failing batch message by message so only the bad ones are parked. Handlers are written to tolerate redelivery:
-- feed-service fanout is idempotent, and feed cache writes use memcache CAS to avoid lost updates between concurrent consumers
+- feed-service fanout is idempotent: feeds are sorted sets, so a redelivered post lands once, and a redelivered post keeps the counts its cache entry gathered
 - every event carries an `event-id` header from its outbox row (`<service>:<row id>`); event-writer derives `event_id` from it (from topic/partition/offset for older messages without one), so a redelivered or republished event writes a row with the same id and readers deduplicate by it; notification-service derives its row id the same way
-- feed-service's cached counts are not deduplicated: a redelivered like adds again until `POST /api/v1/rebuild`
+- feed-service's cached counts are not deduplicated: a redelivered like increments again until `POST /api/v1/rebuild`
 - likes-service emits `like.created` / `like.deleted` only when the row actually changed, so a repeated like or unlike emits nothing
 
 ### CQRS for Search
@@ -119,8 +119,8 @@ Search is a second read model on the same stream: search-service indexes `post.c
 The feed system separates writes from reads:
 
 1. **Write side:** When a user creates a post, the event flows through Redpanda
-2. **Fanout-on-write:** feed-service consumes `post.created` and pushes the post into each follower's home feed (`feed:<id>`) and the author's own feed (`userposts:<id>`) in Memcached
-3. **Read side:** Feed queries hit Memcached directly (no DB joins)
+2. **Fanout-on-write:** feed-service consumes `post.created` and caches the post once (`post:<id>`, a hash with its counts) and adds its id to each follower's home feed (`feed:<id>`) and the author's own feed (`userposts:<id>`), sorted sets in Valkey; a like or comment increments the one hash
+3. **Read side:** Feed queries hit Valkey directly: the newest 100 ids of the sorted set, then their hashes in one pipelined round trip (no DB joins)
 4. **Rebuild:** cache-rebuilder reconstructs feeds from the ClickHouse event store on request (`POST /api/v1/rebuild`)
 
 ```mermaid
@@ -130,7 +130,7 @@ sequenceDiagram
     participant Posts
     participant Redpanda
     participant Feed
-    participant Memcached
+    participant Valkey
     participant EventWriter
     participant ClickHouse
 
@@ -139,12 +139,12 @@ sequenceDiagram
     Posts->>Posts: Store in ScyllaDB
     Posts->>Redpanda: Publish post.created
     Redpanda->>Feed: Consume post.created
-    Feed->>Memcached: Add post to author + follower feeds
+    Feed->>Valkey: Cache post, add it to author + follower feeds
     Redpanda->>EventWriter: Consume post.created
     EventWriter->>ClickHouse: INSERT into feed_events
     User->>Gateway: GET /api/v1/feed/home (Bearer token)
     Gateway->>Feed: GetHomeFeed (gRPC)
-    Feed->>Memcached: Fetch cached feed
+    Feed->>Valkey: Fetch cached feed
     Feed->>Gateway: Feed items
     Gateway->>User: JSON array
 ```
@@ -202,7 +202,7 @@ Each service owns its data store, chosen for its workload:
 | comments | PostgreSQL | Structured text with indexes on entity_id |
 | likes | PostgreSQL | Unique constraint on (user_id, entity_id) |
 | notifications | PostgreSQL | Ordered reads by user, boolean flags |
-| feed | Memcached | Pure cache, rebuilt from the event store |
+| feed | Valkey | Pure cache (no persistence, LRU at 64 MB), rebuilt from the event store |
 | events | ClickHouse | Columnar store, fast aggregations |
 | media | MinIO | S3-compatible object storage for binary files |
 

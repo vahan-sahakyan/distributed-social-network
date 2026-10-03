@@ -30,24 +30,21 @@ func main() {
 	shutdown := observability.Init(ctx, "feed-service")
 	defer shutdown()
 
-	memcachedAddr := os.Getenv("MEMCACHED_ADDR")
-	if memcachedAddr == "" {
-		memcachedAddr = "localhost:11211"
+	valkeyAddr := os.Getenv("VALKEY_ADDR")
+	if valkeyAddr == "" {
+		valkeyAddr = "localhost:6379"
 	}
 
-	mc := cache.NewMemcached(ctx, memcachedAddr)
+	vk := cache.NewValkey(ctx, valkeyAddr)
+	defer vk.Close()
 
-	repo := repository.New(mc)
+	repo := repository.New(vk)
 	svc := service.New(repo)
 
-	// gRPC addresses for upstream services
+	// followers for the fanout of new posts
 	usersAddr := os.Getenv("USERS_SERVICE_GRPC_ADDR")
 	if usersAddr == "" {
 		usersAddr = "localhost:9085"
-	}
-	postsAddr := os.Getenv("POSTS_SERVICE_GRPC_ADDR")
-	if postsAddr == "" {
-		postsAddr = "localhost:9081"
 	}
 
 	usersConn, err := grpc.NewClient(usersAddr, observability.GRPCDialOptions()...)
@@ -55,12 +52,6 @@ func main() {
 		log.Fatalf("failed to connect to users-service: %v", err)
 	}
 	defer usersConn.Close()
-
-	postsConn, err := grpc.NewClient(postsAddr, observability.GRPCDialOptions()...)
-	if err != nil {
-		log.Fatalf("failed to connect to posts-service: %v", err)
-	}
-	defer postsConn.Close()
 
 	// gRPC server
 	grpcPort := os.Getenv("GRPC_PORT")
@@ -72,7 +63,7 @@ func main() {
 		log.Fatalf("failed to listen on grpc port: %v", err)
 	}
 	grpcSrv := grpc.NewServer(observability.GRPCServerOptions()...)
-	feedpb.RegisterFeedServiceServer(grpcSrv, grpcserver.New(svc, mc))
+	feedpb.RegisterFeedServiceServer(grpcSrv, grpcserver.New(svc))
 	observability.InitGRPCMetrics(grpcSrv)
 	go func() {
 		log.Printf("gRPC server listening on :%s", grpcPort)
@@ -114,7 +105,7 @@ func main() {
 		dlq := broker.NewProducer(brokers)
 		defer dlq.Close()
 
-		consumer.New(svc, brokers, dlq, usersConn, postsConn).Start(ctx)
+		consumer.New(svc, brokers, dlq, usersConn).Start(ctx)
 	}()
 
 	<-ctx.Done()

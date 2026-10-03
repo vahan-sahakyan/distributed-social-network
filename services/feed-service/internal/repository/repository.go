@@ -1,25 +1,21 @@
 package repository
 
 import (
-	"encoding/json"
-	"errors"
+	"context"
 
-	"github.com/bradfitz/gomemcache/memcache"
 	"github.com/vahan-sahakyan/distributed-social-network/feed-service/internal/model"
 	"github.com/vahan-sahakyan/distributed-social-network/pkg/cache"
+	"github.com/valkey-io/valkey-go"
 )
 
-// casAttempts bounds the compare-and-swap retry loop. Feeds are updated by four
-// concurrent consumer goroutines, so a plain get/modify/set loses whichever
-// delta lands second; CAS turns that race into a retry.
-const casAttempts = 5
-
+// Repository keeps feeds in Valkey through the pkg/cache helpers, which
+// cache-rebuilder writes with too.
 type Repository struct {
-	mc *memcache.Client
+	c valkey.Client
 }
 
-func New(mc *memcache.Client) *Repository {
-	return &Repository{mc: mc}
+func New(c valkey.Client) *Repository {
+	return &Repository{c: c}
 }
 
 // HomeFeedKey is the cache key of the posts by userID and everyone they follow.
@@ -32,131 +28,44 @@ func UserPostsKey(userID string) string {
 	return cache.UserPostsKey(userID)
 }
 
-func (r *Repository) GetFeed(key string) ([]model.FeedItem, error) {
-	items, _, err := r.getFeedItem(key)
-	return items, err
-}
-
-// getFeedItem returns the decoded feed and the raw memcache item, which carries
-// the CAS token needed to write it back safely. A cache miss yields a nil item.
-func (r *Repository) getFeedItem(key string) ([]model.FeedItem, *memcache.Item, error) {
-	item, err := r.mc.Get(key)
-	if errors.Is(err, memcache.ErrCacheMiss) {
-		return nil, nil, nil
-	}
+func (r *Repository) GetFeed(ctx context.Context, key string) ([]model.FeedItem, error) {
+	posts, err := cache.ReadFeed(ctx, r.c, key)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-
-	var items []model.FeedItem
-	if err := json.Unmarshal(item.Value, &items); err != nil {
-		return nil, nil, err
-	}
-	return items, item, nil
-}
-
-func (r *Repository) SetFeed(key string, items []model.FeedItem) error {
-	data, err := json.Marshal(items)
-	if err != nil {
-		return err
-	}
-	return r.mc.Set(&memcache.Item{
-		Key:        key,
-		Value:      data,
-		Expiration: 3600, // 1 hour TTL
-	})
-}
-
-func (r *Repository) AppendToFeed(key string, item *model.FeedItem) error {
-	return r.update(key, func(items []model.FeedItem) ([]model.FeedItem, bool) {
-		return prependItem(items, item)
-	})
-}
-
-// prependItem puts item at the head of the feed, capped at 100 entries. It is a
-// no-op when the post is already there: a redelivered post.created re-runs the
-// fanout, and feeds that took the post the first time must not show it twice.
-func prependItem(items []model.FeedItem, item *model.FeedItem) ([]model.FeedItem, bool) {
-	for _, existing := range items {
-		if existing.PostID == item.PostID {
-			return items, false
+	items := make([]model.FeedItem, len(posts))
+	for i, p := range posts {
+		items[i] = model.FeedItem{
+			PostID:        p.ID,
+			AuthorID:      p.AuthorID,
+			Text:          p.Text,
+			LikesCount:    p.LikesCount,
+			CommentsCount: p.CommentsCount,
+			ImageURL:      p.ImageURL,
+			CreatedAt:     p.CreatedAt,
 		}
 	}
-	items = append([]model.FeedItem{*item}, items...)
-	// Keep max 100 items in feed cache
-	if len(items) > 100 {
-		items = items[:100]
-	}
-	return items, true
+	return items, nil
 }
 
-// AdjustCounts applies the like and comment deltas to a post in the feed stored under key.
-func (r *Repository) AdjustCounts(key, postID string, likesDelta, commentsDelta int) error {
-	return r.update(key, func(items []model.FeedItem) ([]model.FeedItem, bool) {
-		return adjustCounts(items, postID, likesDelta, commentsDelta)
-	})
+// AddPost caches item and puts it at the head of each feed.
+func (r *Repository) AddPost(ctx context.Context, item *model.FeedItem, feedKeys ...string) error {
+	return cache.AddPost(ctx, r.c, cache.Post{
+		ID:            item.PostID,
+		AuthorID:      item.AuthorID,
+		Text:          item.Text,
+		ImageURL:      item.ImageURL,
+		CreatedAt:     item.CreatedAt,
+		LikesCount:    item.LikesCount,
+		CommentsCount: item.CommentsCount,
+	}, feedKeys...)
 }
 
-// adjustCounts stores raw sums, never clamped: like and unlike arrive on separate
-// topics in any order, and only an unclamped sum ends at the right count. Readers
-// clamp negatives.
-func adjustCounts(items []model.FeedItem, postID string, likesDelta, commentsDelta int) ([]model.FeedItem, bool) {
-	for i := range items {
-		if items[i].PostID != postID {
-			continue
-		}
-		items[i].LikesCount += likesDelta
-		items[i].CommentsCount += commentsDelta
-		return items, true
-	}
-	// Post is not in this feed - nothing to write.
-	return items, false
+// AdjustCounts applies like and comment deltas to a cached post, once for every feed showing it.
+func (r *Repository) AdjustCounts(ctx context.Context, postID string, likesDelta, commentsDelta int) error {
+	return cache.AdjustCounts(ctx, r.c, postID, likesDelta, commentsDelta)
 }
 
-// update applies mutate to the feed at key and writes it back atomically, using
-// CompareAndSwap so a concurrent writer cannot have its delta overwritten. It
-// retries on contention and gives up after casAttempts.
-func (r *Repository) update(key string, mutate func([]model.FeedItem) ([]model.FeedItem, bool)) error {
-	var lastErr error
-
-	for attempt := 0; attempt < casAttempts; attempt++ {
-		items, raw, err := r.getFeedItem(key)
-		if err != nil {
-			return err
-		}
-
-		updated, changed := mutate(items)
-		if !changed {
-			return nil
-		}
-
-		data, err := json.Marshal(updated)
-		if err != nil {
-			return err
-		}
-
-		if raw == nil {
-			// No entry yet: Add fails if another writer created one meanwhile.
-			err = r.mc.Add(&memcache.Item{Key: key, Value: data, Expiration: 3600})
-			if err == nil {
-				return nil
-			}
-			if !errors.Is(err, memcache.ErrNotStored) {
-				return err
-			}
-		} else {
-			raw.Value = data
-			raw.Expiration = 3600
-			err = r.mc.CompareAndSwap(raw)
-			if err == nil {
-				return nil
-			}
-			if !errors.Is(err, memcache.ErrCASConflict) && !errors.Is(err, memcache.ErrNotStored) {
-				return err
-			}
-		}
-		lastErr = err
-	}
-
-	return lastErr
+func (r *Repository) Flush(ctx context.Context) error {
+	return cache.Flush(ctx, r.c)
 }
