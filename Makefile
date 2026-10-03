@@ -68,8 +68,16 @@ lint:
 	done
 
 
+# compose and make forward publish the same localhost ports; with both up, kubectl's
+# 127.0.0.1 binding wins and localhost quietly reaches the cluster instead of compose
+NO_FORWARD = @if pgrep -f 'kubectl -n (dsn|argocd) port-forward' >/dev/null; then \
+	echo "make forward is running and holds compose's localhost ports; stop it (ctrl-c) first"; exit 1; fi
+NO_COMPOSE = @if [ -n "$$(COMPOSE_PROFILES='*' $(COMPOSE) ps -q)" ]; then \
+	echo "compose is up and holds the ports make forward needs; make stop first"; exit 1; fi
+
 .PHONY: infra-up
 infra-up:
+	$(NO_FORWARD)
 	docker compose -f infrastructure/docker-compose.yml $(PROFILES) up -d
 
 
@@ -83,6 +91,7 @@ infra-down:
 .PHONY: up start
 up: BUILD = --build
 up start:
+	$(NO_FORWARD)
 	$(GROUP_ENV) $(COMPOSE) $(PROFILES) up -d $(BUILD)
 	@on=$$($(COMPOSE) $(PROFILES) config --services); \
 	off=$$(COMPOSE_PROFILES='*' $(COMPOSE) config --services | grep -vxF "$$on"); \
@@ -238,6 +247,7 @@ FORWARDS = \
 # skips what isn't deployed (kibana is optional); ctrl-c stops all; waits out a fresh cluster-up (argo server starting, password not yet generated)
 .PHONY: forward
 forward:
+	$(NO_COMPOSE)
 	@kubectl -n argocd rollout status deploy/argocd-server --timeout=180s >/dev/null
 	@kubectl -n argocd wait --for=create secret/argocd-initial-admin-secret --timeout=60s >/dev/null
 	@echo "Argo CD           https://localhost:9443  admin / $$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d)"
