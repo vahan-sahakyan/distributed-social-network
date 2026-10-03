@@ -25,7 +25,15 @@ spec:
           image: {{ .Values.scylla.image }}
           resources:
             {{- toYaml .Values.scylla.resources | nindent 12 }}
-          args: [--smp, "1", --memory, 512M, --overprovisioned, "1"]
+          env:
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+          # CQL on every interface, so kubectl port-forward (which dials localhost in the
+          # pod) reaches it; clients are still told the pod IP
+          args: [--smp, "1", --memory, 512M, --overprovisioned, "1",
+                 --rpc-address, 0.0.0.0, --broadcast-rpc-address, $(POD_IP)]
           ports:
             - containerPort: 9042
           volumeMounts:
