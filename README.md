@@ -164,6 +164,7 @@ On the k3d cluster (`make cluster-up`) the app is on http://localhost:8081 and t
 | [ADR 0002](docs/adr/0002-transactional-outbox.md) | Why a transactional outbox for events |
 | [ADR 0003](docs/adr/0003-authentication-oidc-keycloak.md) | Why OIDC with Keycloak for authentication |
 | [ADR 0004](docs/adr/0004-post-existence-check.md) | Why likes and comments check the post synchronously |
+| [ADR 0005](docs/adr/0005-gateway-api.md) | Why Gateway API on k3s's Traefik instead of Ingress |
 | [Observability](docs/observability.md) | Metrics, logs, traces, dashboard, alerts, things to try |
 | [DataGrip](docs/datagrip.md) | Connecting a DB client to the local databases |
 

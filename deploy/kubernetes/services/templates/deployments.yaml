@@ -42,9 +42,9 @@ spec:
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ . | quote }}
             {{- end }}
-            {{- if and (eq $name "gateway") $.Values.ingress.host }}
+            {{- if and (eq $name "gateway") $.Values.publicUrl }}
             - name: OIDC_ISSUER
-              value: "{{ if $.Values.ingress.tls }}https{{ else }}http{{ end }}://{{ $.Values.ingress.host }}/auth/realms/dsn"
+              value: "{{ trimSuffix "/" $.Values.publicUrl }}/auth/realms/dsn"
             {{- end }}
           {{- if $svc.secret }}
           envFrom:

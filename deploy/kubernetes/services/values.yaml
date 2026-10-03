@@ -14,16 +14,29 @@ resources:
   limits:
     memory: 128Mi
 
+# public base URL, e.g. https://dsn.example.com; sets the gateway's OIDC_ISSUER
+# (keycloak's frontend URL + /auth/realms/dsn). Empty leaves the issuer unchecked
+publicUrl: ""
+
 # OTLP/HTTP collector for traces, e.g. http://jaeger:4318; empty turns tracing off
 otelEndpoint: ""
 
-ingress:
+# Gateway API: an HTTPRoute for the app, on the chart's own Gateway or on parentRefs
+route:
   enabled: true
-  className: traefik
-  # empty host matches any, handy locally
-  host: ""
+  # hostname the app answers on; keeps <name>.localhost routes of other charts apart
+  host: localhost
+  # https listener with a cert-manager certificate for host, http redirects to it
   tls: false
   clusterIssuer: letsencrypt
+  gateway:
+    create: true
+    className: traefik
+    # traefik binds listeners to its entrypoints by port: web 8000, websecure 8443
+    httpPort: 8000
+    httpsPort: 8443
+  # a shared Gateway to attach to instead, when gateway.create is false
+  parentRefs: []
 
 # plain secrets for local clusters; set false where secrets come from elsewhere
 # (helm merges maps, so emptying devSecrets would not remove them)
@@ -55,7 +68,7 @@ services:
       CACHE_REBUILDER_SERVICE_GRPC_ADDR: cache-rebuilder-service:9089
       MINIO_ENDPOINT: minio:9000
       MINIO_BUCKET: images
-      # the gateway trusts tokens signed with these keys; OIDC_ISSUER is added from ingress.host
+      # the gateway trusts tokens signed with these keys; OIDC_ISSUER is added from publicUrl
       OIDC_JWKS_URL: http://keycloak:8080/auth/realms/dsn/protocol/openid-connect/certs
       SEARCH_SERVICE_GRPC_ADDR: search-service:9091
 

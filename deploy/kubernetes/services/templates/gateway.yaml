@@ -1,0 +1,84 @@
+{{- if .Values.route.enabled }}
+{{- $gw := .Values.route.gateway }}
+{{- if $gw.create }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: dsn
+  {{- if .Values.route.tls }}
+  annotations:
+    cert-manager.io/cluster-issuer: {{ .Values.route.clusterIssuer }}
+  {{- end }}
+spec:
+  gatewayClassName: {{ $gw.className }}
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: {{ $gw.httpPort }}
+      allowedRoutes:
+        namespaces:
+          from: Same
+    {{- if .Values.route.tls }}
+    - name: https
+      protocol: HTTPS
+      port: {{ $gw.httpsPort }}
+      hostname: {{ required "route.host is required with route.tls" .Values.route.host | quote }}
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - name: dsn-tls
+      allowedRoutes:
+        namespaces:
+          from: Same
+    {{- end }}
+---
+{{- end }}
+{{- $parents := .Values.route.parentRefs }}
+{{- if $gw.create }}
+{{- $parents = list (dict "name" "dsn" "sectionName" (ternary "https" "http" .Values.route.tls)) }}
+{{- end }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: dsn
+spec:
+  parentRefs:
+    {{- toYaml $parents | nindent 4 }}
+  {{- with .Values.route.host }}
+  hostnames: [{{ . | quote }}]
+  {{- end }}
+  rules:
+    - matches:
+        {{- range list "/api" "/health" "/images" }}
+        - path: {type: PathPrefix, value: {{ . }}}
+        {{- end }}
+      backendRefs:
+        - name: gateway-service
+          port: {{ .Values.services.gateway.port }}
+    - matches:
+        - path: {type: PathPrefix, value: /auth}
+      backendRefs:
+        - name: keycloak
+          port: 8080
+    - backendRefs:
+        - name: ui-service
+          port: {{ .Values.services.ui.port }}
+{{- if and $gw.create .Values.route.tls }}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: dsn-https-redirect
+spec:
+  parentRefs:
+    - name: dsn
+      sectionName: http
+  hostnames: [{{ .Values.route.host | quote }}]
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+{{- end }}
+{{- end }}

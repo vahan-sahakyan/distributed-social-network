@@ -298,10 +298,10 @@ Three Helm charts, deployed by Argo CD from [distributed-social-network-gitops](
 | Chart | Contents |
 |---|---|
 | `deploy/kubernetes/infra` | Postgres x5 (one for Keycloak), Scylla, Redpanda, ClickHouse, MinIO, Memcached, Elasticsearch, Keycloak |
-| `deploy/kubernetes/services` | the 11 services, UI, ingress |
+| `deploy/kubernetes/services` | the 11 services, UI, the `dsn` Gateway and its HTTPRoute |
 | `deploy/kubernetes/observability` | Prometheus, Grafana, Loki, Alloy, Jaeger, Redpanda Console, optional Kibana; configs from `monitoring/` |
 
-The ingress routes `/api`, `/health` and `/images` to the gateway, `/auth` to Keycloak and everything else to the UI.
+Traffic enters through Gateway API: the services chart creates the `dsn` Gateway (class `traefik`, k3s's bundled Traefik with its Gateway provider turned on by `platform-k3s/traefik.yaml` in the gitops repo) and an HTTPRoute for `route.host` that sends `/api`, `/health` and `/images` to the gateway, `/auth` to Keycloak and everything else to the UI. The observability chart adds one HTTPRoute per UI on `<name>.<domain>`. With `route.tls`, an HTTPS listener gets a cert-manager certificate and HTTP redirects to it. For another controller, set `route.gateway.className` and its listener ports, or `route.gateway.create: false` with `route.parentRefs` to attach to a shared Gateway.
 
 Images: `ghcr.io/vahan-sahakyan/distributed-social-network/<name>:<sha>` (linux/arm64), published on every push by `.github/workflows/publish.yml`. On `main` the workflow also commits the new sha to the gitops repo, which Argo CD syncs.
 
@@ -321,6 +321,8 @@ It runs the commit prod runs, with `envs/local` values on top of prod's: plain d
 
 ```bash
 k3d cluster create dsn -p "8081:80@loadbalancer"
+kubectl apply -f https://raw.githubusercontent.com/vahan-sahakyan/distributed-social-network-gitops/main/platform-k3s/traefik.yaml
+kubectl wait --for=create gatewayclass/traefik --timeout=180s
 helm install infra deploy/kubernetes/infra -n dsn --create-namespace --set keycloak.uiUrl=http://localhost:8081
-helm install services deploy/kubernetes/services -n dsn --set image.tag=main
+helm install services deploy/kubernetes/services -n dsn --set image.tag=main --set publicUrl=http://localhost:8081
 ```
