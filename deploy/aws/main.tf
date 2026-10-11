@@ -2,7 +2,7 @@
 # no NAT, no Elastic IP. Costs and rules in deploy/aws/README.md
 
 terraform {
-  required_version = ">= 1.9"
+  required_version = ">= 1.10"
 
   required_providers {
     aws = {
@@ -17,6 +17,14 @@ terraform {
       source  = "hashicorp/local"
       version = "~> 2.9"
     }
+  }
+
+  # shared by every machine, in the bucket from state/ (README):
+  # terraform init -backend-config="bucket=dsn-tfstate-<account id>"
+  backend "s3" {
+    key          = "node/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
   }
 }
 
