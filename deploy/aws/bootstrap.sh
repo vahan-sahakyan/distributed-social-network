@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # k3s, OpenBao's secrets, Argo CD and the prod root app on the node terraform made; safe to rerun.
 # run after terraform apply: deploy/aws/bootstrap.sh
-#   SECRETS     offline dir for the unseal key and prod values (default ~/.config/dsn-aws), made once
+#   SECRETS     local dir for the unseal key and prod values (default ~/.config/dsn-aws); the
+#               values themselves live in SSM Parameter Store (secrets.sh), made once
 #   GITOPS_REF  gitops branch the bootstrap files come from (default main)
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -11,19 +12,12 @@ ARGOCD_VERSION=${ARGOCD_VERSION:-v3.5.3}
 GITOPS_RAW=https://raw.githubusercontent.com/vahan-sahakyan/distributed-social-network-gitops/${GITOPS_REF:-main}
 SECRETS=${SECRETS:-$HOME/.config/dsn-aws}
 
-IP=$(terraform output -raw public_ip)
 mkdir -p "$SECRETS" && chmod 700 "$SECRETS"
-on_node() {
-  ssh -i dsn.pem -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$SECRETS/known_hosts" \
-    -o ConnectTimeout=10 ec2-user@"$IP" "$@"
-}
 
-echo "==> waiting for ssh on $IP"
-for _ in $(seq 1 60); do on_node true 2>/dev/null && break; sleep 5; done
-on_node 'cloud-init status --wait >/dev/null; tail -1 /var/log/user-data.log'
-
-echo "==> offline secrets in $SECRETS"
-# without the unseal key OpenBao's data can't be unsealed: keep it, never in git
+echo "==> secrets: SSM Parameter Store <-> $SECRETS"
+# the values a node was bootstrapped with win; new ones only where none exist yet
+./secrets.sh pull
+# without the unseal key OpenBao's data can't be unsealed: never in git
 [ -f "$SECRETS/openbao-unseal.key" ] || (umask 077 && openssl rand -out "$SECRETS/openbao-unseal.key" 32)
 if [ ! -f "$SECRETS/prod-secrets.env" ]; then
   # the keys of the public local seed; user names kept, every password random
@@ -34,6 +28,19 @@ if [ ! -f "$SECRETS/prod-secrets.env" ]; then
     done >"$SECRETS/prod-secrets.env"
   )
 fi
+./secrets.sh push
+
+# the state only knows the IP from the last apply; it changes on every stop/start
+IP=$(aws ec2 describe-instances --region us-east-1 --instance-ids "$(terraform output -raw instance_id)" \
+  --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+on_node() {
+  ssh -i dsn.pem -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile="$SECRETS/known_hosts" \
+    -o ConnectTimeout=10 ec2-user@"$IP" "$@"
+}
+
+echo "==> waiting for ssh on $IP"
+for _ in $(seq 1 60); do on_node true 2>/dev/null && break; sleep 5; done
+on_node 'cloud-init status --wait >/dev/null; tail -1 /var/log/user-data.log'
 
 echo "==> k3s $K3S_VERSION"
 on_node K3S_VERSION="$K3S_VERSION" bash -s <<'REMOTE'
@@ -134,5 +141,5 @@ cat <<EOF
 Argo CD is syncing; the app comes up on https://$IP (self-signed certificate) in ~15 minutes.
   kubectl:  ssh -i dsn.pem -fN -L 16443:127.0.0.1:6443 ec2-user@$IP && KUBECONFIG=kubeconfig kubectl get applications -n argocd
   Argo UI:  KUBECONFIG=kubeconfig kubectl -n argocd port-forward svc/argocd-server 9443:443
-Offline, keep safe: $SECRETS/openbao-unseal.key, $SECRETS/prod-secrets.env
+Secrets: SSM /dsn/* (any machine: ./connect.sh), local copies in $SECRETS
 EOF
