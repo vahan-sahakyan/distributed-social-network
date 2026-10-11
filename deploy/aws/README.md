@@ -4,7 +4,7 @@ The prod env (gitops `bootstrap/root.yaml`) on a single `m7i-flex.large` running
 
 | Piece | Choice | Why |
 |---|---|---|
-| Node | `m7i-flex.large`: 2 vCPU, 8 GB, x86 | largest Free plan type; no CPU credits to run out of. The prod profile (search on; obs, tools, events off) idles at ~0.5 core and ~4.7 GiB |
+| Node | `m7i-flex.large`: 2 vCPU, 8 GB, x86 | largest Free plan type; no CPU credits to run out of. The prod profile (search and events on, ClickHouse capped at 1.5Gi; obs and tools off) idles at ~0.3 core and ~5.6 GiB. Events stay on: ClickHouse is the feed's only durable source |
 | Disk | 30 GB gp3, encrypted | OS, images and every PVC (k3s local-path) |
 | Network | own VPC `10.1.0.0/16`, one public subnet | free; nothing shared with other stacks |
 | Address | one auto-assigned public IPv4 | changes on stop/start, but bills nothing while stopped. Login redirects are relative and `dsn-tls` is remade for the new IP at boot, so nothing in git holds the IP |
