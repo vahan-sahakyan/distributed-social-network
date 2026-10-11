@@ -159,6 +159,7 @@ dockerfiles:
 
 # local k3d cluster synced by Argo CD from the gitops repo (bootstrap/root-local.yaml)
 # root-local waits for the repo server, else it stalls on a comparison error until the next 3-min refresh
+# argocd-config.yaml: sync waves wait for healthy apps, stuck syncs time out (gitops README)
 ARGOCD_VERSION ?= v3.5.3
 GITOPS_RAW = https://raw.githubusercontent.com/vahan-sahakyan/distributed-social-network-gitops/main
 # the machine's CA for https on the local cluster; it outlives clusters, so it is trusted once
@@ -176,6 +177,8 @@ cluster-up: local-ca
 	kubectl create namespace argocd
 	kubectl apply -n argocd --server-side -f https://raw.githubusercontent.com/argoproj/argo-cd/$(ARGOCD_VERSION)/manifests/install.yaml
 	kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=60s
+	kubectl apply --server-side --field-manager=dsn-bootstrap -f $(GITOPS_RAW)/bootstrap/argocd-config.yaml
+	kubectl -n argocd rollout restart statefulset/argocd-application-controller
 	kubectl -n argocd rollout status deploy/argocd-repo-server --timeout=180s
 	kubectl apply -f $(GITOPS_RAW)/bootstrap/root-local.yaml
 	@$(MAKE) --no-print-directory cluster-profile
