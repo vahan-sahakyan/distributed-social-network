@@ -54,9 +54,10 @@ export function PostCard({ post }) {
   return (
     <article className="border-b border-border hover:bg-surface/40 transition-colors cursor-default">
       <div className="px-4 pt-4 pb-3 flex gap-3">
+        {/* self-start: a stretched button would center the avatar on the whole post */}
         <button
           onClick={() => navigate('/profile/' + post.authorId)}
-          className="shrink-0"
+          className="shrink-0 self-start"
         >
           <Avatar username={username} size="sm" />
         </button>

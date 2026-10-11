@@ -72,7 +72,8 @@ function AppLayout() {
       <div className="w-full max-w-5xl flex">
 
         {/* Left Sidebar */}
-        <aside className="w-56 shrink-0 border-r border-border flex flex-col sticky top-0 h-screen overflow-y-auto">
+        {/* phones get the top bar and bottom tabs below instead */}
+        <aside className="hidden md:flex w-56 shrink-0 border-r border-border flex-col sticky top-0 h-screen overflow-y-auto">
           <div className="p-4 flex flex-col gap-1 h-full">
             {/* Logo */}
             <div className="flex items-center gap-2.5 px-2 py-3 mb-2">
@@ -137,7 +138,8 @@ function AppLayout() {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 min-w-0 border-r border-border">
+        <main className="flex-1 min-w-0 md:border-r border-border pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">
+          <MobileTopBar health={health} currentUser={currentUser} onLogout={() => { clearUsers(); logout() }} />
           <Routes>
             <Route path="/" element={<Navigate to="/home" replace />} />
             <Route path="/login" element={<AuthPage />} />
@@ -238,8 +240,64 @@ function AppLayout() {
           </div>
         </aside>
       </div>
+      <MobileTabs currentUser={currentUser} unread={unread} />
       <Toasts />
     </div>
+  )
+}
+
+// phones only: the brand, theme and session controls of the left sidebar; scrolls away, so
+// each page's sticky header keeps the top
+function MobileTopBar({ health, currentUser, onLogout }) {
+  return (
+    <header className="md:hidden flex items-center gap-2.5 px-4 py-3 border-b border-border">
+      <div className="w-7 h-7 bg-accent rounded-lg flex items-center justify-center shrink-0">
+        <Zap size={13} className="text-white" />
+      </div>
+      <span className="text-sm font-bold">SocialNet</span>
+      <span className={'w-1.5 h-1.5 rounded-full shrink-0 ' + (health === true ? 'bg-success' : health === false ? 'bg-danger' : 'bg-muted')} />
+      <div className="ml-auto w-28">
+        <ThemeToggle />
+      </div>
+      {currentUser
+        ? (
+          <button onClick={onLogout} aria-label="Log out" title="Log out" className="p-1.5 text-muted hover:text-text transition-colors">
+            <LogOut size={16} />
+          </button>
+        )
+        : (
+          <NavLink to="/login" aria-label="Log in" title="Log in" className="p-1.5 text-muted hover:text-text transition-colors">
+            <LogIn size={16} />
+          </NavLink>
+        )}
+    </header>
+  )
+}
+
+// phones only: the left sidebar's navigation as a bottom tab bar, clear of the home indicator
+function MobileTabs({ currentUser, unread }) {
+  const tabClass = ({ isActive }) =>
+    'relative flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] font-medium transition-colors ' +
+    (isActive ? 'text-text' : 'text-muted hover:text-text')
+
+  return (
+    <nav className="md:hidden fixed bottom-0 inset-x-0 z-30 flex bg-bg/90 backdrop-blur-sm border-t border-border pb-[env(safe-area-inset-bottom)]">
+      <NavLink to="/home" className={tabClass}><Home size={20} />Home</NavLink>
+      <NavLink to="/search" className={tabClass}><Search size={20} />Search</NavLink>
+      <NavLink to="/notifications" className={tabClass}>
+        <Bell size={20} />
+        Alerts
+        {unread > 0 && (
+          <span className="absolute top-1 left-1/2 ml-1.5 bg-accent text-white text-[9px] font-bold px-1 rounded-full min-w-[15px] text-center">
+            {unread}
+          </span>
+        )}
+      </NavLink>
+      {currentUser
+        ? <NavLink to={'/profile/' + currentUser.id} className={tabClass}><User size={20} />Profile</NavLink>
+        : <NavLink to="/login" className={tabClass}><LogIn size={20} />Log in</NavLink>}
+      <NavLink to="/loadtest" className={tabClass}><BarChart2 size={20} />Load</NavLink>
+    </nav>
   )
 }
 
