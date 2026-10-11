@@ -1,0 +1,10 @@
+# terraform state, inputs and saved plans (plans embed the ssh private key)
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfplan
+crash.log
+# written by terraform and bootstrap.sh
+*.pem
+kubeconfig

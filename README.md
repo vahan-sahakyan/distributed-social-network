@@ -133,6 +133,7 @@ On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (htt
 ```
 ├── .github/workflows/       CI (vet, lint, test, gofmt, UI lint/build) and image publish + deploy
 ├── deploy/
+│   ├── aws/                 Terraform + bootstrap for the prod env on one EC2 node
 │   ├── images/minio/        MinIO built from source (upstream images discontinued)
 │   └── kubernetes/          Helm charts (infra, services, observability), deployed via GitOps
 ├── docs/                    Architecture, services, API, infrastructure, development
@@ -196,4 +197,4 @@ On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (htt
 - **Object Storage:** MinIO (S3 compatible)
 - **UI:** React, Vite, Tailwind
 - **Observability:** OpenTelemetry, Jaeger, Prometheus, Loki + Alloy, Grafana
-- **Deployment:** Docker Compose (dev), Helm + Argo CD GitOps (production), amd64 + arm64 images on GHCR
+- **Deployment:** Docker Compose (dev), Helm + Argo CD GitOps (production, one EC2 node via `deploy/aws`), amd64 + arm64 images on GHCR
