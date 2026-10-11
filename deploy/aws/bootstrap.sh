@@ -43,7 +43,8 @@ if ! k3s --version 2>/dev/null | grep -qF "${K3S_VERSION}"; then
   # servicelb stay on: no cloud controller runs here, so servicelb binds Traefik to host 80/443
   curl -sfL https://get.k3s.io | INSTALL_K3S_VERSION="$K3S_VERSION" INSTALL_K3S_SKIP_SELINUX_RPM=true sh -
 fi
-for _ in $(seq 1 60); do sudo k3s kubectl get nodes >/dev/null 2>&1 && break; sleep 5; done
+# the API answers before the node has registered, and wait --all needs one to exist
+for _ in $(seq 1 60); do sudo k3s kubectl get nodes -o name 2>/dev/null | grep -q . && break; sleep 5; done
 sudo k3s kubectl wait node --all --for=condition=Ready --timeout=300s
 REMOTE
 
