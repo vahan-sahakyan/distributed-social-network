@@ -16,9 +16,10 @@ env:
   GITOPS_REPO: vahan-sahakyan/distributed-social-network-gitops
 
 jobs:
+  # each arch builds natively and is pushed by digest; images-merge tags the multi-arch manifest
   images:
-    name: image (${{ matrix.name }})
-    runs-on: ubuntu-24.04-arm
+    name: image (${{ matrix.name }}, ${{ matrix.arch }})
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     permissions:
       contents: read
       packages: write
@@ -37,10 +38,8 @@ jobs:
           - event-writer-service
           - cache-rebuilder-service
           - search-service
-        include:
-          - name: ui
-            context: ui
-            file: ui/Dockerfile
+          - ui
+        arch: [amd64, arm64]
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
@@ -49,20 +48,70 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - id: build
+        uses: docker/build-push-action@v6
         with:
-          context: ${{ matrix.context || '.' }}
-          file: ${{ matrix.file || format('services/{0}/Dockerfile', matrix.name) }}
-          platforms: linux/arm64
-          push: true
-          tags: |
-            ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}:${{ github.sha }}
-            ${{ github.ref == 'refs/heads/main' && format('{0}/{1}:main', env.IMAGE_PREFIX, matrix.name) || '' }}
+          context: ${{ matrix.name == 'ui' && 'ui' || '.' }}
+          file: ${{ matrix.name == 'ui' && 'ui/Dockerfile' || format('services/{0}/Dockerfile', matrix.name) }}
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.IMAGE_PREFIX }}/${{ matrix.name }},push-by-digest=true,name-canonical=true,push=true
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
-          cache-from: type=gha,scope=${{ matrix.name }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          cache-from: type=gha,scope=${{ matrix.name }}-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}-${{ matrix.arch }}
+      - run: mkdir -p /tmp/digests && touch "/tmp/digests/${DIGEST#sha256:}"
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.name }}-${{ matrix.arch }}
+          path: /tmp/digests/*
+          retention-days: 1
+
+  images-merge:
+    name: manifest (${{ matrix.name }})
+    needs: images
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        name:
+          - gateway-service
+          - posts-service
+          - comments-service
+          - likes-service
+          - feed-service
+          - users-service
+          - media-service
+          - notification-service
+          - event-writer-service
+          - cache-rebuilder-service
+          - search-service
+          - ui
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: digest-${{ matrix.name }}-*
+          merge-multiple: true
+          path: /tmp/digests
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - working-directory: /tmp/digests
+        env:
+          IMAGE: ${{ env.IMAGE_PREFIX }}/${{ matrix.name }}
+          MAIN: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          tags=(-t "$IMAGE:$GITHUB_SHA")
+          [ "$MAIN" = true ] && tags+=(-t "$IMAGE:main")
+          docker buildx imagetools create "${tags[@]}" $(printf "$IMAGE@sha256:%s " *)
+          docker buildx imagetools inspect "$IMAGE:$GITHUB_SHA"
 
   # minio is built once per release, for both archs so compose works on any machine
   minio-check:
@@ -124,10 +173,10 @@ jobs:
 
   # points the gitops repo at this commit: images and charts move together
   deploy:
-    needs: [images, minio-merge]
+    needs: [images-merge, minio-merge]
     if: >-
       always() && github.ref == 'refs/heads/main'
-      && needs.images.result == 'success'
+      && needs.images-merge.result == 'success'
       && contains(fromJSON('["success", "skipped"]'), needs.minio-merge.result)
     runs-on: ubuntu-latest
     concurrency:

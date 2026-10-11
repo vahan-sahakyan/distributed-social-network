@@ -311,7 +311,7 @@ Workload security (all charts, `templates/_helpers.tpl`):
 - NetworkPolicies, ingress only: the services chart denies all in the namespace, then each pod admits its clients. A service admits the services whose env addresses it (derived), Prometheus on its HTTP port, and `networkPolicy.ingress` extras (the Gateway's Traefik pods for the gateway and UI); stores and UIs list theirs in `networkPolicy.ingress` of the infra and observability charts. A new client of a store needs an entry there
 - `replicaCount` above 1 adds a PodDisruptionBudget (`maxUnavailable: 1`) per service; requests and limits are set on every container
 
-Images: `ghcr.io/vahan-sahakyan/distributed-social-network/<name>:<sha>` (linux/arm64), published on every push by `.github/workflows/publish.yml`. On `main` the workflow also commits the new sha to the gitops repo, which Argo CD syncs.
+Images: `ghcr.io/vahan-sahakyan/distributed-social-network/<name>:<sha>` (linux/amd64 + linux/arm64, each built on a native runner), published on every push by `.github/workflows/publish.yml`. On `main` the workflow also commits the new sha to the gitops repo, which Argo CD syncs.
 
 Local cluster, synced by Argo CD the same way as prod (`bootstrap/root-local.yaml` in the gitops repo):
 
