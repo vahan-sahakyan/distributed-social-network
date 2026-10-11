@@ -42,7 +42,7 @@ ScyllaDB runs with `--smp 1 --memory 512M --overprovisioned 1`.
 |-----------|-------|-------|---------|
 | keycloak | `quay.io/keycloak/keycloak:26.7.5` | 8180 | OIDC provider, served under `/auth`; admin console admin/admin |
 
-The realm (`deploy/kubernetes/infra/files/dsn-realm.json`, shared with Helm) is imported only into an empty `keycloak-db`; after editing it, recreate the volume (`docker compose -f infrastructure/docker-compose.yml rm -sf keycloak keycloak-db && docker volume rm infrastructure_keycloak-data`) or change the realm in the admin console. Tokens carry the issuer `http://localhost:8180/auth/realms/dsn` however Keycloak is reached (`KC_HOSTNAME`). In Helm, set `keycloak.uiUrl` (infra chart) to the UI's public origin, and `publicUrl` (services chart) so the gateway checks the issuer.
+The realm (`deploy/kubernetes/infra/files/dsn-realm.json`, shared with Helm) is imported only into an empty `keycloak-db`; after editing it, recreate the volume (`docker compose -f infrastructure/docker-compose.yml rm -sf keycloak keycloak-db && docker volume rm infrastructure_keycloak-data`) or change the realm in the admin console. Tokens carry the issuer `http://localhost:8180/auth/realms/dsn` however Keycloak is reached (`KC_HOSTNAME`). In Helm, set `keycloak.uiUrl` (infra chart) to the UI's public origin, and `publicUrl` (services chart) so the gateway checks the issuer. On a bare IP that changes on restart, `keycloak.uiUrl: /` makes the redirect URIs relative (valid on any origin), `publicUrl` stays empty, and `route.certificate: false` serves a `dsn-tls` secret made outside cert-manager.
 
 ### Event & Analytics
 

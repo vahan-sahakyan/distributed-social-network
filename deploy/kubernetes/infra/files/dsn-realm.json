@@ -20,7 +20,7 @@
         "${DSN_UI_URL:http://localhost:5173}/*"
       ],
       "webOrigins": [
-        "${DSN_UI_URL:http://localhost:5173}"
+        "+"
       ],
       "attributes": {
         "pkce.code.challenge.method": "S256",

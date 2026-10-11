@@ -88,7 +88,8 @@ keycloak:
   image: quay.io/keycloak/keycloak:26.7.5
   # builds into /opt/keycloak on start
   security: {user: 1000}
-  # public origin of the UI, for login redirects, e.g. https://dsn.example.com
+  # public origin of the UI, for login redirects, e.g. https://dsn.example.com; "/" for
+  # any origin the app is served on (a bare IP that changes on restart)
   uiUrl: ""
   # public URL of Keycloak, e.g. https://dsn.example.com/auth; empty takes it from
   # each request's forwarded host

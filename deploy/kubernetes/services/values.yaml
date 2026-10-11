@@ -53,6 +53,9 @@ route:
   # https listeners with a cert-manager certificate for host, http redirects to it
   tls: false
   clusterIssuer: letsencrypt
+  # false: no cert-manager Certificate, the https listener serves an existing dsn-tls
+  # secret (e.g. self-signed for a bare IP), and host may stay empty
+  certificate: true
   # more names on the certificate, so other charts' routes get https too. No wildcards
   # under single-label names: TLS clients reject *.localhost
   extraHosts: []

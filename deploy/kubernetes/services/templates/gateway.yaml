@@ -1,7 +1,7 @@
 {{- if .Values.route.enabled }}
 {{- $gw := .Values.route.gateway }}
 {{- $tls := .Values.route.tls }}
-{{- if $tls }}
+{{- if and $tls .Values.route.certificate }}
 {{- $_ := required "route.host is required with route.tls" .Values.route.host }}
 {{- end }}
 {{- if $gw.create }}
@@ -31,7 +31,7 @@ spec:
         namespaces:
           from: Same
     {{- end }}
-{{- if $tls }}
+{{- if and $tls .Values.route.certificate }}
 ---
 # one certificate for host and extraHosts
 apiVersion: cert-manager.io/v1
@@ -88,7 +88,9 @@ spec:
   parentRefs:
     - name: dsn
       sectionName: http
-  hostnames: [{{ .Values.route.host | quote }}]
+  {{- with .Values.route.host }}
+  hostnames: [{{ . | quote }}]
+  {{- end }}
   rules:
     - filters:
         - type: RequestRedirect

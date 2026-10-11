@@ -85,9 +85,10 @@ spec:
                   name: keycloak-admin
                   key: KEYCLOAK_ADMIN_PASSWORD
             {{- with .Values.keycloak.uiUrl }}
-            # realm file placeholder; unset, logins only redirect back to the local dev UI
+            # realm file placeholder; unset, logins only redirect back to the local dev UI.
+            # "/" leaves it empty: relative redirect URIs, valid on whatever origin serves the app
             - name: DSN_UI_URL
-              value: {{ . | quote }}
+              value: {{ trimSuffix "/" . | quote }}
             {{- end }}
           ports:
             - name: http
