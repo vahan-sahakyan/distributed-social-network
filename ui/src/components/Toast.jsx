@@ -6,7 +6,7 @@ export function Toasts() {
   if (!toasts.length) return null
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 items-end">
+    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] md:bottom-6 inset-x-4 md:inset-x-auto md:right-6 z-50 flex flex-col gap-2 items-end">
       {toasts.map(t => (
         <div
           key={t.id}
