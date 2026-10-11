@@ -190,7 +190,12 @@ jobs:
       - name: bump prod to ${{ github.sha }}
         env:
           SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          # runs for consecutive merges can finish out of order; an older one must not
+          # re-pin prod behind a newer commit, whose own run deploys it
+          head=$(gh api "repos/${{ github.repository }}/commits/main" --jq .sha)
+          [ "$head" = "$SHA" ] || { echo "main is at ${head:0:7} now, skipping ${SHA:0:7}"; exit 0; }
           yq -i '.image.tag = strenv(SHA)' envs/prod/services-values.yaml
           for app in apps/infra.yaml apps/services.yaml; do
             yq -i '(.spec.sources[] | select(.repoURL == "https://github.com/${{ github.repository }}.git")).targetRevision = strenv(SHA)' "$app"
