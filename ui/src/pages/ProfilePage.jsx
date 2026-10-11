@@ -50,14 +50,16 @@ export function ProfilePage() {
         await api.unfollowUser(profileUserId)
         setFollowers(f => f.filter(id => id !== currentUser.id))
         toast(`Unfollowed @${user?.username}`)
-        // rebuild only this user's feed then clear local state so home reloads
-        api.rebuildUserFeed(currentUser.id).catch(() => {})
-        setFeed([])
       } else {
         await api.followUser(profileUserId)
         setFollowers(f => [...f, currentUser.id])
         toast(`Now following @${user?.username}!`)
       }
+      // only new posts fan out on their own: rebuild this user's feed from who they follow now
+      // (drops an unfollowed user's posts, adds a followed user's earlier ones), then clear local
+      // state so home reloads. Awaited, so home doesn't read the feed mid-rebuild
+      await api.rebuildUserFeed(currentUser.id).catch(() => {})
+      setFeed([])
     } catch (err) {
       toast(err.message, 'error')
     } finally {
