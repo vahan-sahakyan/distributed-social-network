@@ -6,8 +6,8 @@ import { useStore } from '../store'
 import { timeAgo, shortId, parseTimestamp } from '../utils'
 
 const TYPE_ICON = {
-  like: <Heart size={13} className="text-red-400" fill="currentColor" />,
-  comment: <MessageCircle size={13} className="text-blue-400" />,
+  like: <Heart size={13} className="text-danger" fill="currentColor" />,
+  comment: <MessageCircle size={13} className="text-info" />,
 }
 
 const TYPE_LABEL = {

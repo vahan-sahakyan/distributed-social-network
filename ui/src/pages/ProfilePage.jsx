@@ -104,7 +104,7 @@ export function ProfilePage() {
               disabled={followLoading}
               className={`flex items-center gap-2 text-sm font-semibold px-5 py-2 rounded-full transition-colors shrink-0
                 ${isFollowing
-                  ? 'border border-border text-muted hover:border-red-800 hover:text-red-400'
+                  ? 'border border-border text-muted hover:border-danger/60 hover:text-danger'
                   : 'bg-text text-bg hover:bg-text/90'
                 }`}
             >

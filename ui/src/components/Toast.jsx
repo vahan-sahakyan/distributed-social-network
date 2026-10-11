@@ -12,14 +12,14 @@ export function Toasts() {
           key={t.id}
           className={`flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium shadow-2xl max-w-xs
             ${t.type === 'error'
-              ? 'bg-red-950/90 border-red-800/60 text-red-200'
+              ? 'bg-surface border-danger/40 text-text'
               : 'bg-surface border-border text-text'
             }`}
           style={{ backdropFilter: 'blur(8px)' }}
         >
           {t.type === 'error'
-            ? <AlertCircle size={14} className="text-red-400 shrink-0" />
-            : <CheckCircle size={14} className="text-green-400 shrink-0" />
+            ? <AlertCircle size={14} className="text-danger shrink-0" />
+            : <CheckCircle size={14} className="text-success shrink-0" />
           }
           <span className="flex-1">{t.message}</span>
           <button

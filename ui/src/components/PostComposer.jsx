@@ -90,7 +90,7 @@ export function PostComposer({ onPost }) {
           <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleImage} />
 
           <div className="flex items-center gap-3">
-            <span className={`text-xs tabular-nums ${overLimit ? 'text-red-400' : 'text-muted/60'}`}>
+            <span className={`text-xs tabular-nums ${overLimit ? 'text-danger' : 'text-muted/60'}`}>
               {text.length}/280
             </span>
             <button

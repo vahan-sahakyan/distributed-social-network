@@ -82,7 +82,7 @@ export function PostCard({ post }) {
             <button
               onClick={handleLike}
               className={`flex items-center gap-1.5 text-xs transition-colors group ${
-                liked ? 'text-red-400' : 'text-muted hover:text-red-400'
+                liked ? 'text-danger' : 'text-muted hover:text-danger'
               }`}
             >
               <Heart

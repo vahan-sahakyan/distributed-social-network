@@ -14,15 +14,15 @@ const PRESETS = [
 
 function latencyColor(ms) {
   if (ms <= 0)   return 'text-muted'
-  if (ms < MID_SLA)   return 'text-green-400'
-  if (ms < HIGH_SLA)  return 'text-yellow-400'
-  return 'text-red-400'
+  if (ms < MID_SLA)   return 'text-success'
+  if (ms < HIGH_SLA)  return 'text-warning'
+  return 'text-danger'
 }
 
 function barColor(ms) {
-  if (ms < MID_SLA)  return 'bg-green-400/70'
-  if (ms < HIGH_SLA) return 'bg-yellow-400/70'
-  return 'bg-red-400/70'
+  if (ms < MID_SLA)  return 'bg-success/70'
+  if (ms < HIGH_SLA) return 'bg-warning/70'
+  return 'bg-danger/70'
 }
 
 function Bar({ value, max }) {
@@ -57,7 +57,7 @@ function ResultRow({ row, maxP99 }) {
         <div className="flex items-center gap-3 shrink-0">
           <span className="text-[10px] text-muted tabular-nums">{row.ok}/{row.count} ok</span>
           {errPct > 0 && (
-            <span className="text-[10px] text-red-400 font-semibold">{errPct}% err</span>
+            <span className="text-[10px] text-danger font-semibold">{errPct}% err</span>
           )}
         </div>
       </div>
@@ -177,9 +177,9 @@ export function LoadTestPage() {
             <p className="text-[10px] font-semibold text-muted uppercase tracking-widest">Results</p>
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 text-[10px] text-muted">
-                <span className="w-2 h-2 rounded-full bg-green-400/70 inline-block" />&lt;{MID_SLA}ms
-                <span className="w-2 h-2 rounded-full bg-yellow-400/70 inline-block ml-2" />&lt;{HIGH_SLA}ms
-                <span className="w-2 h-2 rounded-full bg-red-400/70 inline-block ml-2" />slow
+                <span className="w-2 h-2 rounded-full bg-success/70 inline-block" />&lt;{MID_SLA}ms
+                <span className="w-2 h-2 rounded-full bg-warning/70 inline-block ml-2" />&lt;{HIGH_SLA}ms
+                <span className="w-2 h-2 rounded-full bg-danger/70 inline-block ml-2" />slow
               </div>
               {elapsed && <span className="text-[10px] text-muted">{elapsed}s total</span>}
             </div>
