@@ -126,7 +126,7 @@ export function SearchPage() {
       {!query.trim() && (
         <p className="py-16 text-center text-sm text-muted">Search posts by words or #hashtag, or find people.</p>
       )}
-      {error && <p className="py-10 text-center text-sm text-red-400">{error}</p>}
+      {error && <p className="py-10 text-center text-sm text-danger">{error}</p>}
       {query.trim() && !error && result && (
         <>
           <p className="px-4 py-2 text-xs text-muted border-b border-border">

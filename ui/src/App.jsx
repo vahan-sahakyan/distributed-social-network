@@ -3,6 +3,7 @@ import { NavLink, Routes, Route, Navigate, useNavigate, useLocation } from 'reac
 import { Zap, Home, Bell, User, RefreshCw, LogIn, LogOut, Trash2, BarChart2, Search } from 'lucide-react'
 import { Avatar } from './components/Avatar'
 import { Toasts } from './components/Toast'
+import { ThemeToggle } from './components/ThemeToggle'
 import { HomePage } from './pages/HomePage'
 import { ProfilePage } from './pages/ProfilePage'
 import { NotificationsPage } from './pages/NotificationsPage'
@@ -79,7 +80,7 @@ function AppLayout() {
                 <Zap size={13} className="text-white" />
               </div>
               <span className="text-sm font-bold">SocialNet</span>
-              <span className={'w-1.5 h-1.5 rounded-full ml-auto shrink-0 ' + (health === true ? 'bg-green-400' : health === false ? 'bg-red-400' : 'bg-neutral-600')} />
+              <span className={'w-1.5 h-1.5 rounded-full ml-auto shrink-0 ' + (health === true ? 'bg-success' : health === false ? 'bg-danger' : 'bg-muted')} />
             </div>
 
             {/* Nav */}
@@ -114,6 +115,8 @@ function AppLayout() {
             </nav>
 
             <div className="flex-1" />
+
+            <ThemeToggle />
 
             {currentUser && (
               <div className="pt-3 border-t border-border mt-2 space-y-1">
@@ -200,7 +203,7 @@ function AppLayout() {
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-muted">Gateway</span>
-                <span className={'text-xs font-medium ' + (health === true ? 'text-green-400' : health === false ? 'text-red-400' : 'text-neutral-500')}>
+                <span className={'text-xs font-medium ' + (health === true ? 'text-success' : health === false ? 'text-danger' : 'text-muted')}>
                   {health === true ? '● Online' : health === false ? '● Offline' : '○ Checking…'}
                 </span>
               </div>
@@ -226,7 +229,7 @@ function AppLayout() {
                   navigate('/login')
                   toast('All data wiped.')
                 }}
-                className="w-full flex items-center justify-center gap-2 text-xs text-red-400/60 hover:text-red-400 border border-transparent hover:border-red-900/40 rounded-lg px-3 py-2 transition-colors"
+                className="w-full flex items-center justify-center gap-2 text-xs text-danger/60 hover:text-danger border border-transparent hover:border-danger/30 rounded-lg px-3 py-2 transition-colors"
               >
                 <Trash2 size={11} />
                 Reset everything

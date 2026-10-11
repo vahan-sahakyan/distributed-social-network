@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+/* dark, the default; light overrides the same tokens below. index.html and src/theme.js
+   set html[data-theme] from the user's choice (system, light or dark) */
 @theme {
   --color-bg: #0a0a0a;
   --color-surface: #111111;
@@ -10,10 +12,38 @@
   --color-text: #ededed;
   --color-accent: #0070f3;
   --color-accent-hover: #0060df;
+  /* status colors: lighter on dark, darker on light, to keep contrast */
+  --color-danger: #f87171;
+  --color-success: #4ade80;
+  --color-warning: #facc15;
+  --color-info: #60a5fa;
+  --color-scrollbar: #2a2a2a;
+  --color-scrollbar-hover: #3a3a3a;
   --font-sans: 'Inter', system-ui, sans-serif;
 }
 
 @layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --color-bg: #ffffff;
+    --color-surface: #fafafa;
+    --color-surface-hover: #f2f2f2;
+    --color-border: #eaeaea;
+    --color-border-hover: #d4d4d4;
+    --color-muted: #6b6b6b;
+    --color-text: #171717;
+    --color-danger: #dc2626;
+    --color-success: #16a34a;
+    --color-warning: #ca8a04;
+    --color-info: #2563eb;
+    --color-scrollbar: #d4d4d4;
+    --color-scrollbar-hover: #a3a3a3;
+  }
+
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   html, body, #root {
@@ -26,6 +56,6 @@
 
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 99px; }
-  ::-webkit-scrollbar-thumb:hover { background: #3a3a3a; }
+  ::-webkit-scrollbar-thumb { background: var(--color-scrollbar); border-radius: 99px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--color-scrollbar-hover); }
 }
