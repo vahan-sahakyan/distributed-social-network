@@ -58,13 +58,25 @@ token=$(curl -sf -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-me
 ip=$(curl -sf -H "X-aws-ec2-metadata-token: $token" http://169.254.169.254/latest/meta-data/public-ipv4)
 # Argo CD creates the namespace on its first sync
 until kubectl get namespace dsn >/dev/null 2>&1; do sleep 10; done
+# browsers send no SNI to an IP, so this must be Traefik's default certificate too
+kubectl apply --server-side --field-manager=dsn-tls -f - <<'YAML'
+apiVersion: traefik.io/v1alpha1
+kind: TLSStore
+metadata:
+  name: default
+  namespace: dsn
+spec:
+  defaultCertificate:
+    secretName: dsn-tls
+YAML
 [ "$(kubectl -n dsn get secret dsn-tls -o jsonpath='{.metadata.annotations.dsn/public-ip}' 2>/dev/null)" = "$ip" ] && exit 0
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 openssl req -x509 -nodes -newkey rsa:2048 -days 825 -keyout "$tmp/tls.key" -out "$tmp/tls.crt" \
   -subj "/CN=$ip" -addext "subjectAltName=IP:$ip"
 kubectl -n dsn create secret tls dsn-tls --cert="$tmp/tls.crt" --key="$tmp/tls.key" --dry-run=client -o yaml \
-  | kubectl annotate --local -f - dsn/public-ip="$ip" -o yaml | kubectl apply -f -
+  | kubectl annotate --local -f - dsn/public-ip="$ip" -o yaml \
+  | kubectl apply --server-side --field-manager=dsn-tls --force-conflicts -f -
 echo "dsn-tls for $ip"
 SCRIPT
 on_node 'sudo tee /etc/systemd/system/dsn-tls.service >/dev/null' <<'UNIT'
