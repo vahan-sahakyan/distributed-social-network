@@ -96,6 +96,18 @@ func (r *Repository) IndexPosts(ctx context.Context, posts []model.Post) error {
 }
 
 // IndexUsers upserts users by id.
+// DeletePosts removes posts from the index; an id it doesn't hold (a redelivery) is no error.
+func (r *Repository) DeletePosts(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	body, err := deleteBody(postsAlias, ids)
+	if err != nil {
+		return err
+	}
+	return r.send(ctx, postsAlias, body)
+}
+
 func (r *Repository) IndexUsers(ctx context.Context, users []model.User) error {
 	docs := make([]doc, len(users))
 	for i, u := range users {
@@ -224,6 +236,18 @@ func bulkBody(index string, docs []doc) (*bytes.Buffer, error) {
 	return &buf, nil
 }
 
+// deleteBody is the NDJSON _bulk payload of delete actions, which carry no document.
+func deleteBody(index string, ids []string) (*bytes.Buffer, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	for _, id := range ids {
+		if err := enc.Encode(map[string]map[string]string{"delete": {"_index": index, "_id": id}}); err != nil {
+			return nil, err
+		}
+	}
+	return &buf, nil
+}
+
 type bulkResponse struct {
 	Errors bool `json:"errors"`
 	Items  []map[string]struct {
@@ -264,6 +288,11 @@ func (r *Repository) bulk(ctx context.Context, index string, docs []doc) error {
 	if err != nil {
 		return err
 	}
+	return r.send(ctx, index, body)
+}
+
+// send runs a _bulk request and reports the items it rejected.
+func (r *Repository) send(ctx context.Context, index string, body *bytes.Buffer) error {
 	res, err := r.es.Bulk(body, r.es.Bulk.WithContext(ctx))
 	if err != nil {
 		return err

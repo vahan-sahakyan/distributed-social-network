@@ -18,6 +18,7 @@ func TestBuildEvent(t *testing.T) {
 		wantComments int32
 	}{
 		{events.PostCreated, `{"id":"p1","author_id":"u1"}`, "p1", "u1", 0, 0},
+		{events.PostDeleted, `{"id":"p1","author_id":"u1"}`, "p1", "u1", 0, 0},
 		{events.LikeCreated, `{"entity_id":"p1","user_id":"u2"}`, "p1", "u2", 1, 0},
 		{events.LikeDeleted, `{"entity_id":"p1","user_id":"u2"}`, "p1", "u2", -1, 0},
 		{events.CommentCreated, `{"entity_id":"p1","user_id":"u3"}`, "p1", "u3", 0, 1},

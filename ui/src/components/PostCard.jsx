@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Heart, MessageCircle } from 'lucide-react'
+import { Heart, MessageCircle, Trash2 } from 'lucide-react'
 import { Avatar } from './Avatar'
 import { CommentSection } from './CommentSection'
 import { api } from '../api'
@@ -8,12 +8,14 @@ import { useStore } from '../store'
 import { timeAgo, shortId } from '../utils'
 import { RichText } from './RichText'
 
-export function PostCard({ post }) {
+export function PostCard({ post, onDeleted }) {
   const navigate = useNavigate()
   const { currentUser, usersById, ensureUser, toast } = useStore()
   const [liked, setLiked] = useState(false)
   const [likes, setLikes] = useState(post.likesCount)
   const [showComments, setShowComments] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const isOwn = currentUser?.id === post.authorId
 
   const author = usersById[post.authorId]
   useEffect(() => { ensureUser(post.authorId) }, [post.authorId, ensureUser])
@@ -25,6 +27,19 @@ export function PostCard({ post }) {
       .then(v => setLiked(v))
       .catch(() => {})
   }, [currentUser?.id, post.id])
+
+  async function handleDelete() {
+    if (!window.confirm('Delete this post? This cannot be undone.')) return
+    setDeleting(true)
+    try {
+      await api.deletePost(post.id)
+      toast('Post deleted')
+      onDeleted?.(post.id)
+    } catch (err) {
+      toast(err.message, 'error')
+      setDeleting(false)
+    }
+  }
 
   async function handleLike() {
     if (!currentUser) return toast('Select a user first', 'error')
@@ -71,6 +86,17 @@ export function PostCard({ post }) {
               @{username}
             </button>
             <span className="text-xs text-muted">{timeAgo(post.createdAt)}</span>
+            {isOwn && (
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                aria-label="Delete post"
+                title="Delete post"
+                className="ml-auto self-center p-1 -m-1 text-muted hover:text-danger transition-colors disabled:opacity-40"
+              >
+                <Trash2 size={13} />
+              </button>
+            )}
           </div>
 
           <p className="text-sm leading-relaxed text-text/90 whitespace-pre-wrap break-words">

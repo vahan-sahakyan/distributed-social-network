@@ -30,6 +30,11 @@ func (s *Service) CreateNotification(ctx context.Context, notificationID, userID
 	return s.repo.Create(ctx, n)
 }
 
+// DeleteForEntity removes the notifications about entityID.
+func (s *Service) DeleteForEntity(ctx context.Context, entityID string) error {
+	return s.repo.DeleteByEntity(ctx, entityID)
+}
+
 func (s *Service) GetByUserID(ctx context.Context, userID string) ([]model.Notification, error) {
 	return s.repo.GetByUserID(ctx, userID)
 }

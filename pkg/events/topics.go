@@ -5,6 +5,7 @@ package events
 
 const (
 	PostCreated    = "post.created"
+	PostDeleted    = "post.deleted"
 	LikeCreated    = "like.created"
 	LikeDeleted    = "like.deleted"
 	CommentCreated = "comment.created"
@@ -12,7 +13,7 @@ const (
 )
 
 // All is every post activity topic, for services that consume the full feed stream.
-var All = []string{PostCreated, LikeCreated, LikeDeleted, CommentCreated}
+var All = []string{PostCreated, PostDeleted, LikeCreated, LikeDeleted, CommentCreated}
 
 // DLQ is the dead-letter topic for messages a consumer could not process.
 func DLQ(topic string) string {

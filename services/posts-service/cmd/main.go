@@ -107,7 +107,7 @@ func main() {
 	// Topics are created after /health is serving so a cold broker does not fail
 	// the liveness probe. Publishes fail while Kafka is unreachable either way.
 	go func() {
-		if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), events.PostCreated); err != nil {
+		if err := broker.EnsureTopics(ctx, os.Getenv("KAFKA_BROKERS"), events.PostCreated, events.PostDeleted); err != nil {
 			log.Fatalf("failed to ensure kafka topics: %v", err)
 		}
 	}()

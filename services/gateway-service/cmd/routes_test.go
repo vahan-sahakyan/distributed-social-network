@@ -8,6 +8,8 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	commentspb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/comments"
 	feedpb "github.com/vahan-sahakyan/distributed-social-network/pkg/grpc/feed"
@@ -45,6 +47,21 @@ func (fakeUsers) Reset(context.Context, *userspb.ResetRequest, ...grpc.CallOptio
 
 func (fakePosts) Reset(context.Context, *postspb.ResetRequest, ...grpc.CallOption) (*postspb.ResetResponse, error) {
 	return &postspb.ResetResponse{}, nil
+}
+
+// alice is the author of every post
+func (fakePosts) DeletePost(_ context.Context, req *postspb.DeletePostRequest, _ ...grpc.CallOption) (*postspb.DeletePostResponse, error) {
+	if req.RequesterId != "alice" {
+		return nil, status.Error(codes.PermissionDenied, "only the author can delete a post")
+	}
+	return &postspb.DeletePostResponse{}, nil
+}
+
+func (fakePosts) DeleteUserPosts(_ context.Context, req *postspb.DeleteUserPostsRequest, _ ...grpc.CallOption) (*postspb.DeleteUserPostsResponse, error) {
+	if req.AuthorId != "alice" {
+		return &postspb.DeleteUserPostsResponse{}, nil
+	}
+	return &postspb.DeleteUserPostsResponse{Deleted: 3}, nil
 }
 
 func (fakeComments) Reset(context.Context, *commentspb.ResetRequest, ...grpc.CallOption) (*commentspb.ResetResponse, error) {
@@ -122,5 +139,55 @@ func TestOptionalDial(t *testing.T) {
 	t.Setenv("SEARCH_SERVICE_GRPC_ADDR", "search-service:9091")
 	if conn := optionalDial("SEARCH_SERVICE_GRPC_ADDR", "localhost:9091"); conn == nil {
 		t.Error("set: want a connection")
+	}
+}
+
+// the caller comes from the X-User header in place of a token
+func appAs(t *testing.T) *fiber.App {
+	t.Helper()
+	app := fiber.New()
+	registerRoutes(app, &clients{posts: fakePosts{}}, func(c *fiber.Ctx) error {
+		c.Locals(identityKey, identity{ID: c.Get("X-User")})
+		return c.Next()
+	})
+	return app
+}
+
+func TestDeletePost(t *testing.T) {
+	app := appAs(t)
+	cases := []struct {
+		user string
+		want int
+	}{
+		{"alice", fiber.StatusNoContent},
+		{"bob", fiber.StatusForbidden},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest("DELETE", "/api/v1/posts/p1", nil)
+		req.Header.Set("X-User", tc.user)
+		resp, err := app.Test(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if resp.StatusCode != tc.want {
+			t.Errorf("%s: got %d, want %d", tc.user, resp.StatusCode, tc.want)
+		}
+	}
+}
+
+func TestDeleteAllOwnPosts(t *testing.T) {
+	app := appAs(t)
+	req := httptest.NewRequest("DELETE", "/api/v1/posts/", nil)
+	req.Header.Set("X-User", "alice")
+	resp, err := app.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var body map[string]int
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	if resp.StatusCode != fiber.StatusOK || body["deleted"] != 3 {
+		t.Errorf("got %d %v, want 200 deleted=3 (the caller's posts)", resp.StatusCode, body)
 	}
 }

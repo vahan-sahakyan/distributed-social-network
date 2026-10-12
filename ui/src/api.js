@@ -41,6 +41,9 @@ export const api = {
   createPost: (text, imageId) =>
     req('POST', '/posts/', { text, ...(imageId ? { image_id: imageId } : {}) }),
   getPost: (id) => req('GET', `/posts/${id}`),
+  // own posts only; the rest of the system drops them through post.deleted
+  deletePost: (id) => req('DELETE', `/posts/${id}`),
+  deleteMyPosts: () => req('DELETE', '/posts/'),
 
   // Feed
   getHomeFeed: () => req('GET', '/feed/home'),
