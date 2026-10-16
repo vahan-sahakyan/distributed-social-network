@@ -26,6 +26,17 @@ func TestBulkBody(t *testing.T) {
 	}
 }
 
+func TestDeleteBody(t *testing.T) {
+	buf, err := deleteBody("posts", []string{"a", "b"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"delete":{"_id":"a","_index":"posts"}}` + "\n" + `{"delete":{"_id":"b","_index":"posts"}}` + "\n"
+	if buf.String() != want {
+		t.Errorf("got %q, want one action line per id and no documents", buf.String())
+	}
+}
+
 func TestBulkFailures(t *testing.T) {
 	var ok, partial bulkResponse
 	_ = json.Unmarshal([]byte(`{"errors":false,"items":[{"index":{"_id":"a","status":201}}]}`), &ok)

@@ -34,6 +34,22 @@ message GetPostResponse {
   Post post = 1;
 }
 
+// only the author may delete a post
+message DeletePostRequest {
+  string id = 1;
+  string requester_id = 2;
+}
+
+message DeletePostResponse {}
+
+message DeleteUserPostsRequest {
+  string author_id = 1;
+}
+
+message DeleteUserPostsResponse {
+  int32 deleted = 1;
+}
+
 message ResetRequest {}
 
 message ResetResponse {
@@ -43,5 +59,7 @@ message ResetResponse {
 service PostsService {
   rpc CreatePost(CreatePostRequest) returns (CreatePostResponse);
   rpc GetPost(GetPostRequest) returns (GetPostResponse);
+  rpc DeletePost(DeletePostRequest) returns (DeletePostResponse);
+  rpc DeleteUserPosts(DeleteUserPostsRequest) returns (DeleteUserPostsResponse);
   rpc Reset(ResetRequest) returns (ResetResponse);
 }

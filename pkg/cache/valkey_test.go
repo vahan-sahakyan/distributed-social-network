@@ -148,3 +148,36 @@ func TestReplaceFeedSetsContentAndCounts(t *testing.T) {
 		t.Fatalf("got %d posts, want an empty feed", len(got))
 	}
 }
+
+func TestRemovePostDropsItFromEveryFeed(t *testing.T) {
+	ctx, c := context.Background(), testClient(t)
+	home, own, now := HomeFeedKey(unique(t, "follower")), UserPostsKey(unique(t, "author")), time.Now()
+	kept, gone := post(t, "kept", now), post(t, "gone", now.Add(time.Second))
+	for _, p := range []Post{kept, gone} {
+		if err := AddPost(ctx, c, p, home, own); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := RemovePost(ctx, c, gone.ID, home, own); err != nil {
+		t.Fatal(err)
+	}
+	// a like arriving after the delete must not bring the hash back
+	if err := AdjustCounts(ctx, c, gone.ID, 1, 0); err != nil {
+		t.Fatal(err)
+	}
+	for _, feed := range []string{home, own} {
+		got, err := ReadFeed(ctx, c, feed)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(got) != 1 || got[0].ID != kept.ID {
+			t.Fatalf("%s: got %+v, want only the kept post", feed, got)
+		}
+		if n, _ := c.Do(ctx, c.B().Zcard().Key(feed).Build()).AsInt64(); n != 1 {
+			t.Fatalf("%s holds %d ids, want 1", feed, n)
+		}
+	}
+	if n, _ := c.Do(ctx, c.B().Exists().Key(PostKey(gone.ID)).Build()).AsInt64(); n != 0 {
+		t.Fatal("the deleted post's hash is still cached")
+	}
+}

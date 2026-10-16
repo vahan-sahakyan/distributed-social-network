@@ -53,6 +53,8 @@ func grpcErrStatus(c *fiber.Ctx, err error) error {
 			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{"error": st.Message()})
 		case codes.InvalidArgument:
 			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{"error": st.Message()})
+		case codes.PermissionDenied:
+			return c.Status(fiber.StatusForbidden).JSON(fiber.Map{"error": st.Message()})
 		case codes.AlreadyExists:
 			return c.Status(fiber.StatusConflict).JSON(fiber.Map{"error": st.Message()})
 		case codes.Unavailable:
@@ -280,6 +282,22 @@ func registerRoutes(app *fiber.App, cl *clients, auth fiber.Handler) {
 			return grpcErrStatus(c, err)
 		}
 		return c.JSON(resp.Post)
+	})
+	// the caller's own post only; post.deleted then takes it out of feeds, search and the event store
+	app.Delete("/api/v1/posts/:id", auth, func(c *fiber.Ctx) error {
+		req := postspb.DeletePostRequest{Id: c.Params("id"), RequesterId: caller(c).ID}
+		if _, err := cl.posts.DeletePost(c.UserContext(), &req); err != nil {
+			return grpcErrStatus(c, err)
+		}
+		return c.SendStatus(fiber.StatusNoContent)
+	})
+	// every post of the caller's
+	app.Delete("/api/v1/posts/", auth, func(c *fiber.Ctx) error {
+		resp, err := cl.posts.DeleteUserPosts(c.UserContext(), &postspb.DeleteUserPostsRequest{AuthorId: caller(c).ID})
+		if err != nil {
+			return grpcErrStatus(c, err)
+		}
+		return c.JSON(fiber.Map{"deleted": resp.Deleted})
 	})
 
 	// --- comments ---

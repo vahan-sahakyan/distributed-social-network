@@ -84,7 +84,8 @@ func buildEvent(eventType string, msg kafka.Message) (*model.FeedEvent, error) {
 	}
 
 	switch eventType {
-	case events.PostCreated:
+	// a deletion is recorded like the creation, so rebuilds can leave the post out
+	case events.PostCreated, events.PostDeleted:
 		event.PostID = payload.ID
 		event.UserID = payload.AuthorID
 	case events.LikeCreated, events.LikeDeleted, events.CommentCreated:

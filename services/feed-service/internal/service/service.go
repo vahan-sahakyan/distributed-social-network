@@ -33,6 +33,15 @@ func (s *Service) FanoutPost(ctx context.Context, item *model.FeedItem, follower
 	return s.repo.AddPost(ctx, item, keys...)
 }
 
+// RemovePost takes a deleted post out of its author's posts and the given users' home feeds.
+func (s *Service) RemovePost(ctx context.Context, postID, authorID string, followerIDs []string) error {
+	keys := []string{repository.UserPostsKey(authorID)}
+	for _, id := range followerIDs {
+		keys = append(keys, repository.HomeFeedKey(id))
+	}
+	return s.repo.RemovePost(ctx, postID, keys...)
+}
+
 // AdjustCounts applies like and comment deltas to a post; every feed showing it reads the same counts.
 func (s *Service) AdjustCounts(ctx context.Context, postID string, likesDelta, commentsDelta int) error {
 	return s.repo.AdjustCounts(ctx, postID, likesDelta, commentsDelta)

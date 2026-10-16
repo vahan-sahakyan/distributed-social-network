@@ -34,6 +34,7 @@ func New(svc *service.Service, brokers string, dlq *broker.Producer, usersConn *
 
 func (c *Consumer) Start(ctx context.Context) {
 	go c.consume(ctx, events.PostCreated, "feed-service-posts", c.handlePostCreated)
+	go c.consume(ctx, events.PostDeleted, "feed-service-deletes", c.handlePostDeleted)
 	go c.consume(ctx, events.LikeCreated, "feed-service-likes", c.countsHandler(1, 0))
 	go c.consume(ctx, events.LikeDeleted, "feed-service-unlikes", c.countsHandler(-1, 0))
 	c.consume(ctx, events.CommentCreated, "feed-service-comments", c.countsHandler(0, 1))
@@ -76,6 +77,29 @@ func (c *Consumer) handlePostCreated(ctx context.Context, msg kafka.Message) err
 	followerIDs = append(followerIDs, post.AuthorID)
 
 	return c.svc.FanoutPost(ctx, item, followerIDs)
+}
+
+// handlePostDeleted takes the post out of the feeds it was fanned out to. Readers already
+// skip it once its hash is gone; removing the ids keeps the feeds' 100 slots for live posts.
+func (c *Consumer) handlePostDeleted(ctx context.Context, msg kafka.Message) error {
+	var post struct {
+		ID       string `json:"id"`
+		AuthorID string `json:"author_id"`
+	}
+	if err := json.Unmarshal(msg.Value, &post); err != nil {
+		return fmt.Errorf("unmarshaling post: %w", err)
+	}
+	if post.ID == "" {
+		return fmt.Errorf("post.deleted without id")
+	}
+
+	followerIDs, err := c.fetchFollowers(ctx, post.AuthorID)
+	if err != nil {
+		return err
+	}
+	followerIDs = append(followerIDs, post.AuthorID)
+
+	return c.svc.RemovePost(ctx, post.ID, post.AuthorID, followerIDs)
 }
 
 // countsHandler returns a handler for like/comment events that applies the given

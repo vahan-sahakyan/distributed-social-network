@@ -56,6 +56,36 @@ func (s *Server) GetPost(ctx context.Context, req *postspb.GetPostRequest) (*pos
 	return &postspb.GetPostResponse{Post: toProto(post)}, nil
 }
 
+func (s *Server) DeletePost(ctx context.Context, req *postspb.DeletePostRequest) (*postspb.DeletePostResponse, error) {
+	if err := validate.Required("id", req.Id); err != nil {
+		return nil, err
+	}
+	if err := validate.Required("requester_id", req.RequesterId); err != nil {
+		return nil, err
+	}
+	err := s.svc.DeletePost(ctx, req.Id, req.RequesterId)
+	switch {
+	case errors.Is(err, model.ErrPostNotFound):
+		return nil, status.Error(codes.NotFound, "post not found")
+	case errors.Is(err, model.ErrNotAuthor):
+		return nil, status.Error(codes.PermissionDenied, err.Error())
+	case err != nil:
+		return nil, status.Errorf(codes.Internal, "deleting post: %v", err)
+	}
+	return &postspb.DeletePostResponse{}, nil
+}
+
+func (s *Server) DeleteUserPosts(ctx context.Context, req *postspb.DeleteUserPostsRequest) (*postspb.DeleteUserPostsResponse, error) {
+	if err := validate.Required("author_id", req.AuthorId); err != nil {
+		return nil, err
+	}
+	n, err := s.svc.DeleteUserPosts(ctx, req.AuthorId)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "deleted %d, then: %v", n, err)
+	}
+	return &postspb.DeleteUserPostsResponse{Deleted: int32(n)}, nil
+}
+
 func (s *Server) Reset(ctx context.Context, _ *postspb.ResetRequest) (*postspb.ResetResponse, error) {
 	if err := s.resetFn(ctx); err != nil {
 		return nil, status.Errorf(codes.Internal, "reset failed: %v", err)

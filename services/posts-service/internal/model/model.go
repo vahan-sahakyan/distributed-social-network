@@ -5,7 +5,10 @@ import (
 	"time"
 )
 
-var ErrPostNotFound = errors.New("post not found")
+var (
+	ErrPostNotFound = errors.New("post not found")
+	ErrNotAuthor    = errors.New("only the author can delete a post")
+)
 
 type Post struct {
 	ID        string    `json:"id"`

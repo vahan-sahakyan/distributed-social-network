@@ -110,6 +110,16 @@ return 1`)
 // AdjustCounts applies like and comment deltas to a cached post. Sums are stored
 // raw, never clamped: like and unlike arrive on separate topics in any order, and
 // only an unclamped sum ends right. Readers clamp negatives.
+// RemovePost drops a deleted post: its hash, which every feed reads it from, and its id from
+// the given feeds. A later like or comment on it leaves it alone (AdjustCounts skips uncached posts).
+func RemovePost(ctx context.Context, c valkey.Client, postID string, feedKeys ...string) error {
+	cmds := valkey.Commands{c.B().Del().Key(PostKey(postID)).Build()}
+	for _, feed := range feedKeys {
+		cmds = append(cmds, c.B().Zrem().Key(feed).Member(postID).Build())
+	}
+	return joinErrs(c.DoMulti(ctx, cmds...))
+}
+
 func AdjustCounts(ctx context.Context, c valkey.Client, postID string, likesDelta, commentsDelta int) error {
 	return adjustCounts.Exec(ctx, c, []string{PostKey(postID)},
 		[]string{strconv.Itoa(likesDelta), strconv.Itoa(commentsDelta)}).Error()

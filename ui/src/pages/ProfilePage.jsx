@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { UserPlus, UserCheck, ArrowLeft } from 'lucide-react'
+import { UserPlus, UserCheck, ArrowLeft, Trash2 } from 'lucide-react'
 import { PostCard } from '../components/PostCard'
 import { Avatar } from '../components/Avatar'
 import { api } from '../api'
@@ -16,6 +16,7 @@ export function ProfilePage() {
   const [followers, setFollowers] = useState([])
   const [following, setFollowing] = useState([])
   const [followLoading, setFollowLoading] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
 
   const isFollowing = followers.includes(currentUser?.id)
   const isSelf = currentUser?.id === profileUserId
@@ -67,6 +68,22 @@ export function ProfilePage() {
     }
   }
 
+  // every post of the user's, not only the cached ones listed here
+  async function handleDeleteAll() {
+    if (!window.confirm('Delete ALL of your posts? This cannot be undone.')) return
+    setDeletingAll(true)
+    try {
+      const { deleted } = await api.deleteMyPosts()
+      setPosts([])
+      setFeed(useStore.getState().feed.filter(p => p.authorId !== currentUser.id))
+      toast(`Deleted ${deleted} ${deleted === 1 ? 'post' : 'posts'}`)
+    } catch (err) {
+      toast(err.message, 'error')
+    } finally {
+      setDeletingAll(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="py-20 text-center text-muted text-sm">Loading profile…</div>
@@ -98,6 +115,16 @@ export function ProfilePage() {
       <div className="px-6 py-6 border-b border-border">
         <div className="flex items-start justify-between gap-4 mb-4">
           <Avatar username={user.username} size="lg" />
+          {isSelf && posts.length > 0 && (
+            <button
+              onClick={handleDeleteAll}
+              disabled={deletingAll}
+              className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-full border border-border text-muted hover:border-danger/60 hover:text-danger transition-colors shrink-0 disabled:opacity-40"
+            >
+              <Trash2 size={14} />
+              {deletingAll ? 'Deleting…' : 'Delete all posts'}
+            </button>
+          )}
           {!isSelf && currentUser && (
             <button
               onClick={handleFollow}
@@ -137,7 +164,7 @@ export function ProfilePage() {
       )}
 
       {posts.map(p => (
-        <PostCard key={p.id} post={p} />
+        <PostCard key={p.id} post={p} onDeleted={id => setPosts(ps => ps.filter(x => x.id !== id))} />
       ))}
     </div>
   )

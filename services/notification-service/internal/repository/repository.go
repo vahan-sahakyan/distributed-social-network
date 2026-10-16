@@ -25,6 +25,12 @@ func (r *Repository) Create(ctx context.Context, n *model.Notification) error {
 	return err
 }
 
+// DeleteByEntity removes every notification about entityID, e.g. a deleted post.
+func (r *Repository) DeleteByEntity(ctx context.Context, entityID string) error {
+	_, err := r.db.Exec(ctx, `DELETE FROM notifications WHERE entity_id = $1`, entityID)
+	return err
+}
+
 func (r *Repository) GetByUserID(ctx context.Context, userID string) ([]model.Notification, error) {
 	rows, err := r.db.Query(ctx,
 		`SELECT id, user_id, type, actor_id, entity_id, read, created_at

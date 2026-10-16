@@ -17,7 +17,7 @@ import (
 
 // Topics is every topic this consumer reads.
 func Topics() []string {
-	return []string{events.PostCreated, events.UserCreated}
+	return []string{events.PostCreated, events.PostDeleted, events.UserCreated}
 }
 
 type Consumer struct {
@@ -35,6 +35,7 @@ func (c *Consumer) Start(ctx context.Context) {
 		return broker.ConsumerConfig{Brokers: c.brokers, Topic: topic, GroupID: "search-service", DLQ: c.dlq}
 	}
 	go broker.ConsumeBatch(ctx, cfg(events.PostCreated), c.indexPosts)
+	go broker.ConsumeBatch(ctx, cfg(events.PostDeleted), c.deletePosts)
 	go broker.ConsumeBatch(ctx, cfg(events.UserCreated), c.indexUsers)
 
 	<-ctx.Done()
@@ -50,6 +51,23 @@ func (c *Consumer) indexPosts(ctx context.Context, msgs []kafka.Message) error {
 		posts[i] = p
 	}
 	return c.repo.IndexPosts(ctx, posts)
+}
+
+func (c *Consumer) deletePosts(ctx context.Context, msgs []kafka.Message) error {
+	ids := make([]string, len(msgs))
+	for i, msg := range msgs {
+		var event struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(msg.Value, &event); err != nil {
+			return fmt.Errorf("offset %d: unmarshaling post: %w", msg.Offset, err)
+		}
+		if event.ID == "" {
+			return fmt.Errorf("offset %d: post.deleted without id", msg.Offset)
+		}
+		ids[i] = event.ID
+	}
+	return c.repo.DeletePosts(ctx, ids)
 }
 
 func (c *Consumer) indexUsers(ctx context.Context, msgs []kafka.Message) error {

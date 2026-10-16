@@ -160,6 +160,29 @@ GET /api/v1/posts/:id
 
 **Response** `200 OK`: the post, as above. `404` if not found.
 
+### Delete Post (auth)
+
+```http
+DELETE /api/v1/posts/:id
+```
+
+**Response** `204 No Content`. `403` unless the caller wrote it, `404` if not found.
+
+**Side effect:** Publishes `post.deleted`; feeds, search, the event store and notifications drop the post.
+
+### Delete All Own Posts (auth)
+
+```http
+DELETE /api/v1/posts/
+```
+
+**Response** `200 OK`:
+```json
+{"deleted": 42}
+```
+
+Every post of the caller's, each with its own `post.deleted`. A failure part way answers `500`; retrying deletes the rest.
+
 ---
 
 ## Comments

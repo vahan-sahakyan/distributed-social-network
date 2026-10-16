@@ -25,7 +25,7 @@ var notifTypes = map[string]string{
 
 // Topics is every topic this consumer reads.
 func Topics() []string {
-	return []string{events.LikeCreated, events.CommentCreated}
+	return []string{events.LikeCreated, events.CommentCreated, events.PostDeleted}
 }
 
 type Consumer struct {
@@ -58,9 +58,29 @@ func (c *Consumer) Start(ctx context.Context) {
 }
 
 func (c *Consumer) handler(topic string) broker.Handler {
+	if topic == events.PostDeleted {
+		return c.handlePostDeleted
+	}
 	return func(ctx context.Context, msg kafka.Message) error {
 		return c.handle(ctx, topic, msg)
 	}
+}
+
+// handlePostDeleted removes the likes and comments notifications about the deleted post.
+func (c *Consumer) handlePostDeleted(ctx context.Context, msg kafka.Message) error {
+	var post struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(msg.Value, &post); err != nil {
+		return fmt.Errorf("unmarshaling post: %w", err)
+	}
+	if post.ID == "" {
+		return fmt.Errorf("post.deleted without id")
+	}
+	if err := c.svc.DeleteForEntity(ctx, post.ID); err != nil {
+		return fmt.Errorf("deleting notifications about %s: %w", post.ID, err)
+	}
+	return nil
 }
 
 // handle returns an error when the notification could not be created, so a

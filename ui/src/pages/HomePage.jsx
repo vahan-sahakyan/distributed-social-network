@@ -59,7 +59,7 @@ export function HomePage() {
       )}
 
       {feed.map(post => (
-        <PostCard key={post.id} post={post} />
+        <PostCard key={post.id} post={post} onDeleted={id => setFeed(feed.filter(p => p.id !== id))} />
       ))}
     </div>
   )

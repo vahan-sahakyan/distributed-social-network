@@ -91,16 +91,17 @@ Services communicate asynchronously through Redpanda (Kafka-compatible) topics. 
 | Topic | Producer | Consumers |
 |-------|----------|-----------|
 | `post.created` | posts-service | feed-service, event-writer-service, search-service |
+| `post.deleted` | posts-service | feed-service, event-writer-service, search-service, notification-service |
 | `like.created` | likes-service | feed-service, notification-service, event-writer-service |
 | `like.deleted` | likes-service | feed-service, event-writer-service |
 | `comment.created` | comments-service | feed-service, notification-service, event-writer-service |
 | `user.created` | users-service | search-service |
 
 Topics are created on startup by `pkg/broker.EnsureTopics` (3 partitions each). Each consumer uses its own **consumer group**, so every service receives every event:
-- `feed-service` - fans out posts to follower feeds, updates like/comment counts
-- `notification-service` - generates notifications for post authors
-- `event-writer-service` - persists all post activity events to ClickHouse
-- `search-service` - indexes posts and users into Elasticsearch
+- `feed-service` - fans out posts to follower feeds, updates like/comment counts, drops deleted posts
+- `notification-service` - generates notifications for post authors, drops those about deleted posts
+- `event-writer-service` - persists all post activity events to ClickHouse, deletions included, so cache rebuilds skip deleted posts
+- `search-service` - indexes posts and users into Elasticsearch, removes deleted posts
 
 Every producing service publishes through a **transactional outbox** (`pkg/outbox`, [ADR 0002](adr/0002-transactional-outbox.md)): the event row is committed with the data (a Postgres transaction, or a LOGGED BATCH in posts-service's ScyllaDB), and a relay publishes it once Redpanda acks, so a broker outage delays events instead of losing them. Producers wait for the broker's ack (`RequireAll`).
 

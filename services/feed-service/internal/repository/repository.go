@@ -61,6 +61,11 @@ func (r *Repository) AddPost(ctx context.Context, item *model.FeedItem, feedKeys
 	}, feedKeys...)
 }
 
+// RemovePost drops a deleted post from the cache and from each feed.
+func (r *Repository) RemovePost(ctx context.Context, postID string, feedKeys ...string) error {
+	return cache.RemovePost(ctx, r.c, postID, feedKeys...)
+}
+
 // AdjustCounts applies like and comment deltas to a cached post, once for every feed showing it.
 func (r *Repository) AdjustCounts(ctx context.Context, postID string, likesDelta, commentsDelta int) error {
 	return cache.AdjustCounts(ctx, r.c, postID, likesDelta, commentsDelta)

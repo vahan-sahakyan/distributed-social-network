@@ -20,6 +20,8 @@ func (r *Repository) GetRecentPostEvents(ctx context.Context, limit int) ([]mode
 		`SELECT event_id, event_type, post_id, user_id, created_at
 		 FROM feed_events
 		 WHERE event_type = 'post.created'
+		   -- a deleted post stays deleted, whatever order its events were written in
+		   AND post_id NOT IN (SELECT post_id FROM feed_events WHERE event_type = 'post.deleted')
 		 ORDER BY created_at DESC
 		 LIMIT 1 BY event_id
 		 LIMIT ?`, limit,
