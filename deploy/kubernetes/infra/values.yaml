@@ -17,6 +17,8 @@ postgres:
     parameters:
       max_prepared_statements: "200"
       default_pool_size: "10"
+      # after a failover, retry the new primary every 3s instead of 15s
+      server_login_retry: "3"
     resources:
       requests: {cpu: 5m, memory: 16Mi}
       limits: {memory: 64Mi}
