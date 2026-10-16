@@ -68,12 +68,12 @@ services:
       <<: *otel
       PORT: "8083"
       GRPC_PORT: "9083"
-      DATABASE_URL: postgres://postgres:postgres@comments-db:5432/comments?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/comments?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081
     depends_on:
       - posts-service
-      - comments-db
+      - postgres
       - redpanda
 
   likes-service:
@@ -87,12 +87,12 @@ services:
       <<: *otel
       PORT: "8084"
       GRPC_PORT: "9084"
-      DATABASE_URL: postgres://postgres:postgres@likes-db:5432/likes?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/likes?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081
     depends_on:
       - posts-service
-      - likes-db
+      - postgres
       - redpanda
 
   feed-service:
@@ -125,10 +125,10 @@ services:
       <<: *otel
       PORT: "8085"
       GRPC_PORT: "9085"
-      DATABASE_URL: postgres://postgres:postgres@users-db:5432/users?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/users?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
     depends_on:
-      - users-db
+      - postgres
       - redpanda
 
   media-service:
@@ -160,11 +160,11 @@ services:
       <<: *otel
       PORT: "8087"
       GRPC_PORT: "9087"
-      DATABASE_URL: postgres://postgres:postgres@notifications-db:5432/notifications?sslmode=disable
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/notifications?sslmode=disable
       KAFKA_BROKERS: redpanda:9092
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081
     depends_on:
-      - notifications-db
+      - postgres
       - redpanda
       - posts-service
 

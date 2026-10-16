@@ -1,63 +1,76 @@
-{{- range $name, $db := .Values.postgres.instances }}
+{{- if .Values.postgres.enabled }}
+{{- $pg := .Values.postgres }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+data:
+  {{- (.Files.Glob "files/postgres-init.sh").AsConfig | nindent 2 }}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ $name }}
+  name: postgres
   labels:
-    app: {{ $name }}
+    app: postgres
 spec:
   replicas: 1
-  serviceName: {{ $name }}-headless
+  serviceName: postgres-headless
   # volumes outlive the StatefulSet: deleting or pruning it never deletes data
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
     whenScaled: Retain
   selector:
     matchLabels:
-      app: {{ $name }}
+      app: postgres
   template:
     metadata:
       labels:
-        app: {{ $name }}
+        app: postgres
     spec:
       securityContext:
-        {{- include "dsn.podSecurityContext" $.Values.postgres.security | nindent 8 }}
+        {{- include "dsn.podSecurityContext" $pg.security | nindent 8 }}
       containers:
-        - name: {{ $name }}
-          image: {{ $.Values.postgres.image }}
+        - name: postgres
+          image: {{ $pg.image }}
           securityContext:
-            {{- include "dsn.securityContext" $.Values.postgres.security | nindent 12 }}
+            {{- include "dsn.securityContext" $pg.security | nindent 12 }}
           resources:
-            {{- toYaml $.Values.postgres.resources | nindent 12 }}
+            {{- toYaml $pg.resources | nindent 12 }}
           env:
-            # a subdirectory: initdb must own the data dir, and a volume's root may not be its own
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
-            - name: POSTGRES_DB
-              value: {{ $db.database }}
             - name: POSTGRES_USER
-              value: {{ $.Values.postgres.user }}
+              value: {{ $pg.user }}
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: postgres-credentials
                   key: POSTGRES_PASSWORD
+            - name: DATABASES
+              value: {{ join " " $pg.databases | quote }}
           ports:
             - containerPort: 5432
           volumeMounts:
+            # 18's layout: data in 18/docker under the mount
             - name: data
-              mountPath: /var/lib/postgresql/data
+              mountPath: /var/lib/postgresql
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
             - name: run
               mountPath: /var/run/postgresql
             - name: tmp
               mountPath: /tmp
           readinessProbe:
             exec:
-              command: [pg_isready, -U, {{ $.Values.postgres.user }}]
+              command: [pg_isready, -U, {{ $pg.user }}]
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+            # executed, not sourced, by the image's entrypoint
+            defaultMode: 0555
         - name: run
           emptyDir: {}
         - name: tmp
@@ -69,15 +82,15 @@ spec:
         accessModes: [ReadWriteOnce]
         resources:
           requests:
-            storage: {{ $.Values.postgres.storage }}
+            storage: {{ $pg.storage }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $name }}
+  name: postgres
 spec:
   selector:
-    app: {{ $name }}
+    app: postgres
   ports:
     - port: 5432
       targetPort: 5432
@@ -86,11 +99,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $name }}-headless
+  name: postgres-headless
 spec:
   clusterIP: None
   selector:
-    app: {{ $name }}
+    app: postgres
   ports:
     - port: 5432
       targetPort: 5432

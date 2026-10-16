@@ -12,14 +12,7 @@ This guide covers connecting to all project databases from JetBrains DataGrip wh
 
 ## PostgreSQL Databases
 
-All Postgres instances use the same credentials with different ports and database names.
-
-| Service        | Host      | Port   | Database        | User       | Password   |
-|----------------|-----------|--------|-----------------|------------|------------|
-| comments-db    | localhost | 5433   | comments        | postgres   | postgres   |
-| likes-db       | localhost | 5434   | likes           | postgres   | postgres   |
-| users-db       | localhost | 5436   | users           | postgres   | postgres   |
-| notifications-db | localhost | 5437 | notifications   | postgres   | postgres   |
+One instance on `localhost:5433` (user `postgres`, password `postgres`), a database per service: `comments`, `likes`, `users`, `notifications`, `keycloak`. One data source covers them all; pick the databases under its Schemas tab.
 
 ### Steps
 
@@ -32,7 +25,7 @@ All Postgres instances use the same credentials with different ports and databas
 ### JDBC URL format
 
 ```
-jdbc:postgresql://localhost:<port>/<database>
+jdbc:postgresql://localhost:5433/<database>
 ```
 
 Example for comments:
@@ -120,7 +113,7 @@ Keys: `feed:<user_id>` and `userposts:<user_id>` are sorted sets of post ids (sc
 
 ## Tips
 
-- **Name your data sources** clearly (e.g., `[DSN] comments-db`, `[DSN] posts-scylla`) to avoid confusion between similar Postgres instances.
+- **Name your data sources** clearly (e.g., `[DSN] postgres`, `[DSN] posts-scylla`) to avoid confusion between similar Postgres instances.
 - **Color-code** each data source in DataGrip (right-click → Change Color) to visually distinguish environments.
 - **Schemas tab**: After connecting to Postgres, go to the Schemas tab in data source properties to select only the `public` schema — keeps the navigator clean.
 - **SSH Tunnel**: If connecting to remote/deployed databases, configure an SSH tunnel under the SSH/SSL tab in the data source properties.

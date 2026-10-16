@@ -1,24 +1,20 @@
+# one instance, one database per service and Keycloak, the way they would share one managed
+# instance. enabled: false runs none: point host and postgres-credentials (and the services'
+# DATABASE_URLs) at a managed database instead
 postgres:
-  image: postgres:16.14-alpine
+  enabled: true
+  host: postgres
+  image: postgres:18.6-alpine
   user: postgres
   # image uids; Pod Security "restricted", see templates/_helpers.tpl
   security: {user: 70, readOnly: true}
   # password comes from the postgres-credentials secret (POSTGRES_PASSWORD)
-  storage: 1Gi
+  storage: 2Gi
   resources:
-    requests: {cpu: 20m, memory: 64Mi}
-    limits: {memory: 256Mi}
-  instances:
-    comments-db:
-      database: comments
-    likes-db:
-      database: likes
-    users-db:
-      database: users
-    notifications-db:
-      database: notifications
-    keycloak-db:
-      database: keycloak
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 512Mi}
+  # created on the first start of an empty volume
+  databases: [comments, likes, users, notifications, keycloak]
 
 scylla:
   image: scylladb/scylla:2026.1.5
@@ -137,16 +133,8 @@ networkPolicy:
     podLabels:
       app.kubernetes.io/name: traefik
   ingress:
-    comments-db:
-      - from: [comments-service]
-    likes-db:
-      - from: [likes-service]
-    users-db:
-      - from: [users-service]
-    notifications-db:
-      - from: [notification-service]
-    keycloak-db:
-      - from: [keycloak]
+    postgres:
+      - from: [comments-service, likes-service, users-service, notification-service, keycloak]
     posts-db:
       - from: [posts-service]
     redpanda:

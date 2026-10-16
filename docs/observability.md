@@ -134,12 +134,12 @@ Then in the log panel pick a feed-service or notification-service ERROR line, ju
 
 **4. Stop a consumer.** `docker stop infrastructure-notification-service-1` for a minute: lag keeps rising (broker-side), events are not lost, and they drain on `docker start`.
 
-**5. Trace an error to its cause.** Take a database away from one service:
+**5. Trace an error to its cause.** Take Postgres away (comments, likes, users and notifications lose their databases):
 ```bash
-docker stop infrastructure-comments-db-1
+docker stop infrastructure-postgres-1
 curl -s -XPOST localhost:8080/api/v1/comments/ -H 'Content-Type: application/json' \
   -d '{"entity_id":"<post id>","user_id":"<user id>","text":"hi"}'
-docker start infrastructure-comments-db-1
+docker start infrastructure-postgres-1
 ```
 The call is a 500, `GRPCServerErrors` fires for `comments-service CreateComment` under load, and the failed span's status carries the Postgres connection error.
 

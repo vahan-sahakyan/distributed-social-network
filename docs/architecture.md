@@ -41,7 +41,7 @@ graph TB
 
     subgraph "Data Stores"
         ScyllaDB[(ScyllaDB)]
-        PG[(PostgreSQL x4)]
+        PG[(PostgreSQL: 4 databases)]
         CH[(ClickHouse)]
         MC[Valkey]
         MIO[MinIO]

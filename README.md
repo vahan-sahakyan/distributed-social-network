@@ -47,7 +47,7 @@ graph LR
 |-------|-------------|
 | API Gateway | Go Fiber, HTTP/JSON -> gRPC |
 | Identity | Keycloak (OIDC, PKCE), JWTs verified at the gateway |
-| Databases | ScyllaDB, PostgreSQL x4 |
+| Databases | ScyllaDB, PostgreSQL (a database per service) |
 | Event Streaming | Redpanda (Kafka-compatible) |
 | Event Store | ClickHouse |
 | Search | Elasticsearch |
@@ -190,7 +190,7 @@ On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (htt
 
 - **Language:** Go 1.27
 - **RPC:** gRPC + Protocol Buffers between services; Fiber v2 for the gateway's HTTP API and each service's health/metrics port
-- **Databases:** ScyllaDB (posts), PostgreSQL 16 (users, comments, likes, notifications)
+- **Databases:** ScyllaDB (posts), PostgreSQL 18 (one instance; users, comments, likes, notifications and Keycloak databases)
 - **Message Broker:** Redpanda (Kafka API compatible)
 - **Event Store:** ClickHouse
 - **Search:** Elasticsearch

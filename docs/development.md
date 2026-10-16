@@ -229,7 +229,7 @@ docker compose -f infrastructure/docker-compose.yml \
 
 ```bash
 # PostgreSQL
-docker exec -it infrastructure-users-db-1 psql -U postgres -d users
+docker exec -it infrastructure-postgres-1 psql -U postgres -d users
 
 # ScyllaDB
 docker exec -it infrastructure-posts-db-1 cqlsh
@@ -298,7 +298,7 @@ Three Helm charts, deployed by Argo CD from [distributed-social-network-gitops](
 
 | Chart | Contents |
 |---|---|
-| `deploy/kubernetes/infra` | Postgres x5 (one for Keycloak), Scylla, Redpanda, ClickHouse, MinIO, Valkey, Elasticsearch, Keycloak |
+| `deploy/kubernetes/infra` | Postgres (one instance, a database per service and Keycloak; `postgres.enabled: false` for a managed one), Scylla, Redpanda, ClickHouse, MinIO, Valkey, Elasticsearch, Keycloak |
 | `deploy/kubernetes/services` | the 11 services, UI, the `dsn` Gateway and its HTTPRoute |
 | `deploy/kubernetes/observability` | Prometheus and Alertmanager (Prometheus Operator resources), Mailpit, Grafana, Loki, Alloy, Tempo, Redpanda Console, optional Kibana; configs from `monitoring/` |
 
@@ -307,7 +307,7 @@ Traffic enters through Gateway API: the services chart creates the `dsn` Gateway
 Workload security (all charts, `templates/_helpers.tpl`):
 - The `dsn` namespace enforces Pod Security `restricted` (labels set by the gitops `infra` app). Every pod runs as its image's non-root uid (`security.user`, numeric so `runAsNonRoot` can verify it), drops all capabilities, no privilege escalation, `RuntimeDefault` seccomp
 - Read-only root filesystem (`security.readOnly`, writable paths as emptyDirs) everywhere except Scylla, Redpanda, ClickHouse, Elasticsearch, Keycloak and Kibana, whose entrypoints write config or build output into the image on start
-- Postgres keeps its data in `pgdata/` under the volume: `initdb` must own the data dir, and a fresh volume's root isn't owned by uid 70
+- Postgres 18 keeps its data in `18/docker/` under the volume (the image's layout), so `initdb` owns the directory it creates
 - NetworkPolicies, ingress only: the services chart denies all in the namespace, then each pod admits its clients. A service admits the services whose env addresses it (derived), Prometheus on its HTTP port, and `networkPolicy.ingress` extras (the Gateway's Traefik pods for the gateway and UI); stores and UIs list theirs in `networkPolicy.ingress` of the infra and observability charts. A new client of a store needs an entry there
 - `replicaCount` above 1 adds a PodDisruptionBudget (`maxUnavailable: 1`) per service; requests and limits are set on every container
 
