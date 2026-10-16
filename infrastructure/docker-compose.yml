@@ -215,7 +215,7 @@ services:
     depends_on:
       - prometheus
       - loki
-      - jaeger
+      - tempo
 
   loki:
     profiles: ["obs"]
@@ -225,28 +225,36 @@ services:
     volumes:
       - loki-data:/loki
 
-  # tails every compose container's stdout into loki
+  # tails every compose container's stdout into loki; the services' OTLP entry, tail
+  # sampling traces into tempo (monitoring/alloy/traces.alloy). Keeps every trace here;
+  # TRACE_SAMPLING_PERCENT=10 make up for the cluster's rate
   alloy:
     profiles: ["obs"]
     image: grafana/alloy:v1.20.1
-    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    command: run --server.http.listen-addr=0.0.0.0:12345 --storage.path=/var/lib/alloy/data /etc/alloy
+    environment:
+      TRACE_SAMPLING_PERCENT: ${TRACE_SAMPLING_PERCENT:-100}
     ports:
       - "12345:12345"
+      - "4317:4317"
+      - "4318:4318"
     volumes:
       - ../monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - ../monitoring/alloy/traces.alloy:/etc/alloy/traces.alloy:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       - loki
+      - tempo
 
-  # all-in-one, in-memory: traces are lost on restart.
-  # 2.21 dropped the /api/services|traces endpoints the grafana jaeger datasource uses
-  jaeger:
+  tempo:
     profiles: ["obs"]
-    image: jaegertracing/jaeger:2.20.0
+    image: grafana/tempo:3.1.0
+    command: -target=all -config.file=/etc/tempo/tempo.yaml
     ports:
-      - "16686:16686"
-      - "4317:4317"
-      - "4318:4318"
+      - "3200:3200"
+    volumes:
+      - ../monitoring/tempo:/etc/tempo:ro
+      - tempo-data:/var/tempo
 
 volumes:
   posts-db-data:
@@ -260,5 +268,6 @@ volumes:
   prometheus-data:
   grafana-data:
   loki-data:
+  tempo-data:
   elasticsearch-data:
   keycloak-data:

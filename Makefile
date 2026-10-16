@@ -16,7 +16,7 @@ PROFILES = $(if $(call on,OBS),--profile obs) $(if $(call on,SEARCH),--profile s
 	$(if $(call on,EVENTS),--profile events) $(if $(call on,TOOLS),--profile tools) \
 	$(if $(and $(call on,TOOLS),$(call on,SEARCH)),--profile kibana)
 # addresses of switched-off services stay empty, which the services read as "off"
-GROUP_ENV = OTEL_EXPORTER_OTLP_ENDPOINT=$(if $(call on,OBS),http://jaeger:4318) \
+GROUP_ENV = OTEL_EXPORTER_OTLP_ENDPOINT=$(if $(call on,OBS),http://alloy:4318) \
 	SEARCH_SERVICE_GRPC_ADDR=$(if $(call on,SEARCH),search-service:9091) \
 	CACHE_REBUILDER_SERVICE_GRPC_ADDR=$(if $(call on,EVENTS),cache-rebuilder-service:9089)
 
@@ -243,8 +243,8 @@ FORWARDS = \
 	dsn/svc/prometheus=9090 \
 	dsn/svc/grafana=3000 \
 	dsn/svc/loki=3100 \
-	dsn/deploy/alloy=12345 \
-	dsn/svc/jaeger=16686,4317,4318 \
+	dsn/svc/alloy=12345,4317,4318 \
+	dsn/svc/tempo=3200 \
 	dsn/svc/kibana=5601
 
 # skips what isn't deployed (kibana is optional); ctrl-c stops all; waits out a fresh cluster-up (argo server starting, password not yet generated)
@@ -258,7 +258,6 @@ forward:
 	@echo "Keycloak          http://localhost:8180/auth  (admin / admin)"
 	@echo "Grafana           http://localhost:3000  (admin / admin)"
 	@echo "Prometheus        http://localhost:9090"
-	@echo "Jaeger            http://localhost:16686"
 	@echo "Redpanda Console  http://localhost:8888"
 	@echo "MinIO Console     http://localhost:9001  (minioadmin / minioadmin)"
 	@echo "Elasticsearch     http://localhost:9200"

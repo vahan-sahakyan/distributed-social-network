@@ -1,0 +1,92 @@
+{{- if .Values.stack.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tempo-config
+data:
+  {{- (.Files.Glob "files/tempo/*.yaml").AsConfig | nindent 2 }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: tempo
+  labels:
+    app: tempo
+spec:
+  replicas: 1
+  serviceName: tempo
+  persistentVolumeClaimRetentionPolicy:
+    whenDeleted: Retain
+    whenScaled: Retain
+  selector:
+    matchLabels:
+      app: tempo
+  template:
+    metadata:
+      labels:
+        app: tempo
+      annotations:
+        checksum/config: {{ (.Files.Glob "files/tempo/*.yaml").AsConfig | sha256sum }}
+    spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.tempo.security | nindent 8 }}
+      containers:
+        - name: tempo
+          image: {{ .Values.tempo.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.tempo.security | nindent 12 }}
+          args:
+            - -target=all
+            - -config.file=/etc/tempo/tempo.yaml
+          resources:
+            {{- toYaml .Values.tempo.resources | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 3200
+            - name: otlp-grpc
+              containerPort: 4317
+          volumeMounts:
+            - name: config
+              mountPath: /etc/tempo
+            - name: data
+              mountPath: /var/tempo
+            - name: tmp
+              mountPath: /tmp
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3200
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: config
+          configMap:
+            name: tempo-config
+        - name: tmp
+          emptyDir: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.tempo.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tempo
+spec:
+  selector:
+    app: tempo
+  ports:
+    - name: http
+      port: 3200
+      targetPort: 3200
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+  type: ClusterIP
+{{- end }}

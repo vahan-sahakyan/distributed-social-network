@@ -303,8 +303,8 @@ data = json.load(sys.stdin)
 for r in sorted(data.get('data',{}).get('result',[]), key=lambda x: -float(x['value'][1])):
     print(f\"  {r['metric'].get('job','?'):30s} {r['value'][1]} calls\")" 2>/dev/null || echo "  (no metrics yet)"
 
-step "Traces: the create-post request, through Kafka to every consumer, is one trace in Jaeger"
-info "$JAEGER_URL/search?service=gateway-service"
+step "Traces: the create-post request, through Kafka to every consumer, is one trace in Tempo (kept if sampled, failed or slow)"
+info "$GRAFANA_URL/explore?schemaVersion=1&panes=%7B%22t%22%3A%7B%22datasource%22%3A%22tempo%22%2C%22queries%22%3A%5B%7B%22refId%22%3A%22A%22%2C%22datasource%22%3A%7B%22type%22%3A%22tempo%22%2C%22uid%22%3A%22tempo%22%7D%2C%22queryType%22%3A%22traceql%22%2C%22query%22%3A%22%7Bresource.service.name%3D%5C%22gateway-service%5C%22%7D%22%2C%22limit%22%3A20%7D%5D%2C%22range%22%3A%7B%22from%22%3A%22now-1h%22%2C%22to%22%3A%22now%22%7D%7D%7D"
 else
   off "Observability" OBS
 fi
@@ -328,7 +328,6 @@ row "MinIO Console:"    "$MINIO_CONSOLE_URL  (minioadmin/minioadmin)"
 if ((on_obs)); then
   row "Prometheus:"     "$PROMETHEUS_URL"
   row "Grafana:"        "$GRAFANA_URL  (admin/admin)"
-  row "Jaeger:"         "$JAEGER_URL"
 fi
 ((on_tools)) && row "Redpanda Console:" "$REDPANDA_CONSOLE_URL"
 ((on_search)) && [[ "${CLUSTER:-}" != 1 ]] && row "Elasticsearch:" "http://localhost:9200"
@@ -340,7 +339,7 @@ line "          notifications, event-writer, cache-rebuilder, search"
 line ""
 line "Infra: ScyllaDB, PostgreSQL×4, ClickHouse, Redpanda, Valkey, MinIO,"
 line "       Elasticsearch,"
-line "       Prometheus, Grafana, Loki, Alloy, Jaeger"
+line "       Prometheus, Grafana, Loki, Alloy, Tempo"
 line ""
 echo "└─────────────────────────────────────────────────────────────────────────────┘"
 echo

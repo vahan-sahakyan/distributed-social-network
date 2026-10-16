@@ -1,0 +1,76 @@
+// the single OTLP entry for services: keeps every trace with an error or a slow span,
+// TRACE_SAMPLING_PERCENT of the rest (default 10), and sends them to tempo.
+// Tail sampling needs all spans of a trace on one instance: one replica, or a
+// trace-id load balancer in front
+
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    traces = [otelcol.processor.tail_sampling.default.input]
+  }
+}
+
+otelcol.processor.tail_sampling "default" {
+  // consumers finish a trace after the request does; spans arriving after the decision
+  // follow it through the decision cache
+  decision_wait = "10s"
+
+  decision_cache = {
+    sampled_cache_size     = 10000,
+    non_sampled_cache_size = 10000,
+  }
+
+  policy {
+    name = "errors"
+    type = "status_code"
+
+    status_code {
+      status_codes = ["ERROR"]
+    }
+  }
+
+  policy {
+    name = "slow"
+    type = "latency"
+
+    latency {
+      threshold_ms = 500
+    }
+  }
+
+  policy {
+    name = "sampled"
+    type = "probabilistic"
+
+    probabilistic {
+      sampling_percentage = encoding.from_json(coalesce(sys.env("TRACE_SAMPLING_PERCENT"), "10"))
+    }
+  }
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+
+    tls {
+      insecure = true
+    }
+  }
+}

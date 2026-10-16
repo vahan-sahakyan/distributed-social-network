@@ -33,8 +33,10 @@ kind: ConfigMap
 metadata:
   name: alloy-config
 data:
-  config.alloy: |
+  logs.alloy: |
     {{- .Files.Get "files/alloy/kubernetes.alloy" | nindent 4 }}
+  traces.alloy: |
+    {{- .Files.Get "files/alloy/traces.alloy" | nindent 4 }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -52,7 +54,7 @@ spec:
       labels:
         app: alloy
       annotations:
-        checksum/config: {{ .Files.Get "files/alloy/kubernetes.alloy" | sha256sum }}
+        checksum/config: {{ print (.Files.Get "files/alloy/kubernetes.alloy") (.Files.Get "files/alloy/traces.alloy") | sha256sum }}
     spec:
       serviceAccountName: alloy
       securityContext:
@@ -66,16 +68,24 @@ spec:
             - run
             - --server.http.listen-addr=0.0.0.0:12345
             - --storage.path=/var/lib/alloy/data
-            - /etc/alloy/config.alloy
+            # every .alloy file in the directory
+            - /etc/alloy
           env:
             - name: POD_NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
+            - name: TRACE_SAMPLING_PERCENT
+              value: {{ .Values.alloy.traceSamplingPercent | quote }}
           resources:
             {{- toYaml .Values.alloy.resources | nindent 12 }}
           ports:
-            - containerPort: 12345
+            - name: http
+              containerPort: 12345
+            - name: otlp-grpc
+              containerPort: 4317
+            - name: otlp-http
+              containerPort: 4318
           volumeMounts:
             - name: config
               mountPath: /etc/alloy
@@ -96,4 +106,23 @@ spec:
           emptyDir: {}
         - name: tmp
           emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alloy
+spec:
+  selector:
+    app: alloy
+  ports:
+    - name: http
+      port: 12345
+      targetPort: 12345
+    - name: otlp-grpc
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      port: 4318
+      targetPort: 4318
+  type: ClusterIP
 {{- end }}

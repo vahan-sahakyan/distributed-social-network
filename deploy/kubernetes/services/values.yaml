@@ -42,7 +42,7 @@ networkPolicy:
 # (keycloak's frontend URL + /auth/realms/dsn). Empty leaves the issuer unchecked
 publicUrl: ""
 
-# OTLP/HTTP collector for traces, e.g. http://jaeger:4318; empty turns tracing off
+# OTLP/HTTP collector for traces, e.g. http://alloy:4318; empty turns tracing off
 otelEndpoint: ""
 
 # Gateway API: an HTTPRoute for the app, on the chart's own Gateway or on parentRefs

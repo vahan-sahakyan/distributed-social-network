@@ -7,7 +7,6 @@ if [[ "${CLUSTER:-}" == 1 ]]; then
   : "${KEYCLOAK_URL:=https://localhost:8443/auth}"
   : "${PROMETHEUS_URL:=https://prometheus.localhost:8443}"
   : "${GRAFANA_URL:=https://grafana.localhost:8443}"
-  : "${JAEGER_URL:=https://jaeger.localhost:8443}"
   : "${REDPANDA_CONSOLE_URL:=https://redpanda.localhost:8443}"
   : "${MINIO_CONSOLE_URL:=https://minio.localhost:8443}"
   # the cluster's certificates come from the machine's local CA (make cluster-up)
@@ -19,7 +18,6 @@ else
   : "${KEYCLOAK_URL:=http://localhost:8180/auth}"
   : "${PROMETHEUS_URL:=http://localhost:9090}"
   : "${GRAFANA_URL:=http://localhost:3000}"
-  : "${JAEGER_URL:=http://localhost:16686}"
   : "${REDPANDA_CONSOLE_URL:=http://localhost:8888}"
   : "${MINIO_CONSOLE_URL:=http://localhost:9001}"
   in_infra() { local svc=$1; shift; docker exec "infrastructure-$svc-1" "$@"; }

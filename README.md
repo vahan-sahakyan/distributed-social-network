@@ -53,7 +53,7 @@ graph LR
 | Search | Elasticsearch |
 | Caching | Valkey (feed timelines as sorted sets, one hash per post) |
 | Object Storage | MinIO |
-| Observability | OpenTelemetry -> Jaeger, JSON logs -> Alloy -> Loki, Prometheus, Grafana |
+| Observability | OpenTelemetry -> Alloy (tail sampling) -> Tempo, JSON logs -> Alloy -> Loki, Prometheus, Grafana |
 
 ## Quick Start
 
@@ -83,7 +83,6 @@ After startup, these are available:
 | MinIO Console | http://localhost:9001 | minioadmin / minioadmin |
 | Prometheus (`OBS=1`) | http://localhost:9090 | - |
 | Grafana (`OBS=1`) | http://localhost:3000 | admin / admin |
-| Jaeger (`OBS=1`) | http://localhost:16686 | - |
 | Redpanda Console (`TOOLS=1`) | http://localhost:8888 | - |
 | Elasticsearch (`SEARCH=1`) | http://localhost:9200 | - |
 | Kibana (`TOOLS=1 SEARCH=1`) | http://localhost:5601 | - |
@@ -94,14 +93,14 @@ The core runs by default; each group is opt-in with its flag, the same on compos
 
 | Flag | Adds | RAM | When off |
 |------|------|-----|----------|
-| `OBS=1` | Prometheus, Grafana, Loki, Alloy, Jaeger; services export traces | ~0.55 GB | no metrics, logs or traces |
+| `OBS=1` | Prometheus, Grafana, Loki, Alloy, Tempo; services export traces | ~0.55 GB | no metrics, logs or traces |
 | `TOOLS=1` | Redpanda Console, Kibana (with `SEARCH=1`) | ~1.2 GB | - |
 | `SEARCH=1` | Elasticsearch, search-service | ~1.2 GB | search answers 503 `search is disabled`, trending is hidden |
 | `EVENTS=1` | ClickHouse, event-writer, cache-rebuilder | ~0.7 GB | no event store; `/api/v1/rebuild` answers 503 |
 
 Core alone is ~1 GB on compose; with `ALL=1`, ~5.4 GB.
 
-On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (http://localhost:8081 redirects) and the tools on `https://<name>.localhost:8443`: minio, plus grafana, prometheus, jaeger, redpanda and kibana when their group is on. Certificates come from a CA generated once per machine in `~/.config/dsn/`; `make trust-ca` adds it to the macOS keychain. `make forward` also puts everything on the URLs above, Kafka's 19092 aside.
+On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (http://localhost:8081 redirects) and the tools on `https://<name>.localhost:8443`: minio, plus grafana, prometheus, redpanda and kibana when their group is on. Certificates come from a CA generated once per machine in `~/.config/dsn/`; `make trust-ca` adds it to the macOS keychain. `make forward` also puts everything on the URLs above, Kafka's 19092 aside.
 
 ## Make Commands
 
@@ -196,5 +195,5 @@ On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (htt
 - **Cache:** Valkey
 - **Object Storage:** MinIO (S3 compatible)
 - **UI:** React, Vite, Tailwind
-- **Observability:** OpenTelemetry, Jaeger, Prometheus, Loki + Alloy, Grafana
+- **Observability:** OpenTelemetry, Alloy, Tempo, Prometheus, Loki, Grafana
 - **Deployment:** Docker Compose (dev), Helm + Argo CD GitOps (production, one EC2 node via `deploy/aws`), amd64 + arm64 images on GHCR

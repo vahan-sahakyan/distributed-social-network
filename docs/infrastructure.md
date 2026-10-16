@@ -80,8 +80,8 @@ MinIO's upstream images and binaries are no longer published, so the image is bu
 | prometheus | `prom/prometheus:v3.12.0` | 9090 | Metrics, alert rules |
 | grafana | `grafana/grafana:13.0.2` | 3000 | Provisioned datasources + DSN Overview dashboard |
 | loki | `grafana/loki:3.7.2` | 3100 | Log storage |
-| alloy | `grafana/alloy:v1.20.1` | 12345 | Ships container logs to Loki via the Docker socket |
-| jaeger | `jaegertracing/jaeger:2.20.0` | 16686 (UI), 4317/4318 (OTLP) | Traces, in-memory |
+| alloy | `grafana/alloy:v1.20.1` | 12345, 4317/4318 (OTLP) | Ships container logs to Loki via the Docker socket; tail-samples traces into Tempo |
+| tempo | `grafana/tempo:3.1.0` | 3200 | Trace storage, 7 days on its volume |
 
 See [Observability](observability.md).
 
@@ -244,11 +244,13 @@ Created on startup by `pkg/broker.EnsureTopics`, replication factor 1.
 |------|---------|
 | `monitoring/prometheus/prometheus.yml` | Scrapes the 11 services on their HTTP ports; reloads on edit (`--config.auto-reload`), Redpanda `/public_metrics`, Prometheus itself |
 | `monitoring/prometheus/alerts.yml` | Alert rules |
-| `monitoring/grafana/provisioning/` | Datasources (Prometheus, Loki, Jaeger, cross-linked) and dashboard provider |
+| `monitoring/grafana/provisioning/` | Datasources (Prometheus, Loki, Tempo, cross-linked) and dashboard provider |
 | `monitoring/grafana/dashboards/dsn-overview.json` | DSN Overview dashboard, also Grafana's home |
 | `monitoring/alloy/config.alloy` | Docker log discovery -> Loki, labelled `service` and `project` |
 | `monitoring/alloy/kubernetes.alloy` | The k8s equivalent: pod logs of the namespace -> Loki, labelled `service`, `namespace` and `pod` |
+| `monitoring/alloy/traces.alloy` | OTLP receiver -> tail sampling -> Tempo, on both |
+| `monitoring/tempo/tempo.yaml` | Tempo single binary, local storage, retention |
 
 The `deploy/kubernetes/observability` chart reads these through its `files/` symlink, so compose and the cluster share them.
 
-Services export traces to `OTEL_EXPORTER_OTLP_ENDPOINT` (`http://jaeger:4318` in compose); unset, tracing is off.
+Services export traces to `OTEL_EXPORTER_OTLP_ENDPOINT` (`http://alloy:4318` in compose and on the cluster); unset, tracing is off.

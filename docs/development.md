@@ -300,7 +300,7 @@ Three Helm charts, deployed by Argo CD from [distributed-social-network-gitops](
 |---|---|
 | `deploy/kubernetes/infra` | Postgres x5 (one for Keycloak), Scylla, Redpanda, ClickHouse, MinIO, Valkey, Elasticsearch, Keycloak |
 | `deploy/kubernetes/services` | the 11 services, UI, the `dsn` Gateway and its HTTPRoute |
-| `deploy/kubernetes/observability` | Prometheus, Grafana, Loki, Alloy, Jaeger, Redpanda Console, optional Kibana; configs from `monitoring/` |
+| `deploy/kubernetes/observability` | Prometheus, Grafana, Loki, Alloy, Tempo, Redpanda Console, optional Kibana; configs from `monitoring/` |
 
 Traffic enters through Gateway API: the services chart creates the `dsn` Gateway (class `traefik`, k3s's bundled Traefik with its Gateway provider turned on by `platform-k3s/traefik.yaml` in the gitops repo) and an HTTPRoute for `route.host` that sends `/api`, `/health` and `/images` to the gateway, `/auth` to Keycloak and everything else to the UI. The observability chart adds one HTTPRoute per UI on `<name>.<domain>`. With `route.tls`, the chart requests one cert-manager certificate (`route.clusterIssuer`) for `route.host` plus `route.extraHosts`, serves it on one HTTPS listener, and redirects the app's HTTP to it (`route.httpsPort` when HTTPS isn't on 443). Locally `extraHosts` lists the UI hosts (`grafana.localhost`, ...) so they get HTTPS as well; a `*.localhost` wildcard doesn't work, TLS clients reject wildcards under single-label names. For another controller, set `route.gateway.className` and its listener ports, or `route.gateway.create: false` with `route.parentRefs` to attach to a shared Gateway.
 
@@ -323,7 +323,7 @@ make trust-ca       # once per machine: browsers accept the cluster's certificat
 make forward        # compose's localhost ports + Argo CD on https://localhost:9443; not while compose is up
 make cluster-down
 # app on https://localhost:8443 (http://localhost:8081 redirects), Keycloak on https://localhost:8443/auth
-# minio, and grafana, prometheus, jaeger, redpanda, kibana with their groups, on https://<name>.localhost:8443
+# minio, and grafana, prometheus, redpanda, kibana with their groups, on https://<name>.localhost:8443
 make demo CLUSTER=1 # demo users and data, also make load CLUSTER=1
 ```
 

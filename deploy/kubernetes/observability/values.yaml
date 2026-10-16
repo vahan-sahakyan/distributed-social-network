@@ -1,6 +1,6 @@
 # configs and the dashboard come from monitoring/ (files/ is a symlink), shared with compose
 
-# switches: stack = prometheus, grafana, loki, alloy, jaeger; redpandaConsole and kibana
+# switches: stack = prometheus, grafana, loki, alloy, tempo; redpandaConsole and kibana
 # on their own. Routes and secrets name the switch they belong to in `group`
 stack:
   enabled: true
@@ -31,22 +31,25 @@ loki:
     requests: {cpu: 20m, memory: 128Mi}
     limits: {memory: 512Mi}
 
-# tails the pods of this namespace into loki
+# tails the pods of this namespace into loki; the services' OTLP entry, keeping traces
+# with an error or a slow span and traceSamplingPercent of the rest. One replica: tail
+# sampling needs all spans of a trace in one place
 alloy:
   image: grafana/alloy:v1.20.1
+  traceSamplingPercent: 10
   security: {user: 473, readOnly: true}
   resources:
-    requests: {cpu: 10m, memory: 64Mi}
-    limits: {memory: 256Mi}
+    requests: {cpu: 10m, memory: 128Mi}
+    limits: {memory: 512Mi}
 
-# all-in-one, in-memory: traces are lost on restart.
-# 2.21 dropped the /api/services|traces endpoints the grafana jaeger datasource uses
-jaeger:
-  image: jaegertracing/jaeger:2.20.0
+# single binary, blocks on its volume; queried through grafana
+tempo:
+  image: grafana/tempo:3.1.0
   security: {user: 10001, readOnly: true}
+  storage: 5Gi
   resources:
-    requests: {cpu: 20m, memory: 128Mi}
-    limits: {memory: 1Gi}
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {memory: 512Mi}
 
 redpandaConsole:
   enabled: true
@@ -76,7 +79,6 @@ route:
   routes:
     grafana: {group: stack, service: grafana, port: 3000}
     prometheus: {group: stack, service: prometheus, port: 9090}
-    jaeger: {group: stack, service: jaeger, port: 16686}
     redpanda: {group: redpandaConsole, service: redpanda-console, port: 8080}
     minio: {service: minio, port: 9001}
 
@@ -112,15 +114,15 @@ networkPolicy:
         gateway: true
     loki:
       - from: [alloy, grafana]
-    jaeger:
+    tempo:
       - from: [grafana]
-        gateway: true
-        ports: [16686]
+        ports: [3200]
+      - from: [alloy]
+        ports: [4317]
+    alloy:
       # OTLP from every service
       - namespace: true
         ports: [4317, 4318]
-    # nothing reads it
-    alloy: []
     redpanda-console:
       - gateway: true
     kibana:

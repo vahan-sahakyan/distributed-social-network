@@ -15,14 +15,16 @@ datasources:
       derivedFields:
         - name: TraceID
           matcherRegex: '"trace_id":"(\w+)"'
-          datasourceUid: jaeger
+          datasourceUid: tempo
           url: "$${__value.raw}"
 
-  - name: Jaeger
-    uid: jaeger
-    type: jaeger
-    url: http://jaeger:16686
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    url: http://tempo:3200
     jsonData:
+      streamingEnabled:
+        search: true
       tracesToLogsV2:
         datasourceUid: loki
         filterByTraceID: true
@@ -31,3 +33,5 @@ datasources:
         tags:
           - key: service.name
             value: service
+      lokiSearch:
+        datasourceUid: loki
