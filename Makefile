@@ -229,10 +229,7 @@ FORWARDS = \
 	dsn/svc/cache-rebuilder-service=9089 \
 	dsn/svc/search-service=9091 \
 	dsn/svc/keycloak=8180:8080 \
-	dsn/svc/comments-db=5433:5432 \
-	dsn/svc/likes-db=5434:5432 \
-	dsn/svc/users-db=5436:5432 \
-	dsn/svc/notifications-db=5437:5432 \
+	dsn/svc/postgres=5433:5432 \
 	dsn/svc/posts-db=9042 \
 	dsn/svc/clickhouse=8123,9009:9000 \
 	dsn/svc/redpanda=9644 \
@@ -267,7 +264,7 @@ forward:
 	@echo "Elasticsearch     http://localhost:9200"
 	@echo "Kibana            http://localhost:5601  (if enabled)"
 	@echo "gRPC              localhost:9081-9091"
-	@echo "Postgres          localhost:5433 comments, 5434 likes, 5436 users, 5437 notifications  (postgres / postgres)"
+	@echo "Postgres          localhost:5433, databases comments likes users notifications keycloak  (postgres / postgres)"
 	@echo "Scylla, ClickHouse, Loki, Alloy, MinIO S3, Valkey, Redpanda admin: their compose ports, see the README"
 	@for f in $(FORWARDS); do \
 		target=$${f%%=*}; \

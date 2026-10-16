@@ -23,16 +23,9 @@ The UI is not in compose; run it with `npm run dev` (see [Development](developme
 | Container | Image | Internal Port | Host Port | Purpose |
 |-----------|-------|--------------|---------------|---------|
 | posts-db | `scylladb/scylla:2026.1.5` | 9042 | 9042 | Posts storage (wide-column) |
-| comments-db | `postgres:16.14-alpine` | 5432 | 5433 | Comments storage |
-| likes-db | `postgres:16.14-alpine` | 5432 | 5434 | Likes storage |
-| users-db | `postgres:16.14-alpine` | 5432 | 5436 | Users + follows storage |
-| notifications-db | `postgres:16.14-alpine` | 5432 | 5437 | Notifications storage |
-| keycloak-db | `postgres:16.14-alpine` | 5432 | - | Keycloak's own store |
+| postgres | `postgres:18.6-alpine` | 5432 | 5433 | One database per service: comments, likes, users, notifications, plus keycloak |
 
-All PostgreSQL instances use:
-- User: `postgres`
-- Password: `postgres`
-- Each has its own named database matching the service
+One instance, a database per service, the way services would share one managed instance (RDS, Cloud SQL). `deploy/kubernetes/infra/files/postgres-init.sh` creates the databases on the first start of an empty volume; compose and the infra chart share it. User `postgres`, password `postgres`. In Helm, `postgres.enabled: false` runs no Postgres: set `postgres.host`, the `postgres-credentials` secret and the services' `DATABASE_URL`s to a managed instance.
 
 ScyllaDB runs with `--smp 1 --memory 512M --overprovisioned 1`.
 
@@ -42,7 +35,7 @@ ScyllaDB runs with `--smp 1 --memory 512M --overprovisioned 1`.
 |-----------|-------|-------|---------|
 | keycloak | `quay.io/keycloak/keycloak:26.7.5` | 8180 | OIDC provider, served under `/auth`; admin console admin/admin |
 
-The realm (`deploy/kubernetes/infra/files/dsn-realm.json`, shared with Helm) is imported only into an empty `keycloak-db`; after editing it, recreate the volume (`docker compose -f infrastructure/docker-compose.yml rm -sf keycloak keycloak-db && docker volume rm infrastructure_keycloak-data`) or change the realm in the admin console. Tokens carry the issuer `http://localhost:8180/auth/realms/dsn` however Keycloak is reached (`KC_HOSTNAME`). In Helm, set `keycloak.uiUrl` (infra chart) to the UI's public origin, and `publicUrl` (services chart) so the gateway checks the issuer. On a bare IP that changes on restart, `keycloak.uiUrl: /` makes the redirect URIs relative (valid on any origin), `publicUrl` stays empty, and `route.certificate: false` serves a `dsn-tls` secret made outside cert-manager.
+The realm (`deploy/kubernetes/infra/files/dsn-realm.json`, shared with Helm) is imported only into an empty `keycloak` database; after editing it, recreate the volume (`docker compose -f infrastructure/docker-compose.yml exec postgres dropdb -U postgres --force keycloak && docker compose -f infrastructure/docker-compose.yml exec postgres createdb -U postgres keycloak`, then restart `keycloak``) or change the realm in the admin console. Tokens carry the issuer `http://localhost:8180/auth/realms/dsn` however Keycloak is reached (`KC_HOSTNAME`). In Helm, set `keycloak.uiUrl` (infra chart) to the UI's public origin, and `publicUrl` (services chart) so the gateway checks the issuer. On a bare IP that changes on restart, `keycloak.uiUrl: /` makes the redirect URIs relative (valid on any origin), `publicUrl` stays empty, and `route.certificate: false` serves a `dsn-tls` secret made outside cert-manager.
 
 ### Event & Analytics
 
@@ -99,11 +92,11 @@ All app services are built from multi-stage Dockerfiles (`golang:1.27-alpine3.24
 | gateway-service | 8080 (host-mapped) | - | all services except event-writer |
 | posts-service | 8081 | 9081 | posts-db, redpanda |
 | feed-service | 8082 | 9082 | redpanda, valkey, users-service |
-| comments-service | 8083 | 9083 | comments-db, redpanda |
-| likes-service | 8084 | 9084 | likes-db, redpanda |
-| users-service | 8085 | 9085 | users-db |
+| comments-service | 8083 | 9083 | postgres, redpanda |
+| likes-service | 8084 | 9084 | postgres, redpanda |
+| users-service | 8085 | 9085 | postgres |
 | media-service | 8086 | 9086 | minio |
-| notification-service | 8087 | 9087 | notifications-db, redpanda, posts-service |
+| notification-service | 8087 | 9087 | postgres, redpanda, posts-service |
 | event-writer-service | 8088 | - | redpanda, clickhouse |
 | cache-rebuilder-service | 8089 | 9089 | clickhouse, valkey, users-service, posts-service |
 | search-service | 8091 | 9091 | elasticsearch, redpanda |
@@ -119,11 +112,12 @@ Exposed to the host: the gateway (8080), the gRPC ports 9081-9089 and 9091 (for 
 Persistent named volumes for all stateful services:
 
 ```
-posts-db-data, comments-db-data, likes-db-data, users-db-data,
-notifications-db-data, clickhouse-data, redpanda-data,
-minio-data, prometheus-data, grafana-data, loki-data, elasticsearch-data,
-keycloak-data
+posts-db-data, postgres-data, clickhouse-data, redpanda-data, minio-data,
+prometheus-data, alertmanager-data, grafana-data, loki-data, tempo-data,
+elasticsearch-data
 ```
+
+The Postgres 16 volumes from before (`comments-db-data`, `likes-db-data`, `users-db-data`, `notifications-db-data`, `keycloak-data`) are no longer mounted; remove them with `docker volume rm infrastructure_<name>` once nothing in them is needed.
 
 `make down-clean` (and `make fresh`) wipe all volumes.
 
@@ -131,7 +125,7 @@ keycloak-data
 
 Each service embeds its migrations (`services/*/migrations/`) and applies them on startup. They are idempotent (`IF NOT EXISTS`).
 
-### PostgreSQL - users-db
+### PostgreSQL - users
 
 ```sql
 CREATE TABLE users (
@@ -150,7 +144,7 @@ CREATE TABLE follows (
 CREATE INDEX idx_follows_followee ON follows (followee_id);
 ```
 
-### PostgreSQL - comments-db
+### PostgreSQL - comments
 
 ```sql
 CREATE TABLE comments (
@@ -166,7 +160,7 @@ CREATE INDEX idx_comments_entity_id ON comments (entity_id);
 CREATE INDEX idx_comments_created_at ON comments (created_at DESC);
 ```
 
-### PostgreSQL - likes-db
+### PostgreSQL - likes
 
 ```sql
 CREATE TABLE likes (
@@ -180,7 +174,7 @@ CREATE INDEX idx_likes_entity_id ON likes (entity_id);
 CREATE INDEX idx_likes_user_id ON likes (user_id);
 ```
 
-### PostgreSQL - notifications-db
+### PostgreSQL - notifications
 
 ```sql
 CREATE TABLE notifications (
