@@ -32,9 +32,10 @@ postgres:
     # seconds first: 03:00 every day
     schedule: "0 0 3 * * *"
     retention: 7d
+    # barman-cloud-backup needs ~200Mi while uploading a base backup
     sidecarResources:
-      requests: {cpu: 5m, memory: 32Mi}
-      limits: {memory: 128Mi}
+      requests: {cpu: 5m, memory: 64Mi}
+      limits: {memory: 384Mi}
   clusters:
     comments-db:
       database: comments
