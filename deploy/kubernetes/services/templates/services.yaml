@@ -20,7 +20,7 @@ spec:
       targetPort: {{ $svc.grpcPort }}
     {{- end }}
   type: ClusterIP
-{{- if $.Values.serviceMonitor.enabled }}
+{{- if and $.Values.serviceMonitor.enabled (ne $svc.metrics false) }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor

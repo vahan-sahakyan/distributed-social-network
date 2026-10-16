@@ -105,7 +105,8 @@ secrets:
       MINIO_SECRET_KEY: "{{ .password }}"
 
 # every service runs unless it sets enabled: false (local clusters switch off
-# search, event-writer and cache-rebuilder that way)
+# search, event-writer and cache-rebuilder that way), and is scraped unless it sets
+# metrics: false
 services:
   gateway:
     port: 8080
@@ -206,6 +207,7 @@ services:
   ui:
     image: ui
     port: 8080
+    metrics: false
     # nginx-unprivileged's user
     security:
       user: 101
