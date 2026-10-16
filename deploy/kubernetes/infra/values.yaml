@@ -1,14 +1,41 @@
+# CloudNativePG clusters, one per database (templates/postgres.yaml); needs the operator
+# and, for backups, its Barman Cloud plugin
 postgres:
-  image: postgres:16.14-alpine
-  user: postgres
-  # image uids; Pod Security "restricted", see templates/_helpers.tpl
-  security: {user: 70, readOnly: true}
-  # password comes from the postgres-credentials secret (POSTGRES_PASSWORD)
+  image: ghcr.io/cloudnative-pg/postgresql:18.6-minimal-trixie
+  # per cluster; 2 or more adds streaming standbys and automatic failover
+  instances: 1
   storage: 1Gi
   resources:
-    requests: {cpu: 20m, memory: 64Mi}
-    limits: {memory: 256Mi}
-  instances:
+    requests: {cpu: 20m, memory: 128Mi}
+    limits: {memory: 384Mi}
+  parameters:
+    shared_buffers: 64MB
+    max_connections: "100"
+  # PgBouncer in front of each cluster for the services; pooler: false on a cluster skips it
+  pooler:
+    instances: 1
+    parameters:
+      max_prepared_statements: "200"
+      default_pool_size: "10"
+    resources:
+      requests: {cpu: 5m, memory: 16Mi}
+      limits: {memory: 64Mi}
+  # WAL archiving and nightly base backups to S3 (minio here), kept for retention
+  backup:
+    enabled: true
+    endpointURL: http://minio:9000
+    bucket: postgres-backups
+    credentials:
+      secret: minio-credentials
+      accessKeyId: MINIO_ROOT_USER
+      secretAccessKey: MINIO_ROOT_PASSWORD
+    # seconds first: 03:00 every day
+    schedule: "0 0 3 * * *"
+    retention: 7d
+    sidecarResources:
+      requests: {cpu: 5m, memory: 32Mi}
+      limits: {memory: 128Mi}
+  clusters:
     comments-db:
       database: comments
     likes-db:
@@ -17,8 +44,10 @@ postgres:
       database: users
     notifications-db:
       database: notifications
+    # keycloak keeps its own connection pool
     keycloak-db:
       database: keycloak
+      pooler: false
 
 scylla:
   image: scylladb/scylla:2026.1.5
@@ -106,10 +135,6 @@ secretStore:
   name: openbao
   refreshInterval: 1h
 secrets:
-  postgres-credentials:
-    from: postgres
-    data:
-      POSTGRES_PASSWORD: "{{ .password }}"
   minio-credentials:
     from: minio
     data:
@@ -136,17 +161,62 @@ networkPolicy:
     namespace: kube-system
     podLabels:
       app.kubernetes.io/name: traefik
+  # the CloudNativePG operator, which manages the instances through their port 8000
+  operator:
+    namespace: cnpg-system
+    podLabels:
+      app.kubernetes.io/name: cloudnative-pg
   ingress:
+    # a cluster's instances: its pooler and clients, each other (replication), the
+    # operator, prometheus on the metrics port
     comments-db:
+      - from: [comments-db-pooler]
+        ports: [5432]
+      - from: [comments-db]
+      - operator: true
+        ports: [8000]
+      - from: [prometheus]
+        ports: [9187]
+    comments-db-pooler:
       - from: [comments-service]
     likes-db:
+      - from: [likes-db-pooler]
+        ports: [5432]
+      - from: [likes-db]
+      - operator: true
+        ports: [8000]
+      - from: [prometheus]
+        ports: [9187]
+    likes-db-pooler:
       - from: [likes-service]
     users-db:
+      - from: [users-db-pooler]
+        ports: [5432]
+      - from: [users-db]
+      - operator: true
+        ports: [8000]
+      - from: [prometheus]
+        ports: [9187]
+    users-db-pooler:
       - from: [users-service]
     notifications-db:
+      - from: [notifications-db-pooler]
+        ports: [5432]
+      - from: [notifications-db]
+      - operator: true
+        ports: [8000]
+      - from: [prometheus]
+        ports: [9187]
+    notifications-db-pooler:
       - from: [notification-service]
     keycloak-db:
       - from: [keycloak]
+        ports: [5432]
+      - from: [keycloak-db]
+      - operator: true
+        ports: [8000]
+      - from: [prometheus]
+        ports: [9187]
     posts-db:
       - from: [posts-service]
     redpanda:
@@ -160,6 +230,9 @@ networkPolicy:
       - from: [event-writer-service, cache-rebuilder-service]
     minio:
       - from: [media-service, gateway-service]
+      # postgres WAL and base backups
+      - from: [comments-db, likes-db, users-db, notifications-db, keycloak-db]
+        ports: [9000]
       # the console route
       - gateway: true
         ports: [9001]

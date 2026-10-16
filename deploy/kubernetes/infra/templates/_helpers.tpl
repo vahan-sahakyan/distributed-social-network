@@ -21,8 +21,9 @@ capabilities:
 
 {{/*
 A NetworkPolicy letting the rules' peers into the pods labelled app=<name>.
-Takes (dict "app" <name> "rules" <rules> "gateway" .Values.networkPolicy.gateway); a rule is
-{from: [app labels], gateway: the Gateway's proxy pods, namespace: any pod here, ports: [...]}.
+Takes (dict "app" <name> "rules" <rules> "gateway" .Values.networkPolicy.gateway "operator"
+.Values.networkPolicy.operator); a rule is {from: [app labels], gateway: the Gateway's proxy pods,
+operator: the CloudNativePG operator's pods, namespace: any pod here, ports: [...]}.
 No rules = nothing gets in.
 */}}
 {{- define "dsn.networkPolicy" -}}
@@ -51,6 +52,14 @@ spec:
           podSelector:
             matchLabels:
               {{- toYaml $.gateway.podLabels | nindent 14 }}
+        {{- end }}
+        {{- if .operator }}
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $.operator.namespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $.operator.podLabels | nindent 14 }}
         {{- end }}
         {{- if .namespace }}
         - podSelector: {}

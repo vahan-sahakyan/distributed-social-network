@@ -32,7 +32,7 @@ spec:
       initContainers:
         - name: wait-for-db
           image: {{ .Values.postgres.image }}
-          command: [sh, -c, "until pg_isready -h keycloak-db -U {{ .Values.postgres.user }}; do sleep 2; done"]
+          command: [sh, -c, "until pg_isready -h keycloak-db-rw; do sleep 2; done"]
           securityContext:
             {{- include "dsn.securityContext" (dict "readOnly" true) | nindent 12 }}
           resources:
@@ -65,15 +65,19 @@ spec:
               value: "true"
             - name: KC_DB
               value: postgres
+            # the database's owner, from the CloudNativePG cluster
             - name: KC_DB_URL
-              value: jdbc:postgresql://keycloak-db:5432/keycloak
+              value: jdbc:postgresql://keycloak-db-rw:5432/keycloak
             - name: KC_DB_USERNAME
-              value: {{ .Values.postgres.user }}
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-db-app
+                  key: username
             - name: KC_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-credentials
-                  key: POSTGRES_PASSWORD
+                  name: keycloak-db-app
+                  key: password
             - name: KC_BOOTSTRAP_ADMIN_USERNAME
               valueFrom:
                 secretKeyRef:

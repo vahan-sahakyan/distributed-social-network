@@ -82,28 +82,14 @@ secretStore:
   name: openbao
   refreshInterval: 1h
 secrets:
-  comments-service:
-    from: postgres
-    data:
-      DATABASE_URL: "postgres://postgres:{{ .password }}@comments-db:5432/comments?sslmode=disable"
-  likes-service:
-    from: postgres
-    data:
-      DATABASE_URL: "postgres://postgres:{{ .password }}@likes-db:5432/likes?sslmode=disable"
-  users-service:
-    from: postgres
-    data:
-      DATABASE_URL: "postgres://postgres:{{ .password }}@users-db:5432/users?sslmode=disable"
-  notification-service:
-    from: postgres
-    data:
-      DATABASE_URL: "postgres://postgres:{{ .password }}@notifications-db:5432/notifications?sslmode=disable"
   media-service:
     from: minio
     data:
       MINIO_ACCESS_KEY: "{{ .user }}"
       MINIO_SECRET_KEY: "{{ .password }}"
 
+# database: <cluster> sets DATABASE_URL to that CloudNativePG cluster's pooler, as the
+# database owner from the operator's <cluster>-app secret (infra chart).
 # every service runs unless it sets enabled: false (local clusters switch off
 # search, event-writer and cache-rebuilder that way), and is scraped unless it sets
 # metrics: false
@@ -144,7 +130,7 @@ services:
   comments:
     port: 8083
     grpcPort: 9083
-    secret: true
+    database: comments-db
     env:
       KAFKA_BROKERS: redpanda:9092
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081
@@ -152,7 +138,7 @@ services:
   likes:
     port: 8084
     grpcPort: 9084
-    secret: true
+    database: likes-db
     env:
       KAFKA_BROKERS: redpanda:9092
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081
@@ -160,7 +146,7 @@ services:
   users:
     port: 8085
     grpcPort: 9085
-    secret: true
+    database: users-db
     env:
       KAFKA_BROKERS: redpanda:9092
 
@@ -175,7 +161,7 @@ services:
   notification:
     port: 8087
     grpcPort: 9087
-    secret: true
+    database: notifications-db
     env:
       KAFKA_BROKERS: redpanda:9092
       POSTS_SERVICE_GRPC_ADDR: posts-service:9081

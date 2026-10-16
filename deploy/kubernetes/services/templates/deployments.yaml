@@ -46,6 +46,26 @@ spec:
             - name: {{ $key }}
               value: {{ if and $target (eq $target.enabled false) }}""{{ else }}{{ $val | quote }}{{ end }}
             {{- end }}
+            {{- with $svc.database }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}-app
+                  key: username
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}-app
+                  key: password
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}-app
+                  key: dbname
+            # the pooler serves TLS with the cluster's certificate
+            - name: DATABASE_URL
+              value: "postgres://$(DB_USER):$(DB_PASSWORD)@{{ . }}-pooler:5432/$(DB_NAME)?sslmode=require"
+            {{- end }}
             {{- with $.Values.otelEndpoint }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
               value: {{ . | quote }}

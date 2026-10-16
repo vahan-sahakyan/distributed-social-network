@@ -9,7 +9,7 @@ services:
       - posts-db-data:/var/lib/scylla
 
   comments-db:
-    image: postgres:16.14-alpine
+    image: postgres:18.6-alpine
     environment:
       POSTGRES_DB: comments
       POSTGRES_USER: postgres
@@ -17,10 +17,10 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - comments-db-data:/var/lib/postgresql/data
+      - comments-db-pg18:/var/lib/postgresql
 
   likes-db:
-    image: postgres:16.14-alpine
+    image: postgres:18.6-alpine
     environment:
       POSTGRES_DB: likes
       POSTGRES_USER: postgres
@@ -28,10 +28,10 @@ services:
     ports:
       - "5434:5432"
     volumes:
-      - likes-db-data:/var/lib/postgresql/data
+      - likes-db-pg18:/var/lib/postgresql
 
   users-db:
-    image: postgres:16.14-alpine
+    image: postgres:18.6-alpine
     environment:
       POSTGRES_DB: users
       POSTGRES_USER: postgres
@@ -39,10 +39,10 @@ services:
     ports:
       - "5436:5432"
     volumes:
-      - users-db-data:/var/lib/postgresql/data
+      - users-db-pg18:/var/lib/postgresql
 
   notifications-db:
-    image: postgres:16.14-alpine
+    image: postgres:18.6-alpine
     environment:
       POSTGRES_DB: notifications
       POSTGRES_USER: postgres
@@ -50,7 +50,7 @@ services:
     ports:
       - "5437:5432"
     volumes:
-      - notifications-db-data:/var/lib/postgresql/data
+      - notifications-db-pg18:/var/lib/postgresql
 
   # --- Event Store ---
   clickhouse:
@@ -102,13 +102,13 @@ services:
 
   # --- Identity ---
   keycloak-db:
-    image: postgres:16.14-alpine
+    image: postgres:18.6-alpine
     environment:
       POSTGRES_DB: keycloak
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     volumes:
-      - keycloak-data:/var/lib/postgresql/data
+      - keycloak-db-pg18:/var/lib/postgresql
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.5
@@ -278,10 +278,10 @@ services:
 
 volumes:
   posts-db-data:
-  comments-db-data:
-  likes-db-data:
-  users-db-data:
-  notifications-db-data:
+  comments-db-pg18:
+  likes-db-pg18:
+  users-db-pg18:
+  notifications-db-pg18:
   clickhouse-data:
   redpanda-data:
   minio-data:
@@ -291,4 +291,4 @@ volumes:
   loki-data:
   tempo-data:
   elasticsearch-data:
-  keycloak-data:
+  keycloak-db-pg18:
