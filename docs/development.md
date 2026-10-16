@@ -316,8 +316,10 @@ Postgres runs on CloudNativePG (`templates/postgres.yaml` in the infra chart; op
 - Services set `database: <cluster>` and get `DATABASE_URL` through a PgBouncer `Pooler` (`<cluster>-pooler`, transaction mode, TLS); Keycloak connects to `keycloak-db-rw` directly
 - WAL is archived continuously and a base backup runs nightly to the `postgres-backups` bucket in MinIO (`postgres.backup`), kept 7 days; each cluster under its own name
 - A `PodMonitor` per cluster when `serviceMonitor.enabled`
+- Failover with 2 instances: a crashed primary's standby is promoted in ~20s, and writes through the pooler resume right after (`server_login_retry: 3`). Deleting the primary pod is a graceful stop: it keeps serving open connections for up to `smartShutdownTimeout` (180s) before the standby takes over
+- Changing `backup.sidecarResources` reaches running instances only after a restart: `kubectl -n dsn annotate cluster <cluster> kubectl.kubernetes.io/restartedAt=$(date -u +%FT%TZ) --overwrite`
 
-Restore a backup into a new cluster:
+Restore a backup into a new cluster (the `app` label lets it reach MinIO):
 ```yaml
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
@@ -327,6 +329,8 @@ spec:
   instances: 1
   imageName: ghcr.io/cloudnative-pg/postgresql:18.6-minimal-trixie
   storage: {size: 1Gi}
+  inheritedMetadata:
+    labels: {app: comments-db}
   bootstrap:
     recovery:
       source: origin

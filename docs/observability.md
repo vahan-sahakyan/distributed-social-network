@@ -184,7 +184,7 @@ sum by (service) (count_over_time({service=~".+-service"} | json | level=~"WARN|
 - Tempo's single binary keeps blocks on local disk; a multi-node cluster would point it at object storage.
 - No span metrics or service graph from traces; RED metrics come from the services' own Prometheus metrics.
 - No database, cache or object-storage spans: a DB call is inside its gRPC server span, not a span of its own.
-- No infra exporters for PostgreSQL, ScyllaDB, ClickHouse, Valkey or MinIO; only Redpanda is scraped.
+- No infra exporters for ScyllaDB, ClickHouse, Valkey or MinIO. On the cluster Postgres instances are scraped (CloudNativePG `cnpg_*` metrics); compose scrapes only Redpanda among the stores.
 - Compose scrapes a static target list, so the services of a switched-off group (`EVENTS`, `SEARCH`) are down targets and mail `ServiceDown`. The cluster scrapes only what runs.
 - Mailpit keeps mails in memory; they are gone after a restart.
 - On the cluster `ServiceDown` catches a pod that runs but doesn't answer (not-ready pods are still scraped); a service scaled to zero has no target, so nothing fires for it.
