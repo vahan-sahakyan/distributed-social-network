@@ -90,7 +90,7 @@ GET posts/_search
 {"size": 0, "aggs": {"per_day": {"date_histogram": {"field": "created_at", "calendar_interval": "day"}}}}
 ```
 
-In Jaeger, a search request is one trace: gateway -> `search.SearchService/SearchPosts` -> the Elasticsearch `search` span with the index and status.
+In Tempo, a search request is one trace: gateway -> `search.SearchService/SearchPosts` -> the Elasticsearch `search` span with the index and status.
 
 ## Limits
 

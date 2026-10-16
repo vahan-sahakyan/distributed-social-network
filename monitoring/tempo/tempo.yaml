@@ -1,0 +1,32 @@
+# single binary, blocks on local disk under /var/tempo; spans arrive from alloy only
+stream_over_http_enabled: true
+
+# GOMEMLIMIT from the container's memory limit
+memory:
+  automemlimit_enabled: true
+
+server:
+  http_listen_port: 3200
+  log_level: warn
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+backend_worker:
+  compaction:
+    block_retention: 168h
+
+usage_report:
+  reporting_enabled: false

@@ -18,9 +18,9 @@ open http://localhost:3000 # admin / admin, lands on "DSN Overview"
 |------|-----|------------|
 | Grafana | http://localhost:3000 | Dashboard, Explore (PromQL / LogQL / traces), alert rules |
 | Prometheus | http://localhost:9090 | Raw queries, `/targets`, `/alerts` |
-| Jaeger | http://localhost:16686 | Trace search and waterfall |
+| Tempo | http://localhost:3200 | API only; search traces in Grafana Explore (TraceQL) |
 | Loki | http://localhost:3100 | API only; query through Grafana |
-| Alloy | http://localhost:12345 | Log pipeline debug UI |
+| Alloy | http://localhost:12345 | Log and trace pipeline debug UI; OTLP on 4317/4318 |
 | Redpanda Console | http://localhost:8888 | Topics, messages, `.dlq` topics, consumer groups |
 
 ### Kubernetes
@@ -31,12 +31,11 @@ open http://localhost:3000 # admin / admin, lands on "DSN Overview"
 |------|-----|
 | Grafana | https://grafana.localhost:8443 (admin / admin) |
 | Prometheus | https://prometheus.localhost:8443 |
-| Jaeger | https://jaeger.localhost:8443 |
 | Redpanda Console | https://redpanda.localhost:8443 |
 | MinIO Console | https://minio.localhost:8443 |
 | Kibana (`kibana.enabled`) | https://kibana.localhost:8443 |
 
-The dashboard's links to Jaeger and Prometheus point at the compose ports.
+The dashboard's Prometheus link points at the compose port; its Traces link opens Grafana Explore on Tempo.
 
 ## How it is wired
 
@@ -44,19 +43,20 @@ The dashboard's links to Jaeger and Prometheus point at the compose ports.
 graph LR
     Svc[11 services] -->|/metrics, scraped every 15s| Prom[Prometheus]
     Redpanda -->|/public_metrics| Prom
-    Svc -->|OTLP/HTTP :4318| Jaeger
+    Svc -->|OTLP/HTTP :4318| Alloy
+    Alloy -->|tail-sampled, OTLP/gRPC| Tempo
     Svc -->|JSON to stdout| Docker
     Docker -->|docker.sock| Alloy --> Loki
     Prom --> Grafana
     Loki --> Grafana
-    Jaeger --> Grafana
+    Tempo --> Grafana
 ```
 
 Shared code: `pkg/observability` (logger, tracer, gRPC options) and `pkg/broker` (Kafka trace propagation + metrics).
 
 | Signal | Source | Notes |
 |--------|--------|-------|
-| Traces | `otelfiber` (gateway), `otelgrpc` (all gRPC servers and clients), `pkg/broker` (publish / process spans) | Trace context rides in Kafka headers, so a request and every consumer it triggers are **one trace**. Exported only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set |
+| Traces | `otelfiber` (gateway), `otelgrpc` (all gRPC servers and clients), `pkg/broker` (publish / process spans) | Trace context rides in Kafka headers, so a request and every consumer it triggers are **one trace**. Exported only when `OTEL_EXPORTER_OTLP_ENDPOINT` is set; sampled in Alloy (see [Sampling](#sampling)) |
 | Logs | `slog` JSON on stdout, std `log` routed through it | Every line has `service`; lines logged with a traced context add `trace_id`, `span_id`. `LOG_LEVEL=debug` for more |
 | Metrics | see below | Go runtime and process metrics on every service too |
 
@@ -79,8 +79,22 @@ Lag comes from the broker rather than the consumer: a dead consumer can't report
 ### Correlation
 
 - **Log -> trace**: in Grafana Explore (Loki) or the dashboard's log panel, expand a line; the `TraceID` link opens the trace.
-- **Trace -> logs**: in Grafana Explore (Jaeger), a span's "Logs for this span" runs `{service="<span service>"} |= "<trace id>"`.
-- Jaeger UI search: service + operation, or tags such as `error=true`.
+- **Trace -> logs**: in Grafana Explore (Tempo), a span's "Logs for this span" runs `{service="<span service>"} |= "<trace id>"`.
+- Trace search: TraceQL in Explore, e.g. `{resource.service.name="gateway-service" && status=error}` or `{duration > 500ms}`.
+
+### Sampling
+
+Services record every span; Alloy (`monitoring/alloy/traces.alloy`) decides per trace, 10s after its first span:
+
+| Kept | Policy |
+|------|--------|
+| every trace with an error span | `status_code` ERROR |
+| every trace with a span over 500ms | `latency` |
+| `TRACE_SAMPLING_PERCENT` of the rest | `probabilistic`, by trace id |
+
+The rate is 100% on compose (`TRACE_SAMPLING_PERCENT=10 make up` to change it) and 10% on the cluster (`alloy.traceSamplingPercent`). Spans arriving after the decision, such as a consumer retrying, follow it. Tail sampling needs a whole trace on one Alloy, so Alloy runs one replica.
+
+Tempo keeps traces on its volume for 7 days (`monitoring/tempo/tempo.yaml`).
 
 ### Alerts
 
@@ -99,7 +113,7 @@ Lag comes from the broker rather than the consumer: a dead consumer can't report
 
 Run `make load DURATION=600` in one terminal and watch **DSN Overview** while doing these.
 
-**1. Follow one request end to end.** Jaeger -> service `gateway-service`, operation `/api/v1/posts/` -> open a trace. Expected: gateway -> posts-service `CreatePost` -> `publish post.created` -> `process post.created` in feed-service and event-writer-service, plus feed's `GetFollowers` call to users-service. Under load event-writer processes batches: its span then starts its own trace and links to each producer span (`messaging.batch.message_count` tag).
+**1. Follow one request end to end.** Grafana Explore -> Tempo, TraceQL `{resource.service.name="gateway-service" && name="/api/v1/posts/" && span.http.request.method="POST"}` -> open a trace. Expected: gateway -> posts-service `CreatePost` -> `publish post.created` -> `process post.created` in feed-service and event-writer-service, plus feed's `GetFollowers` call to users-service. Under load event-writer processes batches: its span then starts its own trace and links to each producer span (`messaging.batch.message_count` tag).
 
 **2. Kill a dependency.**
 ```bash
@@ -129,7 +143,7 @@ docker stop infrastructure-redpanda-1
 # like, comment and create users for a minute (UI or curl)
 docker start infrastructure-redpanda-1
 ```
-"Outbox backlog" climbs per service while Redpanda is down (`OutboxStuck` fires after ~3m) and drops to 0 within seconds of the restart. In Jaeger, a like made during the outage is still one trace: the request, then `publish like.created` attempts backing off 1s, 2s, 4s, 8s until one succeeds, then the consumers. Consumers resume up to 30s after the broker returns (their reconnect backoff).
+"Outbox backlog" climbs per service while Redpanda is down (`OutboxStuck` fires after ~3m) and drops to 0 within seconds of the restart. In Tempo, a like made during the outage is still one trace: the request, then `publish like.created` attempts backing off 1s, 2s, 4s, 8s until one succeeds, then the consumers. Consumers resume up to 30s after the broker returns (their reconnect backoff).
 
 **7. Replay what was parked.** Stop posts-service, like a post, start posts-service again:
 ```bash
@@ -161,8 +175,8 @@ sum by (service) (count_over_time({service=~".+-service"} | json | level=~"WARN|
 
 ## Limits
 
-- Jaeger is in-memory: traces are gone after a restart. Pinned to 2.20.0 because 2.21 removed the HTTP API Grafana's Jaeger datasource uses.
-- 100% of traces are sampled; fine locally, not for production.
+- Tempo's single binary keeps blocks on local disk; a multi-node cluster would point it at object storage.
+- No span metrics or service graph from traces; RED metrics come from the services' own Prometheus metrics.
 - No database, cache or object-storage spans: a DB call is inside its gRPC server span, not a span of its own.
 - No infra exporters for PostgreSQL, ScyllaDB, ClickHouse, Valkey or MinIO; only Redpanda is scraped.
 - Alloy reads the Docker socket, so it ships every compose container's logs, including the data stores' plain-text ones.

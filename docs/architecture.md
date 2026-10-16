@@ -231,7 +231,7 @@ Asynchronous (events)
 
 Wired through `pkg/observability` and `pkg/broker`; details, dashboards and exercises in [Observability](observability.md).
 
-- **Traces**: OpenTelemetry over HTTP -> gRPC -> Kafka headers -> consumers, so a request and the events it causes are one trace (Jaeger)
+- **Traces**: OpenTelemetry over HTTP -> gRPC -> Kafka headers -> consumers, so a request and the events it causes are one trace (Tempo, tail-sampled in Alloy)
 - **Logs**: JSON `slog` with `trace_id`, shipped by Alloy to Loki
 - **Metrics**: gateway HTTP, gRPC server/client, and publish/consume/retry/DLQ metrics per service; consumer lag from Redpanda (Prometheus)
 - Grafana has the three datasources linked and a provisioned **DSN Overview** dashboard
