@@ -1,66 +1,71 @@
 {{- if .Values.stack.enabled }}
+# run by the Prometheus Operator: scrapes the namespace's ServiceMonitors and PodMonitors,
+# evaluates its PrometheusRules, alerts through alertmanager
 ---
 apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: prometheus-config
-data:
-  {{- (.Files.Glob "files/prometheus/*.yml").AsConfig | nindent 2 }}
----
-apiVersion: apps/v1
-kind: StatefulSet
+kind: ServiceAccount
 metadata:
   name: prometheus
-  labels:
-    app: prometheus
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus
+rules:
+  - apiGroups: [""]
+    resources: [services, endpoints, pods]
+    verbs: [get, list, watch]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: prometheus
 spec:
+  image: {{ .Values.prometheus.image }}
+  version: {{ splitList ":" .Values.prometheus.image | last }}
   replicas: 1
-  serviceName: prometheus
+  serviceAccountName: prometheus
+  podMetadata:
+    labels:
+      app: prometheus
+  scrapeInterval: 15s
+  evaluationInterval: 15s
+  retention: {{ .Values.prometheus.retention }}
+  # this namespace only
+  serviceMonitorSelector: {}
+  podMonitorSelector: {}
+  ruleSelector: {}
+  alerting:
+    alertmanagers:
+      - name: alertmanager
+        namespace: {{ .Release.Namespace }}
+        port: web
+        apiVersion: v2
+  securityContext:
+    {{- include "dsn.podSecurityContext" .Values.prometheus.security | nindent 4 }}
+  resources:
+    {{- toYaml .Values.prometheus.resources | nindent 4 }}
   persistentVolumeClaimRetentionPolicy:
     whenDeleted: Retain
     whenScaled: Retain
-  selector:
-    matchLabels:
-      app: prometheus
-  template:
-    metadata:
-      labels:
-        app: prometheus
-    spec:
-      securityContext:
-        {{- include "dsn.podSecurityContext" .Values.prometheus.security | nindent 8 }}
-      containers:
-        - name: prometheus
-          image: {{ .Values.prometheus.image }}
-          securityContext:
-            {{- include "dsn.securityContext" .Values.prometheus.security | nindent 12 }}
-          # configmap edits reach the mount within a minute and are reloaded, no restart
-          args:
-            - --config.file=/etc/prometheus/prometheus.yml
-            - --storage.tsdb.path=/prometheus
-            - --config.auto-reload
-            - --config.auto-reload-interval=10s
-          resources:
-            {{- toYaml .Values.prometheus.resources | nindent 12 }}
-          ports:
-            - containerPort: 9090
-          volumeMounts:
-            - name: config
-              mountPath: /etc/prometheus
-            - name: data
-              mountPath: /prometheus
-          readinessProbe:
-            httpGet:
-              path: /-/ready
-              port: 9090
-            periodSeconds: 5
-      volumes:
-        - name: config
-          configMap:
-            name: prometheus-config
-  volumeClaimTemplates:
-    - metadata:
-        name: data
+  storage:
+    volumeClaimTemplate:
       spec:
         accessModes: [ReadWriteOnce]
         resources:
@@ -71,11 +76,33 @@ apiVersion: v1
 kind: Service
 metadata:
   name: prometheus
+  labels:
+    app: prometheus
 spec:
   selector:
     app: prometheus
   ports:
-    - port: 9090
+    - name: web
+      port: 9090
       targetPort: 9090
   type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: prometheus
+  endpoints:
+    - port: web
+---
+# the alert rules compose loads from the same file
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: dsn
+spec:
+  {{- .Files.Get "files/prometheus/alerts.yml" | nindent 2 }}
 {{- end }}

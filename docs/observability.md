@@ -18,6 +18,8 @@ open http://localhost:3000 # admin / admin, lands on "DSN Overview"
 |------|-----|------------|
 | Grafana | http://localhost:3000 | Dashboard, Explore (PromQL / LogQL / traces), alert rules |
 | Prometheus | http://localhost:9090 | Raw queries, `/targets`, `/alerts` |
+| Alertmanager | http://localhost:9093 | Firing alerts, silences |
+| Mailpit | http://localhost:8025 | Alert mails |
 | Tempo | http://localhost:3200 | API only; search traces in Grafana Explore (TraceQL) |
 | Loki | http://localhost:3100 | API only; query through Grafana |
 | Alloy | http://localhost:12345 | Log and trace pipeline debug UI; OTLP on 4317/4318 |
@@ -25,12 +27,14 @@ open http://localhost:3000 # admin / admin, lands on "DSN Overview"
 
 ### Kubernetes
 
-`make cluster-up` deploys the `deploy/kubernetes/observability` chart through Argo CD. Its `files/` is a symlink to `monitoring/`, so the scrape config, alerts, datasources and dashboard are the ones compose uses; only log collection differs (`monitoring/alloy/kubernetes.alloy` reads pod logs through the API and labels them by the pod's `app` label, which matches the compose service names). Every UI gets an HTTPRoute on the `dsn` Gateway, on https://<name>.localhost:8443 and http://<name>.localhost:8081:
+`make cluster-up` deploys the `deploy/kubernetes/observability` chart through Argo CD, with the Prometheus Operator running Prometheus and Alertmanager. Its `files/` is a symlink to `monitoring/`, so the alert rules (as a `PrometheusRule`), Alertmanager config, datasources and dashboard are the ones compose uses. Two things differ: scraping comes from `ServiceMonitor`s (one per service in the services chart, Redpanda's in the infra chart, on when `serviceMonitor.enabled`; the gitops repo sets it with `obs`) instead of `prometheus.yml`'s static list, so only what runs is scraped; and log collection (`monitoring/alloy/kubernetes.alloy` reads pod logs through the API and labels them by the pod's `app` label, which matches the compose service names). Every UI gets an HTTPRoute on the `dsn` Gateway, on https://<name>.localhost:8443 and http://<name>.localhost:8081:
 
 | Tool | URL |
 |------|-----|
 | Grafana | https://grafana.localhost:8443 (admin / admin) |
 | Prometheus | https://prometheus.localhost:8443 |
+| Alertmanager | https://alertmanager.localhost:8443 |
+| Mailpit | https://mailpit.localhost:8443 |
 | Redpanda Console | https://redpanda.localhost:8443 |
 | MinIO Console | https://minio.localhost:8443 |
 | Kibana (`kibana.enabled`) | https://kibana.localhost:8443 |
@@ -47,7 +51,9 @@ graph LR
     Alloy -->|tail-sampled, OTLP/gRPC| Tempo
     Svc -->|JSON to stdout| Docker
     Docker -->|docker.sock| Alloy --> Loki
+    Prom -->|alerts| AM[Alertmanager] -->|SMTP| Mailpit
     Prom --> Grafana
+    AM --> Grafana
     Loki --> Grafana
     Tempo --> Grafana
 ```
@@ -98,7 +104,7 @@ Tempo keeps traces on its volume for 7 days (`monitoring/tempo/tempo.yaml`).
 
 ### Alerts
 
-`monitoring/prometheus/alerts.yml`, visible at http://localhost:9090/alerts and in Grafana under Alerting -> Alert rules. No Alertmanager, so nothing is sent anywhere.
+`monitoring/prometheus/alerts.yml`, visible at http://localhost:9090/alerts and in Grafana under Alerting. Prometheus sends firing alerts to Alertmanager (`monitoring/alertmanager/alertmanager.yml`), which mails each group to Mailpit: http://localhost:8025 shows `[FIRING:1] ServiceDown likes-service ...` and the resolved mail after it. A real receiver is a different `smarthost`, or another receiver type, in that file.
 
 | Alert | Fires when |
 |-------|-----------|
@@ -179,4 +185,6 @@ sum by (service) (count_over_time({service=~".+-service"} | json | level=~"WARN|
 - No span metrics or service graph from traces; RED metrics come from the services' own Prometheus metrics.
 - No database, cache or object-storage spans: a DB call is inside its gRPC server span, not a span of its own.
 - No infra exporters for PostgreSQL, ScyllaDB, ClickHouse, Valkey or MinIO; only Redpanda is scraped.
+- Compose scrapes a static target list, so the services of a switched-off group (`EVENTS`, `SEARCH`) are down targets and mail `ServiceDown`. The cluster scrapes only what runs.
+- Mailpit keeps mails in memory; they are gone after a restart.
 - Alloy reads the Docker socket, so it ships every compose container's logs, including the data stores' plain-text ones.

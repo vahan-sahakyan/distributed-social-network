@@ -78,6 +78,8 @@ MinIO's upstream images and binaries are no longer published, so the image is bu
 | Container | Image | Host Port | Purpose |
 |-----------|-------|------|---------|
 | prometheus | `prom/prometheus:v3.12.0` | 9090 | Metrics, alert rules |
+| alertmanager | `prom/alertmanager:v0.34.1` | 9093 | Routes Prometheus alerts to Mailpit |
+| mailpit | `axllent/mailpit:v1.31.6` | 8025 | Catches alert mails, in memory |
 | grafana | `grafana/grafana:13.0.2` | 3000 | Provisioned datasources + DSN Overview dashboard |
 | loki | `grafana/loki:3.7.2` | 3100 | Log storage |
 | alloy | `grafana/alloy:v1.20.1` | 12345, 4317/4318 (OTLP) | Ships container logs to Loki via the Docker socket; tail-samples traces into Tempo |
@@ -243,8 +245,9 @@ Created on startup by `pkg/broker.EnsureTopics`, replication factor 1.
 | File | Purpose |
 |------|---------|
 | `monitoring/prometheus/prometheus.yml` | Scrapes the 11 services on their HTTP ports; reloads on edit (`--config.auto-reload`), Redpanda `/public_metrics`, Prometheus itself |
-| `monitoring/prometheus/alerts.yml` | Alert rules |
-| `monitoring/grafana/provisioning/` | Datasources (Prometheus, Loki, Tempo, cross-linked) and dashboard provider |
+| `monitoring/prometheus/alerts.yml` | Alert rules; a `PrometheusRule` on the cluster |
+| `monitoring/alertmanager/alertmanager.yml` | Alertmanager route and receiver (mail to Mailpit) |
+| `monitoring/grafana/provisioning/` | Datasources (Prometheus, Loki, Tempo cross-linked; Alertmanager) and dashboard provider |
 | `monitoring/grafana/dashboards/dsn-overview.json` | DSN Overview dashboard, also Grafana's home |
 | `monitoring/alloy/config.alloy` | Docker log discovery -> Loki, labelled `service` and `project` |
 | `monitoring/alloy/kubernetes.alloy` | The k8s equivalent: pod logs of the namespace -> Loki, labelled `service`, `namespace` and `pod` |

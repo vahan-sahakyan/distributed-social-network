@@ -241,6 +241,8 @@ FORWARDS = \
 	dsn/svc/valkey=6379 \
 	dsn/svc/minio=9000,9001 \
 	dsn/svc/prometheus=9090 \
+	dsn/svc/alertmanager=9093 \
+	dsn/svc/mailpit=8025 \
 	dsn/svc/grafana=3000 \
 	dsn/svc/loki=3100 \
 	dsn/svc/alloy=12345,4317,4318 \
@@ -258,6 +260,8 @@ forward:
 	@echo "Keycloak          http://localhost:8180/auth  (admin / admin)"
 	@echo "Grafana           http://localhost:3000  (admin / admin)"
 	@echo "Prometheus        http://localhost:9090"
+	@echo "Alertmanager      http://localhost:9093"
+	@echo "Mailpit           http://localhost:8025  (alert mails)"
 	@echo "Redpanda Console  http://localhost:8888"
 	@echo "MinIO Console     http://localhost:9001  (minioadmin / minioadmin)"
 	@echo "Elasticsearch     http://localhost:9200"

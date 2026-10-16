@@ -5,6 +5,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ $name }}-service
+  labels:
+    app: {{ $name }}-service
 spec:
   selector:
     app: {{ $name }}-service
@@ -18,5 +20,18 @@ spec:
       targetPort: {{ $svc.grpcPort }}
     {{- end }}
   type: ClusterIP
+{{- if $.Values.serviceMonitor.enabled }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ $name }}-service
+spec:
+  selector:
+    matchLabels:
+      app: {{ $name }}-service
+  endpoints:
+    - port: http
+{{- end }}
 {{- end }}
 {{- end }}

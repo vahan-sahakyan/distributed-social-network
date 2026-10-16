@@ -121,6 +121,11 @@ secrets:
       KEYCLOAK_ADMIN: "{{ .user }}"
       KEYCLOAK_ADMIN_PASSWORD: "{{ .password }}"
 
+# a ServiceMonitor for redpanda's /public_metrics, for a Prometheus Operator Prometheus;
+# needs the operator's CRDs
+serviceMonitor:
+  enabled: false
+
 # NetworkPolicies, one per store: only its clients get in (the services chart denies the
 # rest). A rule is {from: [app labels], gateway: the Gateway's proxy pods, namespace: any pod
 # here, ports: [...]}

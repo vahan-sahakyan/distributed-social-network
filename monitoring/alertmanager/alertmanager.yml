@@ -1,0 +1,17 @@
+# every alert goes by mail to mailpit, which catches it (http://localhost:8025). A real
+# receiver is a new smarthost, or another receiver type, here
+route:
+  receiver: mail
+  group_by: [alertname, job]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: mail
+    email_configs:
+      - to: oncall@dsn.local
+        from: alertmanager@dsn.local
+        smarthost: mailpit:1025
+        require_tls: false
+        send_resolved: true
