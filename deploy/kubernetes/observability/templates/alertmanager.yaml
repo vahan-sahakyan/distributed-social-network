@@ -1,0 +1,107 @@
+{{- if .Values.stack.enabled }}
+# run by the Prometheus Operator, with the config compose uses
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: alertmanager-config
+stringData:
+  alertmanager.yaml: |
+    {{- .Files.Get "files/alertmanager/alertmanager.yml" | nindent 4 }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: Alertmanager
+metadata:
+  name: alertmanager
+spec:
+  image: {{ .Values.alertmanager.image }}
+  version: {{ splitList ":" .Values.alertmanager.image | last }}
+  replicas: 1
+  configSecret: alertmanager-config
+  podMetadata:
+    labels:
+      app: alertmanager
+  securityContext:
+    {{- include "dsn.podSecurityContext" .Values.alertmanager.security | nindent 4 }}
+  resources:
+    {{- toYaml .Values.alertmanager.resources | nindent 4 }}
+  storage:
+    volumeClaimTemplate:
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: {{ .Values.alertmanager.storage }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alertmanager
+spec:
+  selector:
+    app: alertmanager
+  ports:
+    - name: web
+      port: 9093
+      targetPort: 9093
+  type: ClusterIP
+---
+# catches alert mails; keeps them in memory
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mailpit
+  labels:
+    app: mailpit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mailpit
+  template:
+    metadata:
+      labels:
+        app: mailpit
+    spec:
+      securityContext:
+        {{- include "dsn.podSecurityContext" .Values.mailpit.security | nindent 8 }}
+      containers:
+        - name: mailpit
+          image: {{ .Values.mailpit.image }}
+          securityContext:
+            {{- include "dsn.securityContext" .Values.mailpit.security | nindent 12 }}
+          resources:
+            {{- toYaml .Values.mailpit.resources | nindent 12 }}
+          ports:
+            - name: smtp
+              containerPort: 1025
+            - name: http
+              containerPort: 8025
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8025
+            periodSeconds: 5
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mailpit
+spec:
+  selector:
+    app: mailpit
+  ports:
+    - name: smtp
+      port: 1025
+      targetPort: 1025
+    - name: http
+      port: 8025
+      targetPort: 8025
+  type: ClusterIP
+{{- end }}

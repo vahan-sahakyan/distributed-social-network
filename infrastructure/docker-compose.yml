@@ -199,6 +199,26 @@ services:
       # a directory mount, so edits that replace the file are seen
       - ../monitoring/prometheus:/etc/prometheus:ro
       - prometheus-data:/prometheus
+    depends_on:
+      - alertmanager
+
+  alertmanager:
+    profiles: ["obs"]
+    image: prom/alertmanager:v0.34.1
+    ports:
+      - "9093:9093"
+    volumes:
+      - ../monitoring/alertmanager:/etc/alertmanager:ro
+      - alertmanager-data:/alertmanager
+    depends_on:
+      - mailpit
+
+  # catches alert mails: http://localhost:8025
+  mailpit:
+    profiles: ["obs"]
+    image: axllent/mailpit:v1.31.6
+    ports:
+      - "8025:8025"
 
   grafana:
     profiles: ["obs"]
@@ -266,6 +286,7 @@ volumes:
   redpanda-data:
   minio-data:
   prometheus-data:
+  alertmanager-data:
   grafana-data:
   loki-data:
   tempo-data:

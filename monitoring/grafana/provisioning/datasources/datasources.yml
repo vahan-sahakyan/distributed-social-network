@@ -35,3 +35,11 @@ datasources:
             value: service
       lokiSearch:
         datasourceUid: loki
+
+  - name: Alertmanager
+    uid: alertmanager
+    type: alertmanager
+    url: http://alertmanager:9093
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: false

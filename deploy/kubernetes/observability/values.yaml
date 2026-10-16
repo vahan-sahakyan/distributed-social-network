@@ -1,7 +1,8 @@
 # configs and the dashboard come from monitoring/ (files/ is a symlink), shared with compose
 
-# switches: stack = prometheus, grafana, loki, alloy, tempo; redpandaConsole and kibana
-# on their own. Routes and secrets name the switch they belong to in `group`
+# switches: stack = prometheus, alertmanager, mailpit, grafana, loki, alloy, tempo;
+# redpandaConsole and kibana on their own. Prometheus and alertmanager need the Prometheus
+# Operator and its CRDs on the cluster. Routes and secrets name the switch they belong to in `group`
 stack:
   enabled: true
 
@@ -10,9 +11,26 @@ prometheus:
   # image uids; Pod Security "restricted", see templates/_helpers.tpl
   security: {user: 65534, readOnly: true}
   storage: 5Gi
+  retention: 15d
   resources:
     requests: {cpu: 50m, memory: 256Mi}
     limits: {memory: 1Gi}
+
+# monitoring/alertmanager/alertmanager.yml: every alert to mailpit
+alertmanager:
+  image: prom/alertmanager:v0.34.1
+  security: {user: 65534, readOnly: true}
+  storage: 1Gi
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 128Mi}
+
+mailpit:
+  image: axllent/mailpit:v1.31.6
+  security: {user: 65534, readOnly: true}
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 128Mi}
 
 grafana:
   image: grafana/grafana:13.0.2
@@ -79,6 +97,8 @@ route:
   routes:
     grafana: {group: stack, service: grafana, port: 3000}
     prometheus: {group: stack, service: prometheus, port: 9090}
+    alertmanager: {group: stack, service: alertmanager, port: 9093}
+    mailpit: {group: stack, service: mailpit, port: 8025}
     redpanda: {group: redpandaConsole, service: redpanda-console, port: 8080}
     minio: {service: minio, port: 9001}
 
@@ -110,8 +130,17 @@ networkPolicy:
     grafana:
       - gateway: true
     prometheus:
-      - from: [grafana]
+      - from: [grafana, prometheus]
         gateway: true
+    alertmanager:
+      - from: [prometheus, grafana]
+        gateway: true
+        ports: [9093]
+    mailpit:
+      - from: [alertmanager]
+        ports: [1025]
+      - gateway: true
+        ports: [8025]
     loki:
       - from: [alloy, grafana]
     tempo:

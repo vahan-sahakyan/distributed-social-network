@@ -42,6 +42,11 @@ networkPolicy:
 # (keycloak's frontend URL + /auth/realms/dsn). Empty leaves the issuer unchecked
 publicUrl: ""
 
+# a ServiceMonitor per service (/metrics on the http port), for a Prometheus Operator
+# Prometheus; needs the operator's CRDs
+serviceMonitor:
+  enabled: false
+
 # OTLP/HTTP collector for traces, e.g. http://alloy:4318; empty turns tracing off
 otelEndpoint: ""
 
@@ -100,7 +105,8 @@ secrets:
       MINIO_SECRET_KEY: "{{ .password }}"
 
 # every service runs unless it sets enabled: false (local clusters switch off
-# search, event-writer and cache-rebuilder that way)
+# search, event-writer and cache-rebuilder that way), and is scraped unless it sets
+# metrics: false
 services:
   gateway:
     port: 8080
@@ -201,6 +207,7 @@ services:
   ui:
     image: ui
     port: 8080
+    metrics: false
     # nginx-unprivileged's user
     security:
       user: 101
