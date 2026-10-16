@@ -187,4 +187,5 @@ sum by (service) (count_over_time({service=~".+-service"} | json | level=~"WARN|
 - No infra exporters for PostgreSQL, ScyllaDB, ClickHouse, Valkey or MinIO; only Redpanda is scraped.
 - Compose scrapes a static target list, so the services of a switched-off group (`EVENTS`, `SEARCH`) are down targets and mail `ServiceDown`. The cluster scrapes only what runs.
 - Mailpit keeps mails in memory; they are gone after a restart.
+- On the cluster `ServiceDown` catches a pod that runs but doesn't answer (not-ready pods are still scraped); a service scaled to zero has no target, so nothing fires for it.
 - Alloy reads the Docker socket, so it ships every compose container's logs, including the data stores' plain-text ones.
