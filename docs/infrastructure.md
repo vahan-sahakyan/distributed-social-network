@@ -23,11 +23,11 @@ The UI is not in compose; run it with `npm run dev` (see [Development](developme
 | Container | Image | Internal Port | Host Port | Purpose |
 |-----------|-------|--------------|---------------|---------|
 | posts-db | `scylladb/scylla:2026.1.5` | 9042 | 9042 | Posts storage (wide-column) |
-| comments-db | `postgres:16.14-alpine` | 5432 | 5433 | Comments storage |
-| likes-db | `postgres:16.14-alpine` | 5432 | 5434 | Likes storage |
-| users-db | `postgres:16.14-alpine` | 5432 | 5436 | Users + follows storage |
-| notifications-db | `postgres:16.14-alpine` | 5432 | 5437 | Notifications storage |
-| keycloak-db | `postgres:16.14-alpine` | 5432 | - | Keycloak's own store |
+| comments-db | `postgres:18.6-alpine` | 5432 | 5433 | Comments storage |
+| likes-db | `postgres:18.6-alpine` | 5432 | 5434 | Likes storage |
+| users-db | `postgres:18.6-alpine` | 5432 | 5436 | Users + follows storage |
+| notifications-db | `postgres:18.6-alpine` | 5432 | 5437 | Notifications storage |
+| keycloak-db | `postgres:18.6-alpine` | 5432 | - | Keycloak's own store |
 
 All PostgreSQL instances use:
 - User: `postgres`
@@ -42,7 +42,7 @@ ScyllaDB runs with `--smp 1 --memory 512M --overprovisioned 1`.
 |-----------|-------|-------|---------|
 | keycloak | `quay.io/keycloak/keycloak:26.7.5` | 8180 | OIDC provider, served under `/auth`; admin console admin/admin |
 
-The realm (`deploy/kubernetes/infra/files/dsn-realm.json`, shared with Helm) is imported only into an empty `keycloak-db`; after editing it, recreate the volume (`docker compose -f infrastructure/docker-compose.yml rm -sf keycloak keycloak-db && docker volume rm infrastructure_keycloak-data`) or change the realm in the admin console. Tokens carry the issuer `http://localhost:8180/auth/realms/dsn` however Keycloak is reached (`KC_HOSTNAME`). In Helm, set `keycloak.uiUrl` (infra chart) to the UI's public origin, and `publicUrl` (services chart) so the gateway checks the issuer. On a bare IP that changes on restart, `keycloak.uiUrl: /` makes the redirect URIs relative (valid on any origin), `publicUrl` stays empty, and `route.certificate: false` serves a `dsn-tls` secret made outside cert-manager.
+The realm (`deploy/kubernetes/infra/files/dsn-realm.json`, shared with Helm) is imported only into an empty `keycloak-db`; after editing it, recreate the volume (`docker compose -f infrastructure/docker-compose.yml rm -sf keycloak keycloak-db && docker volume rm infrastructure_keycloak-db-pg18`) or change the realm in the admin console. Tokens carry the issuer `http://localhost:8180/auth/realms/dsn` however Keycloak is reached (`KC_HOSTNAME`). In Helm, set `keycloak.uiUrl` (infra chart) to the UI's public origin, and `publicUrl` (services chart) so the gateway checks the issuer. On a bare IP that changes on restart, `keycloak.uiUrl: /` makes the redirect URIs relative (valid on any origin), `publicUrl` stays empty, and `route.certificate: false` serves a `dsn-tls` secret made outside cert-manager.
 
 ### Event & Analytics
 
@@ -119,11 +119,13 @@ Exposed to the host: the gateway (8080), the gRPC ports 9081-9089 and 9091 (for 
 Persistent named volumes for all stateful services:
 
 ```
-posts-db-data, comments-db-data, likes-db-data, users-db-data,
-notifications-db-data, clickhouse-data, redpanda-data,
-minio-data, prometheus-data, grafana-data, loki-data, elasticsearch-data,
-keycloak-data
+posts-db-data, comments-db-pg18, likes-db-pg18, users-db-pg18,
+notifications-db-pg18, clickhouse-data, redpanda-data,
+minio-data, prometheus-data, alertmanager-data, grafana-data, loki-data,
+tempo-data, elasticsearch-data, keycloak-db-pg18
 ```
+
+The Postgres 16 volumes from before (`*-db-data`, `keycloak-data`) are no longer mounted; the 18 image refuses a directory with 16 data. Remove them with `docker volume rm` once nothing in them is needed.
 
 `make down-clean` (and `make fresh`) wipe all volumes.
 

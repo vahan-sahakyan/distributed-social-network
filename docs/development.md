@@ -298,7 +298,7 @@ Three Helm charts, deployed by Argo CD from [distributed-social-network-gitops](
 
 | Chart | Contents |
 |---|---|
-| `deploy/kubernetes/infra` | Postgres x5 (one for Keycloak), Scylla, Redpanda, ClickHouse, MinIO, Valkey, Elasticsearch, Keycloak |
+| `deploy/kubernetes/infra` | Postgres x5 as CloudNativePG clusters (one for Keycloak), Scylla, Redpanda, ClickHouse, MinIO, Valkey, Elasticsearch, Keycloak |
 | `deploy/kubernetes/services` | the 11 services, UI, the `dsn` Gateway and its HTTPRoute |
 | `deploy/kubernetes/observability` | Prometheus and Alertmanager (Prometheus Operator resources), Mailpit, Grafana, Loki, Alloy, Tempo, Redpanda Console, optional Kibana; configs from `monitoring/` |
 
@@ -307,9 +307,37 @@ Traffic enters through Gateway API: the services chart creates the `dsn` Gateway
 Workload security (all charts, `templates/_helpers.tpl`):
 - The `dsn` namespace enforces Pod Security `restricted` (labels set by the gitops `infra` app). Every pod runs as its image's non-root uid (`security.user`, numeric so `runAsNonRoot` can verify it), drops all capabilities, no privilege escalation, `RuntimeDefault` seccomp
 - Read-only root filesystem (`security.readOnly`, writable paths as emptyDirs) everywhere except Scylla, Redpanda, ClickHouse, Elasticsearch, Keycloak and Kibana, whose entrypoints write config or build output into the image on start
-- Postgres keeps its data in `pgdata/` under the volume: `initdb` must own the data dir, and a fresh volume's root isn't owned by uid 70
+- NetworkPolicies also admit the CloudNativePG operator (`networkPolicy.operator`) to the Postgres instances on port 8000
 - NetworkPolicies, ingress only: the services chart denies all in the namespace, then each pod admits its clients. A service admits the services whose env addresses it (derived), Prometheus on its HTTP port, and `networkPolicy.ingress` extras (the Gateway's Traefik pods for the gateway and UI); stores and UIs list theirs in `networkPolicy.ingress` of the infra and observability charts. A new client of a store needs an entry there
 - `replicaCount` above 1 adds a PodDisruptionBudget (`maxUnavailable: 1`) per service; requests and limits are set on every container
+
+Postgres runs on CloudNativePG (`templates/postgres.yaml` in the infra chart; operator and Barman Cloud plugin from the gitops repo):
+- One `Cluster` per database, `postgres.instances` each (1 locally; 2 or more adds streaming standbys and automatic failover). The database owner is named after the database; its credentials are in the operator's `<cluster>-app` secret
+- Services set `database: <cluster>` and get `DATABASE_URL` through a PgBouncer `Pooler` (`<cluster>-pooler`, transaction mode, TLS); Keycloak connects to `keycloak-db-rw` directly
+- WAL is archived continuously and a base backup runs nightly to the `postgres-backups` bucket in MinIO (`postgres.backup`), kept 7 days; each cluster under its own name
+- A `PodMonitor` per cluster when `serviceMonitor.enabled`
+
+Restore a backup into a new cluster:
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: comments-db-restore
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-minimal-trixie
+  storage: {size: 1Gi}
+  bootstrap:
+    recovery:
+      source: origin
+  externalClusters:
+    - name: origin
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: postgres-backups
+          serverName: comments-db
+```
 
 Images: `ghcr.io/vahan-sahakyan/distributed-social-network/<name>:<sha>` (linux/amd64 + linux/arm64, each built on a native runner), published on every push by `.github/workflows/publish.yml`. On `main` the workflow also commits the new sha to the gitops repo, which Argo CD syncs.
 

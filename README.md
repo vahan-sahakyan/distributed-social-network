@@ -190,7 +190,7 @@ On the k3d cluster (`make cluster-up`) the app is on https://localhost:8443 (htt
 
 - **Language:** Go 1.27
 - **RPC:** gRPC + Protocol Buffers between services; Fiber v2 for the gateway's HTTP API and each service's health/metrics port
-- **Databases:** ScyllaDB (posts), PostgreSQL 16 (users, comments, likes, notifications)
+- **Databases:** ScyllaDB (posts), PostgreSQL 18 (users, comments, likes, notifications; CloudNativePG on Kubernetes)
 - **Message Broker:** Redpanda (Kafka API compatible)
 - **Event Store:** ClickHouse
 - **Search:** Elasticsearch

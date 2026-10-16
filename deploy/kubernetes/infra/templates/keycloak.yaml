@@ -32,7 +32,7 @@ spec:
       initContainers:
         - name: wait-for-db
           image: {{ .Values.postgres.image }}
-          command: [sh, -c, "until pg_isready -h keycloak-db-rw; do sleep 2; done"]
+          command: [sh, -c, "until pg_isready -h keycloak-db-rw -U keycloak; do sleep 2; done"]
           securityContext:
             {{- include "dsn.securityContext" (dict "readOnly" true) | nindent 12 }}
           resources:
